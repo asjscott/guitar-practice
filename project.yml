@@ -1,0 +1,40 @@
+# XcodeGen spec — the source of truth for the Xcode project.
+# Run `xcodegen generate` after any change. Never edit GuitarPractice.xcodeproj by hand.
+name: GuitarPractice
+
+options:
+  bundleIdPrefix: com.alecscott
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"            # Swift 6 language mode = strict concurrency
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+
+packages:
+  TheoryCore:
+    path: Packages/TheoryCore
+
+targets:
+  GuitarPractice:
+    type: application
+    platform: macOS
+    sources:
+      - path: App
+        excludes:
+          - "**/.gitkeep"
+    dependencies:
+      - package: TheoryCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.alecscott.GuitarPractice
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: GuitarPractice
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.music
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_IDENTITY: "-"       # ad-hoc signing: runs locally, no Apple team needed
+        ENABLE_HARDENED_RUNTIME: YES
+    scheme: {}

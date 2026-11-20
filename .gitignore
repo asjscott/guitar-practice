@@ -1,0 +1,30 @@
+# macOS
+.DS_Store
+
+# Xcode — the project is generated from project.yml by XcodeGen
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+DerivedData/
+build/
+
+# SwiftPM
+.build/
+.swiftpm/
+
+# Sounds: never committed (size limits + licences). Fetched by scripts/fetch-sounds.
+Sounds/
+*.sf2
+*.sfz
+*.wav
+*.aif
+*.aiff
+*.mp3
+*.flac
+*.ogg
+*.caf
+*.m4a
+
+# Claude Code local settings
+.claude/settings.local.json
+Guitar Practice App*.md
