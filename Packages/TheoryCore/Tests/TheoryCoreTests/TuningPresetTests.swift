@@ -29,4 +29,18 @@ struct TuningPresetTests {
         #expect(TuningPreset.dadgad.tuning.preset == .dadgad)
         #expect(Tuning([38, 45, 50, 55, 59, 63].map(Pitch.init)).preset == nil)
     }
+
+    @Test func onlyFlatNamedPresetsSpellWithFlats() {
+        #expect(TuningPreset.allCases.filter(\.spellsWithFlats) == [.eFlatStandard])
+    }
+
+    @Test func eFlatStandardOpenStringsAreSpelledWithFlats() {
+        #expect(TuningPreset.eFlatStandard.tuning.openPitchNames == ["E♭2", "A♭2", "D♭3", "G♭3", "B♭3", "E♭4"])
+    }
+
+    @Test func sharpPresetsAndCustomTuningsSpellWithSharps() {
+        #expect(TuningPreset.openD.tuning.openPitchNames == ["D2", "A2", "D3", "F♯3", "A3", "D4"])
+        #expect(Tuning([38, 45, 50, 55, 59, 63].map(Pitch.init)).openPitchNames
+            == ["D2", "A2", "D3", "G3", "B3", "D♯4"])
+    }
 }

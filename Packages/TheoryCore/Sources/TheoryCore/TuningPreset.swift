@@ -21,6 +21,15 @@ public enum TuningPreset: String, CaseIterable, Hashable, Sendable, Codable {
         }
     }
 
+    /// Whether the preset's open strings are spelled with flats (E♭ standard: E♭ A♭ D♭ …),
+    /// matching its name. Other presets, and custom tunings, use sharps.
+    public var spellsWithFlats: Bool {
+        switch self {
+        case .eFlatStandard: true
+        case .standard, .dropD, .dadgad, .openG, .openD: false
+        }
+    }
+
     /// The preset's open pitches, string 6 first.
     public var tuning: Tuning {
         let midi: [Int] = switch self {
@@ -39,5 +48,16 @@ extension Tuning {
     /// The preset with exactly these open pitches, or nil for a custom tuning.
     public var preset: TuningPreset? {
         TuningPreset.allCases.first { $0.tuning == self }
+    }
+
+    /// The open strings' names with octave, string 6 first, with no key as context (for
+    /// Settings): flats when the tuning is a flat-named preset ("E♭2"), else sharps ("D♯2").
+    public var openPitchNames: [String] {
+        let flats = preset?.spellsWithFlats ?? false
+        return openPitches.map { pitch in
+            let name = flats ? NoteName(flatSpelling: pitch.pitchClass) : NoteName(sharpSpelling: pitch.pitchClass)
+            // Flat and sharp spellings never cross B–C, so the pitch's octave number holds.
+            return "\(name)\(pitch.octave)"
+        }
     }
 }

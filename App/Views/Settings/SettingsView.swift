@@ -55,7 +55,7 @@ struct SettingsView: View {
             } header: {
                 Text("Positions")
             } footer: {
-                Text("3NPS patterns exist for major and natural minor only; pentatonic and blues always use the five CAGED shapes.")
+                Text(positionsFooter)
                     .foregroundStyle(.secondary)
             }
         }
@@ -64,11 +64,21 @@ struct SettingsView: View {
         .fixedSize(horizontal: false, vertical: true)
     }
 
+    /// Which scales have 3NPS patterns, from TheoryCore: for example "3NPS patterns exist for
+    /// major and natural minor only; major pentatonic, minor pentatonic and blues always use
+    /// the five CAGED shapes."
+    private var positionsFooter: String {
+        let kinds = Scale.Kind.allCases
+        let sevenNote = kinds.filter(\.isSevenNote).map(\.name).formatted(.list(type: .and))
+        let others = kinds.filter { !$0.isSevenNote }.map(\.name).formatted(.list(type: .and))
+        return "3NPS patterns exist for \(sevenNote) only; \(others) always use the five CAGED shapes."
+    }
+
     private func stringRow(_ string: Int) -> some View {
-        let pitch = tuning.openPitch(ofString: string)
-        return LabeledContent {
+        LabeledContent {
             HStack(spacing: 10) {
-                Text(pitch.description)
+                // Spelled by TheoryCore: flats for a flat-named preset (E♭ standard), else sharps.
+                Text(tuning.openPitchNames[string])
                     .font(.body.monospacedDigit())
                     .frame(minWidth: 36, alignment: .trailing)
                 Stepper("String \(tuning.stringNumber(ofString: string)) open pitch",
