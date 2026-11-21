@@ -32,6 +32,7 @@ struct ExplorerView: View {
                 .background(.bar)
         }
         .navigationTitle("Fretboard")
+        .navigationSubtitle(model.windowSubtitle)
         .toolbar { toolbar }
     }
 

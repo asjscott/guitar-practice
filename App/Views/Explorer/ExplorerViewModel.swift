@@ -6,9 +6,9 @@ import TheoryCore
 /// Holds the picker state (not persisted) and turns it, plus the instrument setup, into what
 /// the window shows by asking TheoryCore. It does no note or fret maths of its own.
 ///
-/// The view reads `content` (worked out once per mode: header, chips, legend and diagram),
-/// and the picker state. A new mode adds a case to `Display` and returns its
-/// own `Content`; the view's drawing doesn't change.
+/// The view reads `content` (worked out once per render: header, chips, legend and diagram),
+/// `windowSubtitle` and the picker state. A new mode adds a case to `Display` and its own
+/// `Mode`; the view's drawing doesn't change.
 @MainActor @Observable
 final class ExplorerViewModel {
     /// What the neck shows: a scale, or the key's triad.
@@ -91,6 +91,12 @@ final class ExplorerViewModel {
         return Content(title: mode.title, detail: mode.detail, chips: mode.chips,
                        legend: [LegendItem(role: .root, label: "Root"), LegendItem(role: .tone, label: mode.toneLabel)],
                        diagram: diagram(markers: mode.markers))
+    }
+
+    /// The window subtitle, as in the A2 prototype: "Drop D tuning · capo 2" (no capo part
+    /// without a capo; "Custom tuning" when the tuning is not a preset).
+    var windowSubtitle: String {
+        "\(tuning.preset?.name ?? "Custom") tuning" + (capo > 0 ? " · capo \(capo)" : "")
     }
 
     /// One mode's share of `content`: the legend differs only in what a non-root dot is.
