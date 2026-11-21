@@ -18,18 +18,20 @@ extension Fretboard {
     /// The most frets a triad voicing may cover, counting both ends (5–8 is 4 frets).
     public static let maxTriadVoicingSpan = 4
 
-    /// The string sets this tuning has: every run of three adjacent strings, lowest first.
+    /// The string sets this tuning has strings for, lowest first: all four on six or more
+    /// strings (sets are counted from string 6 up), fewer on a shorter neck.
     public var stringSets: [StringSet] {
-        guard strings.count >= 3 else { return [] }
-        return (0...(strings.count - 3)).map(StringSet.init(lowestString:))
+        StringSet.allCases.filter { strings.contains($0.strings.upperBound) }
     }
 
     /// Every voicing of a triad in an inversion on a string set, ordered up the neck.
     ///
     /// Voicings are in close position: the inversion's tones (for example 3 5 R) go up the set's
     /// strings in that order, each higher in pitch than the one below, all within an octave of
-    /// the lowest note. Every location is playable (capo–22) and the voicing covers at most
-    /// `maxTriadVoicingSpan` frets.
+    /// the lowest note. So every voicing is the inversion's three tones stacked as tightly as
+    /// they go; spread (open) voicings such as R 5 3, or a top note more than an octave above
+    /// the bass, are never produced. Every location is playable (capo–22) and the voicing covers
+    /// at most `maxTriadVoicingSpan` frets.
     public func voicings(of triad: Triad, inversion: Triad.Inversion, on stringSet: StringSet) -> [TriadVoicing] {
         precondition(stringSets.contains(stringSet), "String set \(stringSet) is not on this tuning")
         let tones = triad.tones(in: inversion).map(\.pitchClass)

@@ -84,6 +84,17 @@ struct StandardTriadVoicingTests {
     @Test func theFretboardOffersEveryStringSetOfItsTuning() {
         #expect(Fretboard(tuning: .standard).stringSets == StringSet.allCases)
     }
+
+    @Test func fewerStringsOfferOnlyTheSetsThatFit() {
+        let fourString = Fretboard(tuning: Tuning([28, 33, 38, 43].map(Pitch.init)))
+        #expect(fourString.stringSets == [.eAD, .aDG])
+        #expect(Fretboard(tuning: Tuning([40, 45].map(Pitch.init))).stringSets.isEmpty)
+    }
+
+    @Test func extraStringsOfferNoUnnamedSets() {
+        let sevenString = Fretboard(tuning: Tuning([35, 40, 45, 50, 55, 59, 64].map(Pitch.init)))
+        #expect(sevenString.stringSets == StringSet.allCases)
+    }
 }
 
 @Suite("Triad voicing invariants in any tuning")

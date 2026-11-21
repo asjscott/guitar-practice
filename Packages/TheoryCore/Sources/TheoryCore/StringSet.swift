@@ -2,34 +2,26 @@ import Foundation
 
 /// Three adjacent strings a triad is played on (see "String set" in GLOSSARY.md).
 ///
-/// Named by the open notes of those strings in standard tuning, whatever the actual tuning.
-public struct StringSet: Hashable, Sendable, Codable, CaseIterable {
+/// The four sets of a six-string neck, named by the open notes of those strings in standard
+/// tuning, whatever the actual tuning. This is the one list of string sets: a fretboard offers
+/// the ones its tuning has strings for (`Fretboard.stringSets`).
+public enum StringSet: String, Hashable, Sendable, Codable, CaseIterable {
+    case eAD, aDG, dGB, gBE
+
     /// The internal index of the set's lowest string (0 = physical string 6).
-    public let lowestString: Int
-
-    public init(lowestString: Int) {
-        precondition(lowestString >= 0, "String indices start at 0")
-        self.lowestString = lowestString
-    }
-
-    public static let eAD = StringSet(lowestString: 0)
-    public static let aDG = StringSet(lowestString: 1)
-    public static let dGB = StringSet(lowestString: 2)
-    public static let gBE = StringSet(lowestString: 3)
-
-    /// The four string sets of a six-string guitar, lowest first.
-    public static let allCases: [StringSet] = [.eAD, .aDG, .dGB, .gBE]
+    public var lowestString: Int { Self.allCases.firstIndex(of: self)! }
 
     /// The set's string indices, lowest string first.
     public var strings: ClosedRange<Int> { lowestString...(lowestString + 2) }
 
     /// For example "E-A-D": the strings' open notes in standard tuning.
     public var name: String {
-        let standard = ["E", "A", "D", "G", "B", "E"]
-        guard strings.upperBound < standard.count else {
-            return strings.map { "\($0)" }.joined(separator: "-")
+        switch self {
+        case .eAD: "E-A-D"
+        case .aDG: "A-D-G"
+        case .dGB: "D-G-B"
+        case .gBE: "G-B-E"
         }
-        return strings.map { standard[$0] }.joined(separator: "-")
     }
 }
 
