@@ -30,6 +30,18 @@ public struct Scale: Hashable, Sendable, Codable {
         /// The key mode the scale is built in: minor for minor-side scales, else major.
         public var mode: Key.Mode { isMinor ? .minor : .major }
 
+        /// The matching scale kind in a mode: major ↔ natural minor, major ↔ minor pentatonic,
+        /// blues → major pentatonic. A kind already in that mode is returned unchanged.
+        public func inMode(_ mode: Key.Mode) -> Kind {
+            guard mode != self.mode else { return self }
+            return switch self {
+            case .major: .naturalMinor
+            case .naturalMinor: .major
+            case .majorPentatonic: .minorPentatonic
+            case .minorPentatonic, .blues: .majorPentatonic
+            }
+        }
+
         /// Seven-note scales (major, natural minor): the only ones with 3NPS patterns.
         public var isSevenNote: Bool { degrees.count == 7 }
 

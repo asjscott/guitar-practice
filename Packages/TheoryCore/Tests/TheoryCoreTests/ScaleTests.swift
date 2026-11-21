@@ -101,6 +101,20 @@ struct ScaleTests {
         #expect(Scale.Kind.allCases.map(\.mode) == [.major, .minor, .major, .minor, .minor])
     }
 
+    @Test func scaleKindInTheOtherModeIsItsCounterpart() {
+        #expect(Scale.Kind.major.inMode(.minor) == .naturalMinor)
+        #expect(Scale.Kind.naturalMinor.inMode(.major) == .major)
+        #expect(Scale.Kind.majorPentatonic.inMode(.minor) == .minorPentatonic)
+        #expect(Scale.Kind.minorPentatonic.inMode(.major) == .majorPentatonic)
+        #expect(Scale.Kind.blues.inMode(.major) == .majorPentatonic)
+    }
+
+    @Test func scaleKindInItsOwnModeIsUnchanged() {
+        for kind in Scale.Kind.allCases {
+            #expect(kind.inMode(kind.mode) == kind)
+        }
+    }
+
     @Test func sevenNoteScales() {
         #expect(Scale.Kind.allCases.filter(\.isSevenNote) == [.major, .naturalMinor])
     }
