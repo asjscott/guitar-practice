@@ -81,3 +81,41 @@ struct StandardTriadVoicingTests {
         #expect(Fretboard(tuning: .standard).stringSets == StringSet.allCases)
     }
 }
+
+@Suite("Triad voicing invariants in any tuning")
+struct TriadVoicingInvariantTests {
+    static let fretboards: [Fretboard] = [
+        Fretboard(tuning: TuningPreset.dropD.tuning),
+        Fretboard(tuning: TuningPreset.dadgad.tuning),
+        Fretboard(tuning: TuningPreset.openG.tuning),
+        Fretboard(tuning: .standard, capo: 3),
+        Fretboard(tuning: TuningPreset.dadgad.tuning, capo: 5),
+        Fretboard(tuning: .standard, capo: 12),
+    ]
+
+    static let triads: [Triad] = Key.appMajorKeys.map(\.triad) + Key.appMinorKeys.map(\.triad)
+
+    @Test(arguments: fretboards)
+    func everyVoicingIsPlayableAndFitsItsStringSet(fretboard: Fretboard) {
+        var total = 0
+        for triad in Self.triads {
+            for inversion in Triad.Inversion.allCases {
+                for set in fretboard.stringSets {
+                    let voicings = fretboard.voicings(of: triad, inversion: inversion, on: set)
+                    total += voicings.count
+                    for voicing in voicings {
+                        // One note per string of the set, lowest string first.
+                        #expect(voicing.locations.map(\.string) == Array(set.strings))
+                        #expect(voicing.frets.count <= 4)
+                        #expect(voicing.locations.allSatisfy(fretboard.isPlayable))
+                        // The lowest note is the inversion's bass tone; the voicing holds the whole chord.
+                        let pitches = voicing.locations.map(fretboard.pitch(at:))
+                        #expect(pitches.min()!.pitchClass == triad.tones(in: inversion)[0].pitchClass)
+                        #expect(Set(pitches.map(\.pitchClass)) == Set(triad.pitchClasses))
+                    }
+                }
+            }
+        }
+        #expect(total > 0)
+    }
+}
