@@ -25,6 +25,10 @@ struct FretboardDiagram: Equatable {
     /// The last fret drawn; the neck always runs from the nut to this fret.
     var lastFret: Int = Fretboard.frets.upperBound
 
+    /// The capo fret (0 = none). Drawn as a bar with the frets below it dimmed; fret numbers
+    /// still count from the nut.
+    var capo: Int = 0
+
     var markers: [Marker] = []
 
     var stringCount: Int { stringNames.count }

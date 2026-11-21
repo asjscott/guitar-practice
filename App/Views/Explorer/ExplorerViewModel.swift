@@ -7,7 +7,6 @@ import TheoryCore
 /// the window shows by asking TheoryCore. It does no note or fret maths of its own.
 ///
 /// Extension points for later tickets:
-/// - `tuning` becomes the persisted tuning (and a capo joins it) from Settings (#4).
 /// - `key` becomes TheoryCore's `Key`; scale, position, triad and label-mode state join it (#5–#9).
 /// - `diagram`, `title`, `detail`, `chips` and `legend` are the only things the view reads;
 ///   new modes change what they return, not how the view draws.
@@ -31,9 +30,11 @@ final class ExplorerViewModel {
 
     // MARK: Instrument
 
+    /// Set from the persisted Settings (see `ContentView`).
     var tuning: Tuning = .standard
+    var capo: Int = 0
 
-    var fretboard: Fretboard { Fretboard(tuning: tuning) }
+    var fretboard: Fretboard { Fretboard(tuning: tuning, capo: capo) }
 
     // MARK: What the window shows
 
@@ -43,6 +44,7 @@ final class ExplorerViewModel {
         return FretboardDiagram(
             stringNames: tuning.openPitches.map(\.pitchClass.sharpName),
             lastFret: Fretboard.frets.upperBound,
+            capo: fretboard.capo,
             markers: fretboard.locations(of: key.tonic).map { location in
                 .init(location: location, label: fretboard.pitch(at: location).pitchClass.sharpName, role: .root)
             })

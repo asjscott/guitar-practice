@@ -28,6 +28,7 @@ struct FretboardView: View {
         drawFretWires(in: &context, geometry)
         drawNut(in: &context, geometry)
         drawStrings(in: &context, geometry)
+        drawCapo(in: &context, geometry)
         drawStringNames(in: &context, geometry)
         drawFretRuler(in: &context, geometry)
         drawMarkers(in: &context, geometry)
@@ -95,6 +96,19 @@ struct FretboardView: View {
                            with: .color(isWound ? FretboardPalette.woundString : FretboardPalette.plainString),
                            lineWidth: width)
         }
+    }
+
+    /// Dims the nut and the frets below the capo, then draws the bar just behind the capo fret.
+    private func drawCapo(in context: inout GraphicsContext, _ g: FretboardGeometry) {
+        let capo = diagram.capo
+        guard capo > 0, capo <= diagram.lastFret else { return }
+        let x = g.wireX(capo - 1)
+        let dimmed = CGRect(x: g.nutX - 3, y: g.neck.minY - 1, width: x - g.nutX + 3, height: g.neck.height + 2)
+        context.fill(Path(dimmed), with: .color(.black.opacity(0.55)))
+        let bar = CGRect(x: x - 6, y: g.neck.minY - 6, width: 10, height: g.neck.height + 12)
+        context.fill(Path(roundedRect: bar, cornerRadius: 4),
+                     with: .linearGradient(Gradient(colors: [FretboardPalette.capoLight, FretboardPalette.capoDark]),
+                                           startPoint: CGPoint(x: bar.minX, y: 0), endPoint: CGPoint(x: bar.maxX, y: 0)))
     }
 
     private func drawStringNames(in context: inout GraphicsContext, _ g: FretboardGeometry) {
