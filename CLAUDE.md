@@ -7,7 +7,9 @@ Read the relevant spec section before starting any phase.
 
 ## Current phase
 
-**Phase 0 · Foundations.** Done when: the fretboard view draws correctly for any tuning and all TheoryCore tests pass.
+**Phase 1 · Hear the guitar.** Scope: interface input (device and channel picker, input meter), pitch detection with stability and cents thresholds, tuner screen, Note → play it drill (timed). Done when: played notes are detected reliably and quickly.
+
+Phase 0 · Foundations is complete (spec #1); its scope and decisions below stay as reference.
 
 Phase order: 0 Foundations → 1 Hear the guitar → 2 Session MVP → 3 Scales and triads → 4 Backing and progressions → 5 Lick → solo → 6 Adaptive and polish. Don't start work from a later phase unless asked.
 
