@@ -10,13 +10,14 @@ struct ExplorerView: View {
     @Bindable var model: ExplorerViewModel
 
     var body: some View {
+        let content = model.content
         VStack(spacing: 0) {
-            header
+            header(content)
                 .padding(.horizontal, 24)
                 .padding(.top, 20)
                 .padding(.bottom, 14)
 
-            FretboardView(diagram: model.displayedDiagram)
+            FretboardView(diagram: content.diagram)
                 .frame(height: 250)
                 .padding(16)
                 .background(RoundedRectangle(cornerRadius: 12).fill(Color(nsColor: .controlBackgroundColor)))
@@ -25,7 +26,7 @@ struct ExplorerView: View {
 
             Spacer(minLength: 16)
             Divider()
-            statusBar
+            statusBar(content)
                 .padding(.horizontal, 24)
                 .frame(height: 32)
                 .background(.bar)
@@ -36,15 +37,15 @@ struct ExplorerView: View {
 
     // MARK: Header
 
-    private var header: some View {
+    private func header(_ content: ExplorerViewModel.Content) -> some View {
         HStack(alignment: .lastTextBaseline) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(model.title).font(.system(size: 26, weight: .semibold))
-                Text(model.detail).font(.callout).foregroundStyle(.secondary)
+                Text(content.title).font(.system(size: 26, weight: .semibold))
+                Text(content.detail).font(.callout).foregroundStyle(.secondary)
             }
             Spacer()
             HStack(spacing: 6) {
-                ForEach(Array(model.chips.enumerated()), id: \.offset) { _, chip in
+                ForEach(Array(content.chips.enumerated()), id: \.offset) { _, chip in
                     Text(chip.name)
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
                         .frame(minWidth: 26, minHeight: 22)
@@ -96,9 +97,9 @@ struct ExplorerView: View {
 
     // MARK: Status bar
 
-    private var statusBar: some View {
+    private func statusBar(_ content: ExplorerViewModel.Content) -> some View {
         HStack(spacing: 16) {
-            ForEach(model.legend, id: \.self) { item in
+            ForEach(content.legend, id: \.self) { item in
                 HStack(spacing: 6) {
                     Circle().fill(FretboardPalette.color(for: item.role)).frame(width: 9, height: 9)
                     Text(item.label).foregroundStyle(.secondary)

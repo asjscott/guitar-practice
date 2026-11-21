@@ -1,15 +1,7 @@
 import TheoryCore
 
-/// Display options layered over the explorer's diagram: label mode and the debug heatmap.
+/// Display options applied to the explorer's diagram: label mode and the debug heatmap.
 extension ExplorerViewModel {
-    /// What the fretboard draws: `diagram` (the markers) plus the display options.
-    var displayedDiagram: FretboardDiagram {
-        var diagram = diagram
-        diagram.labelMode = labelMode
-        diagram.heat = heat
-        return diagram
-    }
-
     /// The heatmap values, or nil when the overlay is off. Only playable locations get a value,
     /// so the tint follows the fretboard (a capo narrows it).
     var heat: [FretboardLocation: Double]? {

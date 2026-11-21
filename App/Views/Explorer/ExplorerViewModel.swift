@@ -6,10 +6,9 @@ import TheoryCore
 /// Holds the picker state (not persisted) and turns it, plus the instrument setup, into what
 /// the window shows by asking TheoryCore. It does no note or fret maths of its own.
 ///
-/// Extension points for later tickets:
-/// - Position (#7/#8) and triad (#9) state join `key`, `display` and `scaleKind`.
-/// - `diagram`, `title`, `detail`, `chips` and `legend` are the only things the view reads;
-///   new modes change what they return, not how the view draws.
+/// The view reads `content` (worked out once per mode: header, chips, legend and diagram),
+/// and the picker state. A new mode adds a case to `Display` and returns its
+/// own `Content`; the view's drawing doesn't change.
 @MainActor @Observable
 final class ExplorerViewModel {
     /// What the neck shows: a scale, or the key's triad.
@@ -29,6 +28,16 @@ final class ExplorerViewModel {
     struct LegendItem: Hashable {
         var role: FretboardDiagram.Role
         var label: String
+    }
+
+    /// Everything the window shows for the current mode.
+    struct Content {
+        var title: String
+        var detail: String
+        var chips: [Chip]
+        var legend: [LegendItem]
+        /// The markers plus the display options (labels, heat).
+        var diagram: FretboardDiagram
     }
 
     // MARK: Picker state (opens on C major every time)
@@ -74,51 +83,49 @@ final class ExplorerViewModel {
 
     // MARK: What the window shows
 
-    var diagram: FretboardDiagram {
+    var content: Content {
+        let mode = switch display {
+        case .scale: scaleMode
+        case .triad: triadMode
+        }
+        return Content(title: mode.title, detail: mode.detail, chips: mode.chips,
+                       legend: [LegendItem(role: .root, label: "Root"), LegendItem(role: .tone, label: mode.toneLabel)],
+                       diagram: diagram(markers: mode.markers))
+    }
+
+    /// One mode's share of `content`: the legend differs only in what a non-root dot is.
+    struct Mode {
+        var title: String
+        var detail: String
+        var chips: [Chip]
+        var toneLabel: String
+        var markers: [FretboardDiagram.Marker]
+    }
+
+    private var scaleMode: Mode {
         let fretboard = fretboard
         let scale = scale
-        let markers: [FretboardDiagram.Marker] = switch display {
-        case .scale:
-            scaleLocations.map { location in
+        return Mode(
+            title: scale.name,
+            detail: scaleDetail,
+            chips: scale.notes.map { Chip(name: $0.description, isRoot: $0 == scale.tonic) },
+            toneLabel: "Scale tone",
+            markers: scaleLocations.map { location in
                 let name = fretboard.name(at: location, in: scale)
-                return .init(location: location, label: name.description,
-                             role: name == scale.tonic ? .root : .tone)
-            }
-        case .triad:
-            triadMarkers
-        }
+                return .init(location: location, label: name.description, role: name == scale.tonic ? .root : .tone)
+            })
+    }
+
+    /// The neck with the given markers, string names spelled in the scale's key, and the
+    /// display options applied.
+    private func diagram(markers: [FretboardDiagram.Marker]) -> FretboardDiagram {
+        let fretboard = fretboard
         return FretboardDiagram(
             stringNames: fretboard.stringNames(in: scale.key).map(\.description),
             lastFret: Fretboard.frets.upperBound,
             capo: fretboard.capo,
-            markers: markers)
-    }
-
-    var title: String {
-        switch display {
-        case .scale: scale.name
-        case .triad: triadTitle
-        }
-    }
-
-    var detail: String {
-        switch display {
-        case .scale: scaleDetail
-        case .triad: triadDetail
-        }
-    }
-
-    var chips: [Chip] {
-        switch display {
-        case .scale: scale.notes.map { Chip(name: $0.description, isRoot: $0 == scale.tonic) }
-        case .triad: triadChips
-        }
-    }
-
-    var legend: [LegendItem] {
-        switch display {
-        case .scale: [LegendItem(role: .root, label: "Root"), LegendItem(role: .tone, label: "Scale tone")]
-        case .triad: [LegendItem(role: .root, label: "Root"), LegendItem(role: .tone, label: "Chord tone")]
-        }
+            markers: markers,
+            labelMode: labelMode,
+            heat: heat)
     }
 }
