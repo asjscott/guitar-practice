@@ -15,7 +15,7 @@ extension Fretboard {
         guard scale.kind.isSevenNote else { return [] }
         let notes = scale.pitchClasses
         let positions = (1...notes.count).flatMap { number in
-            placements(ofShape: threeNotesPerStringWalk(notes, from: number - 1))
+            placements(of: threeNotesPerStringWalk(notes, from: number - 1))
                 .enumerated().map { octave, locations in
                     Position(id: .init(system: .threeNotesPerString, number: number, octave: octave),
                              scale: scale,

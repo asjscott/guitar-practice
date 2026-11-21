@@ -1,18 +1,21 @@
 import Foundation
 
-/// Placement shared by every position system (ADR-0001): a shape is generated in relative
-/// frets (any octave, possibly below the nut), then placed at the lowest fret where it fits
-/// wholly between the capo and the last fret, plus its octave-up copy when that fits too.
+/// Placement shared by every position system (ADR-0001): a position's locations are generated
+/// in relative frets (any octave, possibly below the nut), then placed at the lowest fret where
+/// they fit wholly between the capo and the last fret, plus an octave-up copy when that fits too.
 extension Fretboard {
-    /// The placements of a shape given in relative frets: the lowest that fits, then the
-    /// octave-up copy if it fits. Empty when the shape fits nowhere (a high capo).
-    func placements(ofShape shape: [FretboardLocation]) -> [[FretboardLocation]] {
-        guard let low = shape.map(\.fret).min(), let high = shape.map(\.fret).max() else { return [] }
+    /// The placements of a position given in relative frets: the lowest that fits, then the
+    /// octave-up copy if it fits. Empty when it fits nowhere (a high capo).
+    func placements(of relativeLocations: [FretboardLocation]) -> [[FretboardLocation]] {
+        guard let low = relativeLocations.map(\.fret).min(), let high = relativeLocations.map(\.fret).max()
+        else { return [] }
         // The smallest octave shift that lifts the lowest fret to the capo or above.
         let lowest = Int((Double(playableFrets.lowerBound - low) / 12).rounded(.up))
         return [lowest, lowest + 1]
             .filter { high + 12 * $0 <= playableFrets.upperBound }
-            .map { shift in shape.map { FretboardLocation(string: $0.string, fret: $0.fret + 12 * shift) } }
+            .map { shift in
+                relativeLocations.map { FretboardLocation(string: $0.string, fret: $0.fret + 12 * shift) }
+            }
     }
 
     /// The relative fret of a pitch class on a string nearest to `anchor` (ties go lower);

@@ -25,7 +25,7 @@ extension Fretboard {
                         ? FretboardLocation(string: string, fret: fret) : nil
                 }
             }
-            return placements(ofShape: core + extras).enumerated().map { octave, locations in
+            return placements(of: core + extras).enumerated().map { octave, locations in
                 Position(id: .init(system: .caged, number: shape.number, octave: octave),
                          scale: scale,
                          name: usesNames ? "\(shape.letter) shape" : "Position \(shape.number)",

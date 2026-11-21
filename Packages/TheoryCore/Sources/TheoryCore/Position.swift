@@ -14,8 +14,8 @@ public struct Position: Hashable, Sendable, Identifiable {
         case threeNotesPerString
     }
 
-    /// Which position this is, stable across keys, tunings and capo: the system, the shape or
-    /// pattern number, and which placement (0 = lowest, 1 = an octave higher).
+    /// Which position this is, stable across keys, tunings and capo: the system, the CAGED shape or
+    /// 3NPS pattern number, and which placement (0 = lowest, 1 = an octave higher).
     public struct ID: Hashable, Sendable, Codable {
         public let system: System
         /// CAGED: 1–5 (E D C A G); 3NPS: 1–7.
