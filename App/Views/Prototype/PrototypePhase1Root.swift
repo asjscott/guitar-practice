@@ -23,12 +23,12 @@ struct PrototypePhase1Root: View {
 
     @SceneStorage("proto.screen") private var screen: Screen = .tuner
     @AppStorage("proto.tunerVariant") private var tunerVariant = "T1"
-    @AppStorage("proto.drillVariant") private var drillVariant = "D1"
+    @AppStorage("proto.drillVariant") private var drillVariant = "D4"
     @State private var listen = ProtoListen()
     @State private var explorer = ExplorerViewModel()
 
     static let tunerVariants: [(key: String, name: String)] = [("T1", "Needle"), ("T2", "Six strings"), ("T3", "On the neck")]
-    static let drillVariants: [(key: String, name: String)] = [("D1", "Prompt over neck"), ("D2", "Flashcard"), ("D3", "Neck + inspector")]
+    static let drillVariants: [(key: String, name: String)] = [("D1", "Prompt over neck"), ("D2", "Flashcard"), ("D3", "Neck + inspector"), ("D4", "D1 + flashcard")]
 
     var body: some View {
         NavigationSplitView {
@@ -79,6 +79,7 @@ struct PrototypePhase1Root: View {
                 switch drillVariant {
                 case "D2": DrillD2(listen: listen)
                 case "D3": DrillD3(listen: listen)
+                case "D4": DrillD4(listen: listen)
                 default: DrillD1(listen: listen)
                 }
             }

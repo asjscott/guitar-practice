@@ -21,14 +21,17 @@ enum ProtoSnapshots {
         save("T2", TunerT2(listen: listen))
         save("T3", TunerT3(listen: listen))
         save("D2-setup", DrillD2(listen: listen))
+        save("D4-idle", DrillD4(listen: listen))
         listen.start()
         listen.playWrong()
         save("D1-wrong", DrillD1(listen: listen))
         save("D2-wrong", DrillD2(listen: listen))
         save("D3-wrong", DrillD3(listen: listen))
+        save("D4-wrong", DrillD4(listen: listen))
         listen.playCorrect()
         save("D1-correct", DrillD1(listen: listen))
         save("D3-correct", DrillD3(listen: listen))
+        save("D4-correct", DrillD4(listen: listen))
         exit(0)
     }
 }

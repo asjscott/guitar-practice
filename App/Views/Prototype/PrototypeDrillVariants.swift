@@ -332,3 +332,95 @@ extension String {
     var capitalizedFirstProto: String { prefix(1).uppercased() + dropFirst() }
 }
 #endif
+
+#if DEBUG
+// MARK: - D4: D1 + D2 — D1's toolbar, neck card, status bar and summary sheet; under the neck,
+// D2's flashcard prompt, countdown ring and strip of recent attempts (user's pick, Nov 21).
+
+struct DrillD4: View {
+    @Bindable var listen: ProtoListen
+    @State private var showSummary = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            DrillNeck(listen: listen)
+                .frame(height: 210)
+                .padding(16)
+                .background(RoundedRectangle(cornerRadius: 12).fill(Color(nsColor: .controlBackgroundColor)))
+                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color(nsColor: .separatorColor)))
+                .padding(.horizontal, 24).padding(.top, 20)
+
+            Spacer(minLength: 12)
+            HStack(spacing: 24) {
+                flashcard
+                TimeoutRing(listen: listen).frame(width: 64, height: 64)
+            }
+            Feedback(listen: listen, big: true).padding(.top, 10)
+            attemptStrip.padding(.top, 10)
+            Spacer(minLength: 12)
+
+            Divider()
+            HStack(spacing: 18) {
+                Text("\(listen.attempts.count) prompts")
+                Text("first-try \(listen.accuracy.map { "\(Int($0 * 100))%" } ?? "–")")
+                Text("median \(listen.medianTime.map { String(format: "%.2f s", $0) } ?? "–")")
+                Spacer()
+                ProtoInputLabel(level: listen.level)
+            }
+            .font(.caption).foregroundStyle(.secondary)
+            .padding(.horizontal, 24).frame(height: 32).background(.bar)
+        }
+        .toolbar {
+            ToolbarItemGroup(placement: .principal) { DrillOptions(listen: listen).disabled(listen.running) }
+            ToolbarItemGroup(placement: .primaryAction) { StartStop(listen: listen) }
+        }
+        .onChange(of: listen.running) { if !listen.running, !listen.attempts.isEmpty { showSummary = true } }
+        .sheet(isPresented: $showSummary) {
+            VStack(alignment: .trailing) {
+                RunSummary(listen: listen)
+                Button("Done") { showSummary = false }.keyboardShortcut(.defaultAction)
+            }
+            .padding(24).frame(width: 520)
+        }
+    }
+
+    private var flashcard: some View {
+        VStack(spacing: 4) {
+            if listen.running {
+                Text(listen.prompt.pitchClass.sharpName).font(.system(size: 76, weight: .bold, design: .rounded))
+                Text("on \(listen.stringLabel(listen.prompt.string))").font(.title2).foregroundStyle(.secondary)
+            } else {
+                Text("Note → play it").font(.title.weight(.semibold))
+                Text("Press Start (↩)").font(.title3).foregroundStyle(.secondary)
+            }
+        }
+        .frame(width: 320, height: 150)
+        .background(RoundedRectangle(cornerRadius: 18).fill(tint))
+        .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Color(nsColor: .separatorColor)))
+    }
+
+    private var attemptStrip: some View {
+        HStack(spacing: 6) {
+            ForEach(listen.attempts.suffix(14)) { a in
+                VStack(spacing: 0) {
+                    Text(a.prompt.pitchClass.sharpName).font(.caption.weight(.semibold))
+                    Text(a.time.map { String(format: "%.1f", $0) } ?? "—").font(.caption2.monospacedDigit())
+                }
+                .frame(width: 38, height: 34)
+                .background(RoundedRectangle(cornerRadius: 6).fill((a.firstRight ? Color.green : a.time == nil ? .orange : .red).opacity(0.2)))
+                .help(a.wrongNotes.isEmpty ? "" : "Played \(a.wrongNotes.joined(separator: ", ")) first")
+            }
+        }
+        .frame(height: 34)
+    }
+
+    private var tint: Color {
+        switch listen.phase {
+        case .correct: .green.opacity(0.15)
+        case .wrong: .red.opacity(0.12)
+        case .timedOut: .orange.opacity(0.15)
+        default: Color(nsColor: .controlBackgroundColor)
+        }
+    }
+}
+#endif
