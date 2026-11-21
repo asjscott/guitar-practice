@@ -12,6 +12,15 @@ struct FretboardDiagram: Equatable {
         case tone
     }
 
+    /// Note labels: names, faded names (about 30% opacity) or dots only.
+    enum LabelMode: String, CaseIterable, Hashable, Identifiable {
+        case shown
+        case faded
+        case hidden
+
+        var id: Self { self }
+    }
+
     /// A dot on the neck at one fretboard location, with its (already spelled) label.
     struct Marker: Hashable {
         var location: FretboardLocation
@@ -26,6 +35,13 @@ struct FretboardDiagram: Equatable {
     var lastFret: Int = Fretboard.frets.upperBound
 
     var markers: [Marker] = []
+
+    /// How dot labels are drawn. The dots themselves stay in every mode.
+    var labelMode: LabelMode = .shown
+
+    /// Optional heatmap: a value from 0 to 1 per fretboard location, drawn as an amber-to-red
+    /// tint behind that location. `nil` draws no tint. Callers pass only playable locations.
+    var heat: [FretboardLocation: Double]? = nil
 
     var stringCount: Int { stringNames.count }
 }
