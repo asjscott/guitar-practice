@@ -64,10 +64,10 @@ struct ExplorerView: View {
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
         ToolbarItemGroup(placement: .navigation) {
-            Picker("Key", selection: $model.key) {
-                ForEach(model.keys, id: \.self) { Text($0.shortName).tag($0) }
+            Picker("Key", selection: $model.tonic) {
+                ForEach(model.keys, id: \.self) { Text($0.tonic.description).tag($0.tonic.pitchClass) }
             }
-            .help("Key")
+            .help("Key (tonic)")
 
             Picker("Show", selection: $model.display) {
                 ForEach(ExplorerViewModel.Display.allCases) { Text($0.rawValue).tag($0) }

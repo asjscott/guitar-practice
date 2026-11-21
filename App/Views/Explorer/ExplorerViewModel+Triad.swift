@@ -2,7 +2,7 @@ import TheoryCore
 
 /// Triad mode: the key's triad on the chosen string set and inversion, every voicing along the neck.
 extension ExplorerViewModel {
-    /// The key's tonic triad (the key picker offers major keys, so this is a major triad).
+    /// The key's tonic triad: major with a major scale kind, minor with a minor one (A minor triad).
     var triad: Triad { key.triad }
 
     /// Every voicing of the triad on the chosen string set and inversion, up the neck.

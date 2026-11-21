@@ -42,8 +42,9 @@ final class ExplorerViewModel {
 
     // MARK: Picker state (opens on C major every time)
 
-    /// One of `Key.appMajorKeys`; minor scales use its relative minor.
-    var key: Key = .major(.c)
+    /// The key picker's tonic. The mode comes from the scale kind, so switching between
+    /// major and minor scales keeps the pitch class (D♭ major → C♯ minor).
+    var tonic: PitchClass = Key.major(.c).tonic.pitchClass
     var display: Display = .scale
     var scaleKind: Scale.Kind = .major
     /// The position picker's choice (see ExplorerViewModel+Position.swift); opens on the E shape.
@@ -53,8 +54,8 @@ final class ExplorerViewModel {
     var stringSet: StringSet = .gBE
     var inversion: Triad.Inversion = .root
 
-    /// The keys the key picker offers.
-    let keys = Key.appMajorKeys
+    /// The keys the key picker offers, in the current mode (labelled by tonic: C G D … / A E B …).
+    var keys: [Key] { Key.appKeys(scaleKind.mode) }
 
     // MARK: Display options (labels, debug heatmap; see ExplorerViewModel+Display.swift)
 
@@ -78,7 +79,10 @@ final class ExplorerViewModel {
 
     // MARK: Theory
 
-    /// The chosen scale in the chosen key (minor kinds start on the key's relative minor).
+    /// The chosen key: the picked tonic in the scale kind's mode (A + natural minor → A minor).
+    var key: Key { Key.app(tonic: tonic, mode: scaleKind.mode) }
+
+    /// The chosen scale, built on the key's tonic.
     var scale: Scale { Scale(scaleKind, in: key) }
 
     // MARK: What the window shows
