@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import TheoryCore
 
 /// Where things sit when the neck is drawn into a given size: drawing geometry only, no music.
 ///
@@ -55,10 +56,11 @@ struct FretboardGeometry {
         fret == 0 ? Self.openAreaWidth : wireX(fret) - wireX(fret - 1)
     }
 
-    /// The whole cell for one string at one fret (useful for tints behind a location).
-    func cell(string: Int, fret: Int) -> CGRect {
-        let x0 = fret == 0 ? Self.nameColumnWidth : wireX(fret - 1)
-        return CGRect(x: x0, y: y(ofString: string) - rowHeight / 2, width: width(ofFret: fret), height: rowHeight)
+    /// The whole cell of a fretboard location (useful for tints behind it).
+    func cell(at location: FretboardLocation) -> CGRect {
+        let x0 = location.fret == 0 ? Self.nameColumnWidth : wireX(location.fret - 1)
+        return CGRect(x: x0, y: y(ofString: location.string) - rowHeight / 2,
+                      width: width(ofFret: location.fret), height: rowHeight)
     }
 
     var stringNameX: CGFloat { Self.nameColumnWidth / 2 }

@@ -57,7 +57,7 @@ struct FretboardView: View {
         guard let heat = diagram.heat else { return }
         for (location, value) in heat
         where (0..<diagram.stringCount).contains(location.string) && (0...diagram.lastFret).contains(location.fret) {
-            let cell = g.cell(string: location.string, fret: location.fret).insetBy(dx: 1, dy: 1)
+            let cell = g.cell(at: location).insetBy(dx: 1, dy: 1)
             context.fill(Path(roundedRect: cell, cornerRadius: 3), with: .color(FretboardPalette.heat(value)))
         }
     }
