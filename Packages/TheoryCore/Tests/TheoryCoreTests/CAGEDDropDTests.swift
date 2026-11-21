@@ -41,3 +41,38 @@ struct CAGEDDropDTests {
         }
     }
 }
+
+/// A dropped low string plays the standard shape's string-6 notes: the same pitches as standard
+/// tuning's low E, which on the string dropped a whole tone sit two frets higher.
+@Suite("CAGED string 6 in Drop D")
+struct CAGEDDropDLowStringTests {
+    @Test func cMajorDShapeLowStringIsTheStandardNotesTwoFretsUp() throws {
+        let scale = Scale(.major, in: .major(.c))
+        let standardD = try #require(Fretboard(tuning: .standard).cagedPositions(of: scale)
+            .first { $0.cagedShape == .d && $0.octave == 0 })
+        let dropD = try #require(Fretboard(tuning: TuningPreset.dropD.tuning).cagedPositions(of: scale)
+            .first { $0.cagedShape == .d && $0.octave == 0 })
+        #expect(standardD.locations.filter { $0.string == 0 }.map(\.fret) == [10, 12, 13]) // D E F
+        #expect(dropD.locations.filter { $0.string == 0 }.map(\.fret) == [12, 14, 15])     // D E F
+    }
+
+    @Test(arguments: [0, 2])
+    func everyShapePlaysTheStandardShapesPitches(capo: Int) {
+        let standard = Fretboard(tuning: .standard, capo: capo)
+        let dropD = Fretboard(tuning: TuningPreset.dropD.tuning, capo: capo)
+        for scale in CAGEDDropDTests.scales {
+            let standardShapes = standard.cagedPositions(of: scale)
+            for shape in dropD.cagedPositions(of: scale) {
+                let pitches = shape.locations.map { [$0.string, dropD.pitch(at: $0).midi] }
+                // The same shape in standard tuning, at any placement, by whole octaves: every
+                // string, string 6 included, sounds the same pitches.
+                let matches = standardShapes.filter { $0.number == shape.number }.contains { candidate in
+                    [-12, 0, 12].contains { shift in
+                        candidate.locations.map { [$0.string, standard.pitch(at: $0).midi + shift] } == pitches
+                    }
+                }
+                #expect(matches, "\(scale) \(shape.name) octave \(shape.octave) capo \(capo)")
+            }
+        }
+    }
+}

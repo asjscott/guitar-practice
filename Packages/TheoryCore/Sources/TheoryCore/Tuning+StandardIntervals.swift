@@ -10,3 +10,13 @@ extension Tuning {
         return [5, 7].contains(intervals[0]) && Array(intervals.dropFirst()) == [5, 5, 4, 5]
     }
 }
+
+extension Tuning {
+    /// For a standard-interval tuning with its low string dropped a whole tone (Drop D), the
+    /// same tuning with string 6 back a fourth below string 5 (Drop D → standard). Nil for
+    /// every other tuning.
+    var undroppingLowString: Tuning? {
+        guard hasStandardIntervals, (openPitches[1] - openPitches[0]).semitones != 5 else { return nil }
+        return Tuning([openPitches[1] - Interval(5)] + openPitches.dropFirst())
+    }
+}
