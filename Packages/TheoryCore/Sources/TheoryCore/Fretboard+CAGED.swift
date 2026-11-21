@@ -19,9 +19,8 @@ extension Fretboard {
         let positions = CAGEDShape.allCases.flatMap { shape in
             let start = shape.number - 1 // index of the starting degree in the pentatonic
             let core = pentatonicWalk(pentatonic, from: start)
-            let window = core.map(\.fret).min()!...core.map(\.fret).max()!
             let extras = strings.flatMap { string in
-                window.compactMap { fret in
+                window(of: core, onString: string).compactMap { fret in
                     extraNotes.contains(tuning.openPitch(ofString: string).pitchClass + Interval(fret))
                         ? FretboardLocation(string: string, fret: fret) : nil
                 }
@@ -35,6 +34,20 @@ extension Fretboard {
             }
         }
         return positions.sorted { ($0.frets.lowerBound, $0.number) < ($1.frets.lowerBound, $1.number) }
+    }
+
+    /// The frets on a string where a shape's other scale notes are added: the fret window of
+    /// the pentatonic notes on every string above the lowest, which on the lowest string also
+    /// stretches to cover that string's own two notes.
+    ///
+    /// The lowest string is left out of the window so that a dropped low string (Drop D) moves
+    /// only its own notes: strings 5–1 keep their standard-tuning look. In standard tuning
+    /// strings 6 and 1 hold the same frets, so this is the whole shape's window.
+    private func window(of core: [FretboardLocation], onString string: Int) -> ClosedRange<Int> {
+        let lowest = strings.lowerBound
+        let upper = core.filter { $0.string != lowest || strings.count == 1 }.map(\.fret)
+        let frets = string == lowest ? upper + core.filter { $0.string == lowest }.map(\.fret) : upper
+        return frets.min()!...frets.max()!
     }
 
     /// Two pentatonic notes per string from string 6 up, starting on `pentatonic[start]`, in

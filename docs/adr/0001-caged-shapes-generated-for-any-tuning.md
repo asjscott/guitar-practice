@@ -13,6 +13,6 @@ CAGED comes from open-chord shapes in standard tuning, but the app must work in 
 
 ## Generation rule
 
-- **CAGED shapes:** for each of the five notes of the key's major pentatonic on string 6, walk up the strings taking two pentatonic notes per string; that fret window is the shape. Seven-note scales add their other notes inside the window. Names by starting degree: 1→E, 2→D, 3→C, 5→A, 6→G. Minor keys use their relative major's shapes. In standard tuning this reproduces the familiar boxes (including the B-string shift) with no special cases.
+- **CAGED shapes:** for each of the five notes of the key's major pentatonic on string 6, walk up the strings taking two pentatonic notes per string; that fret window is the shape. Seven-note scales (and blues, for its ♭5) add their other notes inside the window, taken from strings 5–1 only (on string 6, widened to cover its own two notes), so a dropped low string moves only its own notes and Drop D keeps the standard shape on strings 5–1. Names by starting degree: 1→E, 2→D, 3→C, 5→A, 6→G. Minor keys use their relative major's shapes. In standard tuning this reproduces the familiar boxes (including the B-string shift) with no special cases.
 - **3NPS patterns:** each of the seven scale degrees on string 6 starts a pattern; every string takes the next three scale notes going up.
 - **Placement:** a position sits at the lowest fret where it fits wholly between the capo and fret 22; its octave-up copy is offered too when it fits.
