@@ -52,7 +52,16 @@ final class ExplorerViewModel {
 
     /// Triad mode (see ExplorerViewModel+Triad.swift).
     var stringSet: StringSet = .gBE
-    var inversion: Triad.Inversion = .root
+    var inversionChoice: InversionChoice = .all
+
+    /// Major or minor, shared by both displays: the scale kind's mode, which is also the
+    /// triad's quality. Setting it moves the scale kind to its counterpart in that mode
+    /// (major ↔ natural minor, pentatonics swap, blues → major pentatonic) and keeps the
+    /// tonic pitch class, so the key picker relabels (D♭ major → C♯ minor).
+    var mode: Key.Mode {
+        get { scaleKind.mode }
+        set { scaleKind = scaleKind.inMode(newValue) }
+    }
 
     /// The keys the key picker offers, in the current mode (labelled by tonic: C G D … / A E B …).
     var keys: [Key] { Key.appKeys(scaleKind.mode) }
