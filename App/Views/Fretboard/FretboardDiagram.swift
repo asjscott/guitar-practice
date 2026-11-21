@@ -48,4 +48,10 @@ struct FretboardDiagram: Equatable {
     var heat: [FretboardLocation: Double]? = nil
 
     var stringCount: Int { stringNames.count }
+
+    /// Whether a location is on the drawn neck (one of its strings, nut to `lastFret`);
+    /// markers and heat elsewhere are skipped.
+    func draws(_ location: FretboardLocation) -> Bool {
+        (0..<stringCount).contains(location.string) && (0...lastFret).contains(location.fret)
+    }
 }

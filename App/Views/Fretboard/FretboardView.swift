@@ -55,8 +55,7 @@ struct FretboardView: View {
     /// everything that sits on the board. Off when `diagram.heat` is nil.
     private func drawHeat(in context: inout GraphicsContext, _ g: FretboardGeometry) {
         guard let heat = diagram.heat else { return }
-        for (location, value) in heat
-        where (0..<diagram.stringCount).contains(location.string) && (0...diagram.lastFret).contains(location.fret) {
+        for (location, value) in heat where diagram.draws(location) {
             let cell = g.cell(at: location).insetBy(dx: 1, dy: 1)
             context.fill(Path(roundedRect: cell, cornerRadius: 3), with: .color(FretboardPalette.heat(value)))
         }
@@ -144,9 +143,7 @@ struct FretboardView: View {
 
     /// Dots (root orange, tones blue) with a soft shadow, then the white ring and label on top.
     private func drawMarkers(in context: inout GraphicsContext, _ g: FretboardGeometry) {
-        let markers = diagram.markers.filter {
-            (0..<diagram.stringCount).contains($0.location.string) && (0...diagram.lastFret).contains($0.location.fret)
-        }
+        let markers = diagram.markers.filter { diagram.draws($0.location) }
         func dotRect(_ marker: FretboardDiagram.Marker) -> CGRect {
             let d = g.dotDiameter(atFret: marker.location.fret)
             let center = CGPoint(x: g.centerX(ofFret: marker.location.fret), y: g.y(ofString: marker.location.string))
