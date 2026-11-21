@@ -16,7 +16,7 @@ struct ExplorerView: View {
                 .padding(.top, 20)
                 .padding(.bottom, 14)
 
-            FretboardView(diagram: model.diagram)
+            FretboardView(diagram: model.displayedDiagram)
                 .frame(height: 250)
                 .padding(16)
                 .background(RoundedRectangle(cornerRadius: 12).fill(Color(nsColor: .controlBackgroundColor)))
@@ -82,6 +82,8 @@ struct ExplorerView: View {
                 .help("Scale")
             }
         }
+
+        displayToolbar
     }
 
     // MARK: Status bar
@@ -95,6 +97,7 @@ struct ExplorerView: View {
                 }
                 .font(.caption)
             }
+            heatLegend
             Spacer()
         }
         .font(.callout)

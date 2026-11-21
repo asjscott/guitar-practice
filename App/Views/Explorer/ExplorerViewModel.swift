@@ -42,6 +42,16 @@ final class ExplorerViewModel {
     /// The keys the key picker offers.
     let keys = Key.appMajorKeys
 
+    // MARK: Display options (labels, debug heatmap; see ExplorerViewModel+Display.swift)
+
+    var labelMode: FretboardDiagram.LabelMode = .shown
+
+    /// Debug: fill the heatmap with random values. Off by default; Phase 0 has no real data.
+    var showsDebugHeatmap = false
+
+    /// Seed for the debug heatmap's random values; shuffling picks a new one.
+    var debugHeatSeed = UInt64.random(in: .min ... .max)
+
     // MARK: Instrument
 
     var tuning: Tuning = .standard

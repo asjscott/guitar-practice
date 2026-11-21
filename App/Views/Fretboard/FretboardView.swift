@@ -8,7 +8,8 @@ import TheoryCore
 /// ruler. The view fills whatever width it is given.
 ///
 /// Drawing happens in passes, back to front (see `draw`). New features add a pass
-/// (for example a tint under the inlays, or a capo bar over the strings).
+/// (for example a capo bar over the strings). The heatmap tint is the pass right after the
+/// fingerboard, under the inlays.
 struct FretboardView: View {
     let diagram: FretboardDiagram
 
@@ -24,6 +25,7 @@ struct FretboardView: View {
 
     private func draw(in context: inout GraphicsContext, _ geometry: FretboardGeometry) {
         drawFingerboard(in: &context, geometry)
+        drawHeat(in: &context, geometry)
         drawInlays(in: &context, geometry)
         drawFretWires(in: &context, geometry)
         drawNut(in: &context, geometry)
@@ -45,6 +47,17 @@ struct FretboardView: View {
         for edge in [neck.minY + 0.75, neck.maxY - 0.75] {
             context.stroke(line(from: CGPoint(x: neck.minX, y: edge), to: CGPoint(x: neck.maxX, y: edge)),
                            with: .color(FretboardPalette.binding.opacity(0.9)), lineWidth: 1.5)
+        }
+    }
+
+    /// Heatmap tint: one rounded cell per location the diagram gives a value for, behind
+    /// everything that sits on the board. Off when `diagram.heat` is nil.
+    private func drawHeat(in context: inout GraphicsContext, _ g: FretboardGeometry) {
+        guard let heat = diagram.heat else { return }
+        for (location, value) in heat
+        where (0..<diagram.stringCount).contains(location.string) && (0...diagram.lastFret).contains(location.fret) {
+            let cell = g.cell(string: location.string, fret: location.fret).insetBy(dx: 1, dy: 1)
+            context.fill(Path(roundedRect: cell, cornerRadius: 3), with: .color(FretboardPalette.heat(value)))
         }
     }
 
@@ -138,11 +151,27 @@ struct FretboardView: View {
         }
     }
 
+    /// The label inside a dot, per `diagram.labelMode`: shown, faded (about 30%) or hidden.
+    /// The font shrinks with the dot (see `FretboardLabelLayout`); text that can't fit is hidden.
     private func drawLabel(_ label: String, in dot: CGRect, context: inout GraphicsContext) {
-        guard dot.width >= 14 else { return } // no room for text: the dot alone stays
-        let fontSize = max(8, min(12, dot.width * 0.48))
-        context.draw(Text(label).font(.system(size: fontSize, weight: .semibold, design: .rounded)).foregroundColor(.white),
-                     at: CGPoint(x: dot.midX, y: dot.midY))
+        let opacity: Double
+        switch diagram.labelMode {
+        case .shown: opacity = 1
+        case .faded: opacity = 0.3
+        case .hidden: return
+        }
+        func text(_ string: String, _ size: CGFloat) -> Text {
+            Text(string).font(.system(size: size, weight: .semibold, design: .rounded))
+        }
+        let unbounded = CGSize(width: CGFloat.infinity, height: .infinity)
+        func measure(_ size: CGFloat) -> CGSize {
+            let own = context.resolve(text(label, size)).measure(in: unbounded)
+            let reference = context.resolve(text(FretboardLabelLayout.referenceLabel, size)).measure(in: unbounded)
+            return CGSize(width: max(own.width, reference.width), height: max(own.height, reference.height))
+        }
+        guard let fontSize = FretboardLabelLayout.fontSize(forDot: dot.width, measure: measure)
+        else { return } // no room for text: the dot alone stays
+        context.draw(text(label, fontSize).foregroundColor(.white.opacity(opacity)), at: CGPoint(x: dot.midX, y: dot.midY))
     }
 
     private func line(from start: CGPoint, to end: CGPoint) -> Path {
