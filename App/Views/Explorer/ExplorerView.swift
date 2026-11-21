@@ -1,4 +1,5 @@
 import SwiftUI
+import TheoryCore
 
 /// The main window: the fretboard explorer in the A2 layout.
 ///
@@ -62,9 +63,24 @@ struct ExplorerView: View {
     private var toolbar: some ToolbarContent {
         ToolbarItemGroup(placement: .navigation) {
             Picker("Key", selection: $model.key) {
-                ForEach(ExplorerKeyChoice.all) { Text($0.name).tag($0) }
+                ForEach(model.keys, id: \.self) { Text($0.shortName).tag($0) }
             }
             .help("Key")
+
+            Picker("Show", selection: $model.display) {
+                ForEach(ExplorerViewModel.Display.allCases) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .help("Show a scale or a triad")
+        }
+
+        ToolbarItemGroup(placement: .principal) {
+            if model.display == .scale {
+                Picker("Scale", selection: $model.scaleKind) {
+                    ForEach(Scale.Kind.allCases, id: \.self) { Text($0.name.capitalizedFirst).tag($0) }
+                }
+                .help("Scale")
+            }
         }
     }
 
@@ -83,6 +99,11 @@ struct ExplorerView: View {
         }
         .font(.callout)
     }
+}
+
+private extension String {
+    /// "natural minor" → "Natural minor", for picker labels.
+    var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
 }
 
 #Preview {

@@ -8,11 +8,18 @@ import TheoryCore
 ///
 /// Extension points for later tickets:
 /// - `tuning` becomes the persisted tuning (and a capo joins it) from Settings (#4).
-/// - `key` becomes TheoryCore's `Key`; scale, position, triad and label-mode state join it (#5–#9).
+/// - Position (#7/#8), triad (#9) and label-mode (#6) state join `key`, `display` and `scaleKind`.
 /// - `diagram`, `title`, `detail`, `chips` and `legend` are the only things the view reads;
 ///   new modes change what they return, not how the view draws.
 @MainActor @Observable
 final class ExplorerViewModel {
+    /// What the neck shows: a scale, or a triad (triads arrive with #9).
+    enum Display: String, CaseIterable, Identifiable {
+        case scale = "Scale"
+        case triad = "Triad"
+        var id: Self { self }
+    }
+
     /// A note chip in the header.
     struct Chip: Hashable {
         var name: String
@@ -25,9 +32,15 @@ final class ExplorerViewModel {
         var label: String
     }
 
-    // MARK: Picker state (opens on C every time)
+    // MARK: Picker state (opens on C major every time)
 
-    var key: ExplorerKeyChoice = .c
+    /// One of `Key.appMajorKeys`; minor scales use its relative minor.
+    var key: Key = .major(.c)
+    var display: Display = .scale
+    var scaleKind: Scale.Kind = .major
+
+    /// The keys the key picker offers.
+    let keys = Key.appMajorKeys
 
     // MARK: Instrument
 
@@ -35,27 +48,57 @@ final class ExplorerViewModel {
 
     var fretboard: Fretboard { Fretboard(tuning: tuning) }
 
+    // MARK: Theory
+
+    /// The chosen scale in the chosen key (minor kinds start on the key's relative minor).
+    var scale: Scale { Scale(scaleKind, in: key) }
+
     // MARK: What the window shows
 
-    /// Every location of the key's tonic, labelled with sharps (no key-aware spelling yet).
     var diagram: FretboardDiagram {
         let fretboard = fretboard
+        let scale = scale
+        let markers: [FretboardDiagram.Marker] = switch display {
+        case .scale:
+            fretboard.locations(of: scale).map { location in
+                let name = fretboard.name(at: location, in: scale)
+                return .init(location: location, label: name.description,
+                             role: name == scale.tonic ? .root : .tone)
+            }
+        case .triad:
+            [] // #9: triad voicings.
+        }
         return FretboardDiagram(
-            stringNames: tuning.openPitches.map(\.pitchClass.sharpName),
+            stringNames: fretboard.stringNames(in: scale.key).map(\.description),
             lastFret: Fretboard.frets.upperBound,
-            markers: fretboard.locations(of: key.tonic).map { location in
-                .init(location: location, label: fretboard.pitch(at: location).pitchClass.sharpName, role: .root)
-            })
+            markers: markers)
     }
 
-    var title: String { "\(key.name) major" }
+    var title: String {
+        switch display {
+        case .scale: scale.name
+        case .triad: "\(key) triad"
+        }
+    }
 
     var detail: String {
-        let count = fretboard.locations(of: key.tonic).count
-        return "Every \(key.name) on the neck · \(count) locations"
+        switch display {
+        case .scale: "Whole neck · \(fretboard.locations(of: scale).count) locations"
+        case .triad: "Triad voicings are not available yet"
+        }
     }
 
-    var chips: [Chip] { [Chip(name: key.name, isRoot: true)] }
+    var chips: [Chip] {
+        switch display {
+        case .scale: scale.notes.map { Chip(name: $0.description, isRoot: $0 == scale.tonic) }
+        case .triad: []
+        }
+    }
 
-    var legend: [LegendItem] { [LegendItem(role: .root, label: "Root")] }
+    var legend: [LegendItem] {
+        switch display {
+        case .scale: [LegendItem(role: .root, label: "Root"), LegendItem(role: .tone, label: "Scale tone")]
+        case .triad: [LegendItem(role: .root, label: "Root"), LegendItem(role: .tone, label: "Chord tone")]
+        }
+    }
 }
