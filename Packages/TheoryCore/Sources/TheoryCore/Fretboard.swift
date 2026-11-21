@@ -25,18 +25,30 @@ public struct Fretboard: Hashable, Sendable {
     /// Frets counted from the nut, open string (0) to the last fret.
     public static let frets: ClosedRange<Int> = 0...22
 
+    /// Capo frets: none (0) up to fret 12.
+    public static let capoFrets: ClosedRange<Int> = 0...12
+
     public let tuning: Tuning
 
-    public init(tuning: Tuning) {
+    /// The fret the capo sits at (0 = no capo). Fret numbers still count from the nut.
+    public let capo: Int
+
+    public init(tuning: Tuning, capo: Int = 0) {
+        precondition(Fretboard.capoFrets.contains(capo), "Capo must be at fret 0–12")
         self.tuning = tuning
+        self.capo = capo
     }
 
     /// String indices, 0 = physical string 6.
     public var strings: Range<Int> { tuning.strings }
 
-    /// The frets that can be played.
-    // Extension point: a capo will narrow this to capo...22.
-    public var playableFrets: ClosedRange<Int> { Fretboard.frets }
+    /// The frets that can be played: from the capo (or the nut) to the last fret.
+    public var playableFrets: ClosedRange<Int> { capo...Fretboard.frets.upperBound }
+
+    /// What a string sounds when played without fretting: its open pitch raised by the capo.
+    public func soundingOpenPitch(ofString string: Int) -> Pitch {
+        tuning.openPitch(ofString: string) + Interval(capo)
+    }
 
     /// True when the location is on one of this tuning's strings at a playable fret.
     public func isPlayable(_ location: FretboardLocation) -> Bool {
