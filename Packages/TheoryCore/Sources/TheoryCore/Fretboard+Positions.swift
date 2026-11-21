@@ -18,6 +18,28 @@ extension Fretboard {
             }
     }
 
+    /// `notesPerString` scale notes per string from string 6 up, starting on `notes[start]`,
+    /// in relative frets. Each string's first note sits nearest the previous string's first
+    /// note, which keeps the walk compact in any tuning (and is the plain pitch walk in rising
+    /// ones). CAGED shapes walk the pentatonic two per string; 3NPS patterns the scale three.
+    func walk(_ notes: [PitchClass], from start: Int, notesPerString: Int) -> [FretboardLocation] {
+        var locations: [FretboardLocation] = []
+        var anchor: Int?
+        for string in strings {
+            let index = start + notesPerString * (string - strings.lowerBound)
+            let first = relativeFret(of: notes[index % notes.count], onString: string, near: anchor)
+            var fret = first
+            locations.append(FretboardLocation(string: string, fret: fret))
+            for step in 1..<notesPerString {
+                let previous = notes[(index + step - 1) % notes.count]
+                fret += previous.interval(upTo: notes[(index + step) % notes.count]).semitones
+                locations.append(FretboardLocation(string: string, fret: fret))
+            }
+            anchor = first
+        }
+        return locations
+    }
+
     /// The relative fret of a pitch class on a string nearest to `anchor` (ties go lower);
     /// with no anchor, the lowest fret 0–11.
     func relativeFret(of pitchClass: PitchClass, onString string: Int, near anchor: Int?) -> Int {
@@ -26,5 +48,20 @@ extension Fretboard {
         guard let anchor else { return base }
         let up = (base - anchor % 12 + 24) % 12
         return up < 6 ? anchor + up : anchor + up - 12
+    }
+}
+
+extension Array where Element == Position {
+    /// Ordered up the neck: by lowest fret, then CAGED shape or 3NPS pattern number.
+    func sortedUpTheNeck() -> [Position] {
+        sorted { ($0.frets.lowerBound, $0.number) < ($1.frets.lowerBound, $1.number) }
+    }
+}
+
+extension Array where Element == FretboardLocation {
+    /// The frets covered, lowest to highest (open strings count as fret 0). The array must not be empty.
+    var fretSpan: ClosedRange<Int> {
+        let frets = map(\.fret)
+        return frets.min()!...frets.max()!
     }
 }

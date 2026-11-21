@@ -18,7 +18,7 @@ extension Fretboard {
 
         let positions = CAGEDShape.allCases.flatMap { shape in
             let start = shape.number - 1 // index of the starting degree in the pentatonic
-            let core = pentatonicWalk(pentatonic, from: start)
+            let core = walk(pentatonic, from: start, notesPerString: 2)
             let extras = strings.flatMap { string in
                 window(of: core, onString: string).compactMap { fret in
                     extraNotes.contains(tuning.openPitch(ofString: string).pitchClass + Interval(fret))
@@ -33,7 +33,7 @@ extension Fretboard {
                          locations: locations)
             }
         }
-        return positions.sorted { ($0.frets.lowerBound, $0.number) < ($1.frets.lowerBound, $1.number) }
+        return positions.sortedUpTheNeck()
     }
 
     /// The frets on a string where a shape's other scale notes are added: the fret window of
@@ -48,22 +48,5 @@ extension Fretboard {
         let upper = core.filter { $0.string != lowest || strings.count == 1 }.map(\.fret)
         let frets = string == lowest ? upper + core.filter { $0.string == lowest }.map(\.fret) : upper
         return frets.min()!...frets.max()!
-    }
-
-    /// Two pentatonic notes per string from string 6 up, starting on `pentatonic[start]`, in
-    /// relative frets. Each string's first note sits nearest the previous string's first note,
-    /// which keeps the shape compact in any tuning (and is the plain pitch walk in rising ones).
-    private func pentatonicWalk(_ pentatonic: [PitchClass], from start: Int) -> [FretboardLocation] {
-        var locations: [FretboardLocation] = []
-        var anchor: Int?
-        for string in strings {
-            let index = start + 2 * (string - strings.lowerBound)
-            let note = pentatonic[index % 5], next = pentatonic[(index + 1) % 5]
-            let first = relativeFret(of: note, onString: string, near: anchor)
-            let second = first + note.interval(upTo: next).semitones
-            locations += [FretboardLocation(string: string, fret: first), FretboardLocation(string: string, fret: second)]
-            anchor = first
-        }
-        return locations
     }
 }

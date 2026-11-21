@@ -58,8 +58,5 @@ public struct Position: Hashable, Sendable, Identifiable {
     public var octave: Int { id.octave }
 
     /// The fret window: lowest to highest fret used.
-    public var frets: ClosedRange<Int> {
-        let frets = locations.map(\.fret)
-        return frets.min()!...frets.max()!
-    }
+    public var frets: ClosedRange<Int> { locations.fretSpan }
 }

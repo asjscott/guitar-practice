@@ -14,8 +14,8 @@ extension Fretboard {
     public func threeNPSPositions(of scale: Scale) -> [Position] {
         guard scale.kind.isSevenNote else { return [] }
         let notes = scale.pitchClasses
-        let positions = (1...notes.count).flatMap { number in
-            placements(of: threeNotesPerStringWalk(notes, from: number - 1))
+        return (1...notes.count).flatMap { number in
+            placements(of: walk(notes, from: number - 1, notesPerString: 3))
                 .enumerated().map { octave, locations in
                     Position(id: .init(system: .threeNotesPerString, number: number, octave: octave),
                              scale: scale,
@@ -23,7 +23,7 @@ extension Fretboard {
                              locations: locations)
                 }
         }
-        return positions.sorted { ($0.frets.lowerBound, $0.number) < ($1.frets.lowerBound, $1.number) }
+        .sortedUpTheNeck()
     }
 
     /// The positions of a scale in a position system. 3NPS gives 3NPS patterns for seven-note
@@ -33,24 +33,5 @@ extension Fretboard {
         case .threeNotesPerString where scale.kind.isSevenNote: threeNPSPositions(of: scale)
         case .caged, .threeNotesPerString: cagedPositions(of: scale)
         }
-    }
-
-    /// Three scale notes per string from string 6 up, starting on `notes[start]`, in relative frets.
-    private func threeNotesPerStringWalk(_ notes: [PitchClass], from start: Int) -> [FretboardLocation] {
-        var locations: [FretboardLocation] = []
-        var anchor: Int?
-        for string in strings {
-            let index = start + 3 * (string - strings.lowerBound)
-            let first = relativeFret(of: notes[index % notes.count], onString: string, near: anchor)
-            var fret = first
-            locations.append(FretboardLocation(string: string, fret: fret))
-            for step in 1...2 {
-                let previous = notes[(index + step - 1) % notes.count]
-                fret += previous.interval(upTo: notes[(index + step) % notes.count]).semitones
-                locations.append(FretboardLocation(string: string, fret: fret))
-            }
-            anchor = first
-        }
-        return locations
     }
 }

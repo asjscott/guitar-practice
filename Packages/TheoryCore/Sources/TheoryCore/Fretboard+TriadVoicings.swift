@@ -11,10 +11,7 @@ public struct TriadVoicing: Hashable, Sendable {
     public let locations: [FretboardLocation]
 
     /// The frets the voicing covers, lowest to highest (open strings count as fret 0).
-    public var frets: ClosedRange<Int> {
-        let frets = locations.map(\.fret)
-        return frets.min()!...frets.max()!
-    }
+    public var frets: ClosedRange<Int> { locations.fretSpan }
 }
 
 extension Fretboard {
