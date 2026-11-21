@@ -10,6 +10,14 @@ struct ContentView: View {
     @AppStorage(InstrumentSettings.Key.positionSystem) private var positionSystem = InstrumentSettings.defaultPositionSystem
 
     var body: some View {
+        #if DEBUG
+        PrototypePhase1Root() // PROTOTYPE — Phase 1 screens; throwaway branch only
+        #else
+        explorer
+        #endif
+    }
+
+    private var explorer: some View {
         ExplorerView(model: model)
             .onChange(of: storedOpenPitches, initial: true) {
                 model.tuning = InstrumentSettings.tuning(from: storedOpenPitches)
