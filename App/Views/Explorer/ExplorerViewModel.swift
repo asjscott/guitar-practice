@@ -62,6 +62,8 @@ final class ExplorerViewModel {
     /// Set from the persisted Settings (see `ContentView`).
     var tuning: Tuning = .standard
     var capo: Int = 0
+    /// CAGED or 3NPS; pentatonic and blues always get CAGED shapes (TheoryCore decides).
+    var positionSystem: Position.System = .caged
 
     var fretboard: Fretboard { Fretboard(tuning: tuning, capo: capo) }
 

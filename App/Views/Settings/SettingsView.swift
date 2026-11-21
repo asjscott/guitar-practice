@@ -1,15 +1,15 @@
 import SwiftUI
 import TheoryCore
 
-/// Settings (⌘,): tuning and capo, persisted with `@AppStorage`.
+/// Settings (⌘,): tuning, capo and position system, persisted with `@AppStorage`.
 ///
 /// Picking a preset sets every string; stepping any string switches the picker to Custom.
 /// Each string is limited to MIDI 24–72 by TheoryCore; re-entrant tunings are allowed.
-/// Extension point: the position system (CAGED / 3NPS) joins this form in its own section.
 struct SettingsView: View {
     @AppStorage(InstrumentSettings.Key.tuningChoice) private var storedChoice = InstrumentSettings.defaultTuningChoice
     @AppStorage(InstrumentSettings.Key.openPitches) private var storedOpenPitches = InstrumentSettings.defaultOpenPitches
     @AppStorage(InstrumentSettings.Key.capo) private var storedCapo = InstrumentSettings.defaultCapo
+    @AppStorage(InstrumentSettings.Key.positionSystem) private var positionSystem = InstrumentSettings.defaultPositionSystem
 
     private var tuning: Tuning { InstrumentSettings.tuning(from: storedOpenPitches) }
 
@@ -45,6 +45,18 @@ struct SettingsView: View {
                     Text("None").tag(0)
                     ForEach(1...Fretboard.capoFrets.upperBound, id: \.self) { Text("Fret \($0)").tag($0) }
                 }
+            }
+
+            Section {
+                Picker("Position system", selection: $positionSystem) {
+                    ForEach(Position.System.allCases, id: \.self) { Text($0.settingsName).tag($0) }
+                }
+                .pickerStyle(.segmented)
+            } header: {
+                Text("Positions")
+            } footer: {
+                Text("3NPS patterns exist for major and natural minor only; pentatonic and blues always use the five CAGED shapes.")
+                    .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)

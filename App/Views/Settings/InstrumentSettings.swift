@@ -1,6 +1,6 @@
 import TheoryCore
 
-/// The persisted instrument setup: tuning and capo, stored with `@AppStorage` (UserDefaults).
+/// The persisted instrument setup: tuning, capo and position system, stored with `@AppStorage` (UserDefaults).
 ///
 /// Values are stored as plain strings and ints; reading them back always yields something
 /// TheoryCore accepts, falling back to standard tuning and no capo if what is stored is unusable.
@@ -10,6 +10,8 @@ enum InstrumentSettings {
         static let tuningChoice = "tuning.choice"
         static let openPitches = "tuning.openPitches"
         static let capo = "capo"
+        /// `Position.System` raw value: "caged" or "threeNotesPerString".
+        static let positionSystem = "positionSystem"
     }
 
     /// The UI is fixed at six strings, though the model allows any count.
@@ -18,6 +20,7 @@ enum InstrumentSettings {
     static let defaultTuningChoice = TuningChoice.preset(.standard).rawValue
     static let defaultOpenPitches = encode(.standard)
     static let defaultCapo = 0
+    static let defaultPositionSystem = Position.System.caged
 
     /// Open pitches as comma-separated MIDI numbers, string 6 first ("40,45,50,55,59,64").
     static func encode(_ tuning: Tuning) -> String {
@@ -35,6 +38,16 @@ enum InstrumentSettings {
     /// The stored capo, clamped to 0–12.
     static func capo(from stored: Int) -> Int {
         min(max(stored, Fretboard.capoFrets.lowerBound), Fretboard.capoFrets.upperBound)
+    }
+}
+
+extension Position.System {
+    /// The name in the Settings picker.
+    var settingsName: String {
+        switch self {
+        case .caged: "CAGED"
+        case .threeNotesPerString: "3NPS"
+        }
     }
 }
 

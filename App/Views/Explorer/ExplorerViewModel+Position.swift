@@ -12,18 +12,22 @@ enum PositionChoice: Hashable {
 
 /// The scale display's position: which positions exist, which one is shown, and the header text.
 extension ExplorerViewModel {
-    /// The positions on offer for the current scale, ordered up the neck.
-    /// #8: choose CAGED or 3NPS here from the position-system setting.
-    var positions: [Position] { fretboard.cagedPositions(of: scale) }
+    /// The positions on offer for the current scale in the chosen position system, ordered up
+    /// the neck. With 3NPS chosen, pentatonic and blues still get the five CAGED shapes.
+    var positions: [Position] { fretboard.positions(of: scale, system: positionSystem) }
 
     /// The position shown, or nil for the whole neck. When the chosen placement no longer fits
     /// (for example its octave-up copy after a key change), falls back to the same shape's
-    /// lowest placement, then to the whole neck.
+    /// lowest placement. When the positions on offer are of another system (the setting changed,
+    /// or a pentatonic scale fell back to CAGED), falls back to that system's first shape or
+    /// pattern (E shape / Pattern 1), then to the whole neck. The choice itself is kept, so
+    /// returning to the original system restores it.
     var position: Position? {
         guard case .position(let id) = positionChoice else { return nil }
         let positions = positions
         return positions.first { $0.id == id }
             ?? positions.first { $0.system == id.system && $0.number == id.number && $0.octave == 0 }
+            ?? positions.first { $0.system != id.system && $0.number == 1 && $0.octave == 0 }
     }
 
     /// The picker's selection: always one of `positionOptions`.
