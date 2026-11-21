@@ -37,6 +37,8 @@ final class ExplorerViewModel {
     var key: Key = .major(.c)
     var display: Display = .scale
     var scaleKind: Scale.Kind = .major
+    /// The position picker's choice (see ExplorerViewModel+Position.swift); opens on the E shape.
+    var positionChoice: PositionChoice = .initial
 
     /// The keys the key picker offers.
     let keys = Key.appMajorKeys
@@ -71,7 +73,7 @@ final class ExplorerViewModel {
         let scale = scale
         let markers: [FretboardDiagram.Marker] = switch display {
         case .scale:
-            fretboard.locations(of: scale).map { location in
+            scaleLocations.map { location in
                 let name = fretboard.name(at: location, in: scale)
                 return .init(location: location, label: name.description,
                              role: name == scale.tonic ? .root : .tone)
@@ -95,7 +97,7 @@ final class ExplorerViewModel {
 
     var detail: String {
         switch display {
-        case .scale: "Whole neck · \(fretboard.locations(of: scale).count) locations"
+        case .scale: scaleDetail
         case .triad: "Triad voicings are not available yet"
         }
     }

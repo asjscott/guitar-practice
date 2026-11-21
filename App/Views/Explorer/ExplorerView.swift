@@ -80,6 +80,13 @@ struct ExplorerView: View {
                     ForEach(Scale.Kind.allCases, id: \.self) { Text($0.name.capitalizedFirst).tag($0) }
                 }
                 .help("Scale")
+
+                Picker("Position", selection: $model.selectedPosition) {
+                    Text("Whole neck").tag(PositionChoice.wholeNeck)
+                    Divider()
+                    ForEach(model.positionOptions, id: \.choice) { Text($0.label).tag($0.choice) }
+                }
+                .help("Position")
             }
         }
 
