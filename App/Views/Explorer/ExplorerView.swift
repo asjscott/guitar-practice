@@ -1,0 +1,91 @@
+import SwiftUI
+
+/// The main window: the fretboard explorer in the A2 layout.
+///
+/// Pickers live in the native window toolbar; a header names what is on the neck with the
+/// notes as chips; the fretboard sits in a rounded card; a status bar holds the legend.
+/// The view is thin: everything it shows comes from `ExplorerViewModel`.
+struct ExplorerView: View {
+    @Bindable var model: ExplorerViewModel
+
+    var body: some View {
+        VStack(spacing: 0) {
+            header
+                .padding(.horizontal, 24)
+                .padding(.top, 20)
+                .padding(.bottom, 14)
+
+            FretboardView(diagram: model.diagram)
+                .frame(height: 250)
+                .padding(16)
+                .background(RoundedRectangle(cornerRadius: 12).fill(Color(nsColor: .controlBackgroundColor)))
+                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color(nsColor: .separatorColor)))
+                .padding(.horizontal, 24)
+
+            Spacer(minLength: 16)
+            Divider()
+            statusBar
+                .padding(.horizontal, 24)
+                .frame(height: 32)
+                .background(.bar)
+        }
+        .navigationTitle("Fretboard")
+        .toolbar { toolbar }
+    }
+
+    // MARK: Header
+
+    private var header: some View {
+        HStack(alignment: .lastTextBaseline) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(model.title).font(.system(size: 26, weight: .semibold))
+                Text(model.detail).font(.callout).foregroundStyle(.secondary)
+            }
+            Spacer()
+            HStack(spacing: 6) {
+                ForEach(Array(model.chips.enumerated()), id: \.offset) { _, chip in
+                    Text(chip.name)
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .frame(minWidth: 26, minHeight: 22)
+                        .background(Capsule().fill(chip.isRoot
+                            ? FretboardPalette.root.opacity(0.18)
+                            : Color.secondary.opacity(0.12)))
+                        .foregroundStyle(chip.isRoot ? FretboardPalette.root : .primary)
+                }
+            }
+        }
+    }
+
+    // MARK: Toolbar
+
+    @ToolbarContentBuilder
+    private var toolbar: some ToolbarContent {
+        ToolbarItemGroup(placement: .navigation) {
+            Picker("Key", selection: $model.key) {
+                ForEach(ExplorerKeyChoice.all) { Text($0.name).tag($0) }
+            }
+            .help("Key")
+        }
+    }
+
+    // MARK: Status bar
+
+    private var statusBar: some View {
+        HStack(spacing: 16) {
+            ForEach(model.legend, id: \.self) { item in
+                HStack(spacing: 6) {
+                    Circle().fill(FretboardPalette.color(for: item.role)).frame(width: 9, height: 9)
+                    Text(item.label).foregroundStyle(.secondary)
+                }
+                .font(.caption)
+            }
+            Spacer()
+        }
+        .font(.callout)
+    }
+}
+
+#Preview {
+    ExplorerView(model: ExplorerViewModel())
+        .frame(width: 900, height: 420)
+}
