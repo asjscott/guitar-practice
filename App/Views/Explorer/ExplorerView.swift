@@ -83,6 +83,7 @@ struct ExplorerView: View {
             }
         }
 
+        triadToolbar
         displayToolbar
     }
 

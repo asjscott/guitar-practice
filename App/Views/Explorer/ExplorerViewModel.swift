@@ -12,7 +12,7 @@ import TheoryCore
 ///   new modes change what they return, not how the view draws.
 @MainActor @Observable
 final class ExplorerViewModel {
-    /// What the neck shows: a scale, or a triad (triads arrive with #9).
+    /// What the neck shows: a scale, or the key's triad.
     enum Display: String, CaseIterable, Identifiable {
         case scale = "Scale"
         case triad = "Triad"
@@ -37,6 +37,10 @@ final class ExplorerViewModel {
     var key: Key = .major(.c)
     var display: Display = .scale
     var scaleKind: Scale.Kind = .major
+
+    /// Triad mode (see ExplorerViewModel+Triad.swift).
+    var stringSet: StringSet = .gBE
+    var inversion: Triad.Inversion = .root
 
     /// The keys the key picker offers.
     let keys = Key.appMajorKeys
@@ -77,7 +81,7 @@ final class ExplorerViewModel {
                              role: name == scale.tonic ? .root : .tone)
             }
         case .triad:
-            [] // #9: triad voicings.
+            triadMarkers
         }
         return FretboardDiagram(
             stringNames: fretboard.stringNames(in: scale.key).map(\.description),
@@ -89,21 +93,21 @@ final class ExplorerViewModel {
     var title: String {
         switch display {
         case .scale: scale.name
-        case .triad: "\(key) triad"
+        case .triad: triadTitle
         }
     }
 
     var detail: String {
         switch display {
         case .scale: "Whole neck · \(fretboard.locations(of: scale).count) locations"
-        case .triad: "Triad voicings are not available yet"
+        case .triad: triadDetail
         }
     }
 
     var chips: [Chip] {
         switch display {
         case .scale: scale.notes.map { Chip(name: $0.description, isRoot: $0 == scale.tonic) }
-        case .triad: []
+        case .triad: triadChips
         }
     }
 
