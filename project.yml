@@ -34,6 +34,7 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: GuitarPractice
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.music
+        INFOPLIST_KEY_NSPrincipalClass: NSApplication
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_IDENTITY: "-"       # ad-hoc signing: runs locally, no Apple team needed
         ENABLE_HARDENED_RUNTIME: YES
