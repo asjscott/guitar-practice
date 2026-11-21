@@ -18,8 +18,8 @@ struct KeySpellingTests {
     @Test func eFlatInABlues() {
         let aBlues = Scale(.blues, tonic: .a)
         #expect(aBlues.spell(PitchClass(3)).description == "E♭")
-        // Chosen key C, blues → A blues, still E♭.
-        #expect(Scale(.blues, in: .major(.c)).spell(PitchClass(3)).description == "E♭")
+        // Chosen tonic A, blues → A blues, still E♭.
+        #expect(Scale(.blues, in: .minor(.a)).spell(PitchClass(3)).description == "E♭")
     }
 
     @Test func dSharpMinorIsSpelledLikeFSharpMajor() {
@@ -60,6 +60,35 @@ struct KeySpellingTests {
             == ["Am", "Em", "Bm", "F♯m", "C♯m", "G♯m", "D♯m", "Dm", "Gm", "Cm", "Fm", "B♭m"])
         #expect(Key.minor(.dSharp).relativeMajor == .major(.fSharp))
         #expect(Key.major(.dFlat).relativeMinor == .minor(.bFlat))
+    }
+
+    @Test func pickerLabelsPerMode() {
+        #expect(Key.appKeys(.major).map(\.tonic.description)
+            == ["C", "G", "D", "A", "E", "B", "F♯", "F", "B♭", "E♭", "A♭", "D♭"])
+        #expect(Key.appKeys(.minor).map(\.tonic.description)
+            == ["A", "E", "B", "F♯", "C♯", "G♯", "D♯", "D", "G", "C", "F", "B♭"])
+        #expect(Key.appKeys(.minor).allSatisfy { $0.mode == .minor })
+    }
+
+    @Test func appKeyForAPickedPitchClassAndMode() {
+        #expect(Key.app(tonic: PitchClass(9), mode: .minor) == .minor(.a))
+        #expect(Key.app(tonic: PitchClass(9), mode: .major) == .major(.a))
+        #expect(Key.app(tonic: PitchClass(1), mode: .major) == .major(.dFlat))
+        #expect(Key.app(tonic: PitchClass(1), mode: .minor) == .minor(.cSharp))
+        #expect(Key.app(tonic: PitchClass(10), mode: .minor) == .minor(.bFlat))
+        for mode in Key.Mode.allCases {
+            #expect(PitchClass.allCases.map { Key.app(tonic: $0, mode: mode).tonic.pitchClass } == PitchClass.allCases)
+        }
+    }
+
+    @Test func switchingModeKeepsThePitchClass() {
+        #expect(Key.major(.dFlat).withMode(.minor) == .minor(.cSharp))
+        #expect(Key.major(.eFlat).withMode(.minor) == .minor(.dSharp))
+        #expect(Key.major(.aFlat).withMode(.minor) == .minor(.gSharp))
+        #expect(Key.minor(.a).withMode(.major) == .major(.a))
+        #expect(Key.minor(.bFlat).withMode(.major) == .major(.bFlat))
+        #expect(Key.minor(.dSharp).withMode(.major) == .major(.eFlat))
+        #expect(Key.major(.c).withMode(.major) == .major(.c))
     }
 
     @Test(arguments: [

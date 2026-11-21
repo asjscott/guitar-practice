@@ -19,13 +19,16 @@ public struct Scale: Hashable, Sendable, Codable {
             }
         }
 
-        /// Whether the scale sits on the minor side: a key's minor scales start on its relative minor.
+        /// Whether the scale is a minor-side scale (natural minor, minor pentatonic, blues).
         public var isMinor: Bool {
             switch self {
             case .major, .majorPentatonic: false
             case .naturalMinor, .minorPentatonic, .blues: true
             }
         }
+
+        /// The key mode the scale is built in: minor for minor-side scales, else major.
+        public var mode: Key.Mode { isMinor ? .minor : .major }
 
         /// Seven-note scales (major, natural minor): the only ones with 3NPS patterns.
         public var isSevenNote: Bool { degrees.count == 7 }
@@ -72,15 +75,16 @@ public struct Scale: Hashable, Sendable, Codable {
         self.tonic = tonic
     }
 
-    /// The scale of `kind` for a chosen key: minor scales (natural minor, minor pentatonic, blues)
-    /// start on the key's relative minor, major scales on its relative major.
-    /// So C + blues is A blues, and A minor + major is C major.
+    /// The scale of `kind` on the key's own tonic: A minor + natural minor is A natural minor,
+    /// A minor + blues is A blues. A key in the other mode first moves to that mode on the same
+    /// tonic pitch class (`Key.withMode`), so D♭ major + natural minor is C♯ natural minor.
     public init(_ kind: Kind, in key: Key) {
-        self.init(kind, tonic: (kind.isMinor ? key.relativeMinor : key.relativeMajor).tonic)
+        self.init(kind, tonic: key.withMode(kind.mode).tonic)
     }
 
     /// The key this scale belongs to (tonic and mode), which spells notes outside the scale.
-    public var key: Key { Key(tonic: tonic, mode: kind.isMinor ? .minor : .major) }
+    /// A minor key takes its relative major's signature.
+    public var key: Key { Key(tonic: tonic, mode: kind.mode) }
 
     /// The scale notes from the tonic, spelled by the degree formula.
     public var notes: [NoteName] {

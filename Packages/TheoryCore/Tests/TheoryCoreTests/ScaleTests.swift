@@ -22,41 +22,58 @@ struct ScaleTests {
         #expect(names(Scale(.blues, tonic: .a)) == "A C D E♭ E G")
     }
 
-    // Sharp key (E major, relative minor C♯) and flat key (B♭ major, relative minor G).
+    // Sharp tonic (E) and flat tonic (B♭): every kind is built on the key's own tonic.
     @Test(arguments: [
         (Scale.Kind.major, "E F♯ G♯ A B C♯ D♯", "B♭ C D E♭ F G A"),
-        (.naturalMinor, "C♯ D♯ E F♯ G♯ A B", "G A B♭ C D E♭ F"),
+        (.naturalMinor, "E F♯ G A B C D", "B♭ C D♭ E♭ F G♭ A♭"),
         (.majorPentatonic, "E F♯ G♯ B C♯", "B♭ C D F G"),
-        (.minorPentatonic, "C♯ E F♯ G♯ B", "G B♭ C D F"),
+        (.minorPentatonic, "E G A B D", "B♭ D♭ E♭ F A♭"),
     ])
-    func scalesInSharpAndFlatKeys(kind: Scale.Kind, inE: String, inBFlat: String) {
-        #expect(names(Scale(kind, in: .major(.e))) == inE)
-        #expect(names(Scale(kind, in: .major(.bFlat))) == inBFlat)
+    func scalesOnSharpAndFlatTonics(kind: Scale.Kind, onE: String, onBFlat: String) {
+        #expect(names(Scale(kind, in: Key(tonic: .e, mode: kind.mode))) == onE)
+        #expect(names(Scale(kind, in: Key(tonic: .bFlat, mode: kind.mode))) == onBFlat)
     }
 
-    @Test func bluesInSharpAndFlatKeys() {
+    @Test func bluesOnSharpAndFlatTonics() {
         // ♭5 is spelled on the 5th degree's letter: C♯ blues has G (not F𝄪), G blues has D♭.
-        #expect(names(Scale(.blues, in: .major(.e))) == "C♯ E F♯ G G♯ B")
-        #expect(names(Scale(.blues, in: .major(.bFlat))) == "G B♭ C D♭ D F")
+        #expect(names(Scale(.blues, in: .minor(.cSharp))) == "C♯ E F♯ G G♯ B")
+        #expect(names(Scale(.blues, in: .minor(.g))) == "G B♭ C D♭ D F")
+        #expect(names(Scale(.blues, in: .minor(.a))) == "A C D E♭ E G")
     }
 
-    @Test func minorScalesUseTheRelativeMinorOfTheChosenKey() {
-        #expect(Scale(.naturalMinor, in: .major(.c)).tonic == .a)
-        #expect(Scale(.minorPentatonic, in: .major(.fSharp)).tonic == .dSharp)
-        #expect(Scale(.blues, in: .major(.dFlat)).tonic == .bFlat)
+    @Test func aNaturalMinorIsBuiltOnA() {
+        #expect(names(Scale(.naturalMinor, in: .minor(.a))) == "A B C D E F G")
+        // Picking A then natural minor: the key follows the scale's mode, the tonic stays A.
+        #expect(names(Scale(.naturalMinor, in: .major(.a))) == "A B C D E F G")
+        #expect(names(Scale(.major, in: .minor(.a))) == "A B C♯ D E F♯ G♯")
+    }
+
+    @Test func scalesAreBuiltOnTheKeysOwnTonic() {
+        #expect(Scale(.naturalMinor, in: .minor(.a)).tonic == .a)
+        #expect(Scale(.minorPentatonic, in: .minor(.dSharp)).tonic == .dSharp)
+        #expect(Scale(.blues, in: .minor(.bFlat)).tonic == .bFlat)
         #expect(Scale(.major, in: .major(.dFlat)).tonic == .dFlat)
-        #expect(Scale(.majorPentatonic, in: .minor(.a)).tonic == .c)
+        #expect(Scale(.majorPentatonic, in: .major(.c)).tonic == .c)
+    }
+
+    @Test func aMismatchedModeKeepsThePitchClassAndUsesTheAppKeyForTheScalesMode() {
+        // D♭ major + natural minor → C♯ minor (not D♭ minor, which needs B𝄫).
+        #expect(Scale(.naturalMinor, in: .major(.dFlat)).tonic == .cSharp)
+        #expect(Scale(.blues, in: .major(.eFlat)).tonic == .dSharp)
+        #expect(Scale(.minorPentatonic, in: .major(.aFlat)).tonic == .gSharp)
+        // D♯ minor + major → E♭ major.
+        #expect(Scale(.major, in: .minor(.dSharp)).tonic == .eFlat)
     }
 
     @Test func minorScaleNotesMatchTheRelativeMajorsSpelling() {
-        for key in Key.appMajorKeys {
-            #expect(Set(Scale(.naturalMinor, in: key).notes) == Set(Scale(.major, in: key).notes))
+        for key in Key.appKeys(.minor) {
+            #expect(Set(Scale(.naturalMinor, in: key).notes) == Set(Scale(.major, in: key.relativeMajor).notes))
         }
     }
 
     @Test func scaleNotesAreSpelledOnConsecutiveLettersForSevenNoteScales() {
-        for key in Key.appMajorKeys {
-            for kind in [Scale.Kind.major, .naturalMinor] {
+        for kind in [Scale.Kind.major, .naturalMinor] {
+            for key in Key.appKeys(kind.mode) {
                 let letters = Scale(kind, in: key).notes.map(\.letter)
                 #expect(Set(letters).count == 7, "\(Scale(kind, in: key))")
                 #expect(Scale(kind, in: key).notes.allSatisfy { abs($0.accidental) <= 1 })
@@ -81,6 +98,7 @@ struct ScaleTests {
 
     @Test func minorSideScales() {
         #expect(Scale.Kind.allCases.filter(\.isMinor) == [.naturalMinor, .minorPentatonic, .blues])
+        #expect(Scale.Kind.allCases.map(\.mode) == [.major, .minor, .major, .minor, .minor])
     }
 
     @Test func sevenNoteScales() {
@@ -89,7 +107,8 @@ struct ScaleTests {
 
     @Test func names() {
         #expect(Scale(.major, in: .major(.c)).name == "C major")
-        #expect(Scale(.naturalMinor, in: .major(.c)).name == "A natural minor")
-        #expect(Scale(.blues, in: .major(.fSharp)).name == "D♯ blues")
+        #expect(Scale(.naturalMinor, in: .minor(.a)).name == "A natural minor")
+        #expect(Scale(.blues, in: .minor(.a)).name == "A blues")
+        #expect(Scale(.blues, in: .minor(.dSharp)).name == "D♯ blues")
     }
 }

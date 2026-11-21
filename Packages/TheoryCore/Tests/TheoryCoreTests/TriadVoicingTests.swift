@@ -54,6 +54,13 @@ struct StandardTriadVoicingTests {
         #expect(voicingFrets(aMinor, .second, .dGB) == [[2, 2, 1], [14, 14, 13]])
     }
 
+    @Test func pickingAInMinorModeReachesTheAMinorTriadsVoicings() {
+        let triad = Key.app(tonic: PitchClass(9), mode: Scale.Kind.naturalMinor.mode).triad
+        #expect(triad == aMinor)
+        #expect(voicingFrets(triad, .root, .gBE) == [[2, 1, 0], [14, 13, 12]])
+        #expect(Key.app(tonic: PitchClass(9), mode: Scale.Kind.major.mode).triad == Triad(.major, root: .a))
+    }
+
     @Test func aMinorOnGBE() {
         #expect(voicingFrets(aMinor, .root, .gBE) == [[2, 1, 0], [14, 13, 12]])
         #expect(voicingFrets(aMinor, .first, .gBE) == [[5, 5, 5], [17, 17, 17]])

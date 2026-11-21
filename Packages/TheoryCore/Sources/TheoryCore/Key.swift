@@ -28,6 +28,23 @@ public struct Key: Hashable, Sendable, Codable {
     /// (Am Em Bm F♯m C♯m G♯m D♯m Dm Gm Cm Fm B♭m).
     public static let appMinorKeys: [Key] = appMajorKeys.map(\.relativeMinor)
 
+    /// The app's 12 keys in one mode, in picker order: `appMajorKeys` or `appMinorKeys`.
+    /// The key picker shows their tonics (C G D … or A E B …).
+    public static func appKeys(_ mode: Mode) -> [Key] {
+        mode == .major ? appMajorKeys : appMinorKeys
+    }
+
+    /// The app key with this tonic pitch class in this mode: pitch class 1 is D♭ major or C♯ minor.
+    public static func app(tonic: PitchClass, mode: Mode) -> Key {
+        appKeys(mode).first { $0.tonic.pitchClass == tonic }!
+    }
+
+    /// This key in another mode on the same tonic pitch class, spelled as the app's key in
+    /// that mode (D♭ major → C♯ minor, D♯ minor → E♭ major). The same mode returns the key itself.
+    public func withMode(_ mode: Mode) -> Key {
+        mode == self.mode ? self : .app(tonic: tonic.pitchClass, mode: mode)
+    }
+
     /// All 15 major key signatures, from 7 flats (C♭) to 7 sharps (C♯).
     public static let allMajorKeySignatures: [Key] = [
         .cFlat, .gFlat, .dFlat, .aFlat, .eFlat, .bFlat, .f, .c, .g, .d, .a, .e, .b, .fSharp, .cSharp,
