@@ -79,6 +79,10 @@ struct ScaleTests {
         #expect(Scale(.majorPentatonic, tonic: .f).spell(PitchClass(10)).description == "B♭")
     }
 
+    @Test func minorSideScales() {
+        #expect(Scale.Kind.allCases.filter(\.isMinor) == [.naturalMinor, .minorPentatonic, .blues])
+    }
+
     @Test func sevenNoteScales() {
         #expect(Scale.Kind.allCases.filter(\.isSevenNote) == [.major, .naturalMinor])
     }

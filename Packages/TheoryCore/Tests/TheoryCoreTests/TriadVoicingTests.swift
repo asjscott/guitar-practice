@@ -77,6 +77,10 @@ struct StandardTriadVoicingTests {
         #expect(voicingFrets(cMajor, .root, .aDG, on: capo3) == [[15, 14, 12]])
     }
 
+    @Test func aVoicingSpansAtMostFourFrets() {
+        #expect(Fretboard.maxTriadVoicingSpan == 4)
+    }
+
     @Test func theFretboardOffersEveryStringSetOfItsTuning() {
         #expect(Fretboard(tuning: .standard).stringSets == StringSet.allCases)
     }
@@ -106,7 +110,7 @@ struct TriadVoicingInvariantTests {
                     for voicing in voicings {
                         // One note per string of the set, lowest string first.
                         #expect(voicing.locations.map(\.string) == Array(set.strings))
-                        #expect(voicing.frets.count <= 4)
+                        #expect(voicing.frets.count <= Fretboard.maxTriadVoicingSpan)
                         #expect(voicing.locations.allSatisfy(fretboard.isPlayable))
                         // The lowest note is the inversion's bass tone; the voicing holds the whole chord.
                         let pitches = voicing.locations.map(fretboard.pitch(at:))

@@ -92,3 +92,21 @@ struct CAGEDStandardTuningTests {
         #expect(e.frets == 2...5)
     }
 }
+
+@Suite("CAGED shape starting degrees")
+struct CAGEDStartingDegreeTests {
+    @Test func startingDegreesByShape() {
+        #expect(CAGEDShape.allCases.map(\.startingDegree) == [1, 2, 3, 5, 6])
+    }
+
+    @Test func eachShapeStartsOnItsDegreeOnString6() throws {
+        let scale = Scale(.majorPentatonic, tonic: .c)
+        let fretboard = Fretboard(tuning: .standard)
+        for position in fretboard.cagedPositions(of: scale) {
+            let shape = try #require(position.cagedShape)
+            let lowest = try #require(position.locations.first { $0.string == 0 })
+            let degree = try #require(scale.degree(of: fretboard.pitch(at: lowest).pitchClass))
+            #expect(degree.number == shape.startingDegree, "\(position.name)")
+        }
+    }
+}
