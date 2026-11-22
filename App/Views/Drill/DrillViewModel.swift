@@ -147,7 +147,7 @@ final class DrillViewModel {
 
     /// "Standard tuning", plus " · capo 2" with a capo.
     var windowSubtitle: String {
-        "\(tuning.preset?.name ?? "Custom") tuning" + (capo > 0 ? " · capo \(capo)" : "")
+        tuning.displayName + (capo > 0 ? " · capo \(capo)" : "")
     }
 
     /// The neck: no labels except on the answer, the prompted string highlighted while running, the played

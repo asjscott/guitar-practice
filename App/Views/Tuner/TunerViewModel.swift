@@ -92,7 +92,7 @@ final class TunerViewModel {
 
     /// "Standard tuning · A4 = 440 Hz".
     var windowSubtitle: String {
-        "\(tuning.preset?.name ?? "Custom") tuning · A4 = 440 Hz"
+        tuning.displayName + " · A4 = 440 Hz"
     }
 
     private var pitch: Pitch? { reading.map { Pitch($0.midiNote) } }
