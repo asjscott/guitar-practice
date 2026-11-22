@@ -17,6 +17,8 @@ settings:
 packages:
   TheoryCore:
     path: Packages/TheoryCore
+  PracticeCore:
+    path: Packages/PracticeCore
 
 targets:
   GuitarPractice:
@@ -28,6 +30,7 @@ targets:
           - "**/.gitkeep"
     dependencies:
       - package: TheoryCore
+      - package: PracticeCore
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.alecscott.GuitarPractice
