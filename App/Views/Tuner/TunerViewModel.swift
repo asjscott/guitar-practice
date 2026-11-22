@@ -1,12 +1,13 @@
 import ListenCore
 import Observation
+import os
 import TheoryCore
 
 /// The Tuner screen's state. Adapts the ListenCore listener (fed by the audio input service) to what the
 /// T1 "Needle" layout shows: the note, the needle's cents, the "+18 cents · 83.3 Hz" line and the string chips.
 ///
-/// The listener runs on the audio tap's thread inside a lock; each block's tuner reading hops to the main
-/// actor. With no signal the last reading is kept, marked as not sounding, so the view can grey it out.
+/// The listener runs on the audio tap's thread inside a lock; a block's tuner reading hops to the main actor
+/// when it changed. With no signal the last reading is kept, marked as not sounding, so the view can grey it out.
 @MainActor @Observable
 final class TunerViewModel {
     /// How close a sound is to its target, for colouring the needle, note and string chip.
@@ -47,6 +48,8 @@ final class TunerViewModel {
     private(set) var isSounding = false
 
     @ObservationIgnored private let listener = LockedListener()
+    /// The reading last sent to the main actor, on the tap thread.
+    @ObservationIgnored private let lastPosted = OSAllocatedUnfairLock<TunerReading?>(initialState: nil)
 
     // MARK: - Display
 
@@ -107,8 +110,15 @@ final class TunerViewModel {
     /// The consumer for `.listensToAudioInput(_:)`: runs the listener on the tap thread, shows results here.
     var audioConsumer: AudioInputConsumer {
         let listener = self.listener
+        let lastPosted = self.lastPosted
         return { [weak self] block in
             let reading = listener.process(block).tunerReading
+            // Hop to the main actor only when the reading changed: silence posts once, not ~47 times a second.
+            let changed = lastPosted.withLock { last in
+                defer { last = reading }
+                return last != reading
+            }
+            guard changed else { return }
             Task { @MainActor [weak self] in self?.show(reading) }
         }
     }
@@ -126,5 +136,6 @@ final class TunerViewModel {
     /// Marks the tuner silent (keeping the last note), e.g. when the screen closes.
     func stopSounding() {
         isSounding = false
+        lastPosted.withLock { $0 = nil }
     }
 }
