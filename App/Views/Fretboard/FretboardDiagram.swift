@@ -47,6 +47,10 @@ struct FretboardDiagram: Equatable {
     /// tint behind that location. `nil` draws no tint. Callers pass only playable locations.
     var heat: [FretboardLocation: Double]? = nil
 
+    /// A string to highlight with a band along its length (internal index, 0 = string 6), such as a
+    /// drill's target string. `nil` highlights none.
+    var highlightedString: Int? = nil
+
     var stringCount: Int { stringNames.count }
 
     /// Whether a location is on the drawn neck (one of its strings, nut to `lastFret`);
