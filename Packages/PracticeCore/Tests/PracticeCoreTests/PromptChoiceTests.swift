@@ -160,6 +160,12 @@ struct PromptTextTests {
         #expect(prompt.text(in: .standard) == "F♯ on string 3 (G)")
     }
 
+    @Test func allSharpsInEFlatStandard() {
+        let eFlat = TuningPreset.eFlatStandard.tuning
+        #expect(NotePrompt(pitchClass: PitchClass(3), string: 0).text(in: eFlat) == "D♯ on string 6 (D♯)")
+        #expect(NotePrompt(pitchClass: PitchClass(6), string: 3).text(in: eFlat) == "F♯ on string 3 (F♯)")
+    }
+
     @Test func dadgadLabels() {
         let dadgad = TuningPreset.dadgad.tuning
         #expect(NotePrompt(pitchClass: PitchClass(2), string: 5).stringLabel(in: dadgad) == "string 1 (D)")

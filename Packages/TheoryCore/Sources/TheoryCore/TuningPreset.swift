@@ -83,8 +83,11 @@ extension Tuning {
     }
 
     /// A string named by its guitarist number and open note, as drills show it: "string 3 (G)".
-    /// Names exactly one string even when open notes repeat (DADGAD). Ignores any capo.
+    /// Spelled with sharps in every tuning, like the drill's notes (no key applies): "string 6 (D♯)"
+    /// in E♭ standard, where the tuner and Settings say E♭. Names exactly one string even when open
+    /// notes repeat (DADGAD). Ignores any capo.
     public func stringLabel(ofString string: Int) -> String {
-        "string \(stringNumber(ofString: string)) (\(openNoteName(ofString: string)))"
+        let open = NoteName(sharpSpelling: openPitch(ofString: string).pitchClass)
+        return "string \(stringNumber(ofString: string)) (\(open))"
     }
 }
