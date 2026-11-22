@@ -11,8 +11,6 @@ struct DrillView: View {
     @State private var model = DrillViewModel()
     @State private var showSummary = false
     @Environment(AudioInputService.self) private var audioInput
-    @AppStorage(InstrumentSettings.Key.openPitches) private var storedOpenPitches = InstrumentSettings.defaultOpenPitches
-    @AppStorage(InstrumentSettings.Key.capo) private var storedCapo = InstrumentSettings.defaultCapo
 
     var body: some View {
         Group {
@@ -29,16 +27,14 @@ struct DrillView: View {
                 DrillOptionsBar(model: model).disabled(model.isRunning)
             }
             ToolbarItemGroup(placement: .primaryAction) {
-                DrillRunButtons(model: model)
+                DrillRunButtons(model: model, canStart: audioInput.canListen)
             }
         }
         .listensToAudioInput(model.audioConsumer)
         .onDisappear { model.leave() }
-        .onChange(of: storedOpenPitches, initial: true) {
-            model.tuning = InstrumentSettings.tuning(from: storedOpenPitches)
-        }
-        .onChange(of: storedCapo, initial: true) {
-            model.capo = InstrumentSettings.capo(from: storedCapo)
+        .followsInstrumentSettings { tuning, capo in
+            model.tuning = tuning
+            model.capo = capo
         }
         .onChange(of: model.isRunning) {
             if !model.isRunning, !model.snapshot.attempts.isEmpty { showSummary = true }
@@ -101,7 +97,8 @@ private struct DrillOptionsBar: View {
             Text("Naturals").tag(NotePlayItOptions.Notes.naturals)
             Text("All notes").tag(NotePlayItOptions.Notes.all)
         }
-        .help("Notes")
+        .help("Notes (an In order check walks every note)")
+        .disabled(model.options.order == .inOrder)
         Picker("Frets", selection: $model.options.frets) {
             ForEach(NotePlayItOptions.fretRanges, id: \.self) { range in
                 Text("\(range.lowerBound)–\(range.upperBound)").tag(range)
@@ -142,9 +139,11 @@ private struct DrillOptionsBar: View {
     }
 }
 
-/// Start (↩) when idle; Pause/Resume (P) and Stop (Esc) during a run.
+/// Start (↩) when idle; Pause/Resume (P) and Stop (Esc) during a run. Start (and ↩) is disabled while
+/// microphone access is denied or there's no input device.
 private struct DrillRunButtons: View {
     let model: DrillViewModel
+    let canStart: Bool
 
     var body: some View {
         if model.isRunning {
@@ -156,6 +155,7 @@ private struct DrillRunButtons: View {
             Button("Start") { model.start() }
                 .keyboardShortcut(.return, modifiers: [])
                 .buttonStyle(.borderedProminent)
+                .disabled(!canStart)
         }
     }
 }
@@ -192,7 +192,7 @@ private struct DrillFlashcard: View {
     }
 }
 
-/// The 10 s timeout: a ring that empties as time runs out (orange in the last 30%), with the seconds so far.
+/// The 10 s timeout: a ring that empties as time runs out (orange in the last 30%), with the seconds left.
 private struct DrillCountdownRing: View {
     let model: DrillViewModel
 
@@ -205,12 +205,12 @@ private struct DrillCountdownRing: View {
                 .trim(from: 0, to: 1 - fraction)
                 .stroke(fraction > 0.7 ? Color.orange : Color.accentColor, style: StrokeStyle(lineWidth: 6, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-            Text(countdown.map { String(format: "%.1f", $0.elapsed) } ?? "")
+            Text(countdown.map { String(format: "%.1f", $0.remaining) } ?? "")
                 .font(.callout.monospacedDigit())
         }
         .accessibilityElement()
-        .accessibilityLabel("Time")
-        .accessibilityValue(countdown.map { Text("\(Int($0.elapsed)) seconds") } ?? Text("Not running"))
+        .accessibilityLabel("Time left")
+        .accessibilityValue(countdown.map { Text("\(Int($0.remaining.rounded(.up))) seconds") } ?? Text("Not running"))
     }
 }
 

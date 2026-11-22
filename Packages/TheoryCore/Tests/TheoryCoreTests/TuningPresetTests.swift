@@ -20,6 +20,12 @@ struct TuningPresetTests {
             == ["Standard", "Drop D", "DADGAD", "Open G", "Open D", "E♭ standard"])
     }
 
+    @Test func aTuningIsNamedByItsPresetOrAsCustom() {
+        #expect(Tuning.standard.displayName == "Standard tuning")
+        #expect(TuningPreset.eFlatStandard.tuning.displayName == "E♭ standard tuning")
+        #expect(Tuning([38, 45, 50, 55, 59, 63].map(Pitch.init)).displayName == "Custom tuning")
+    }
+
     @Test func standardPresetIsTheStandardTuning() {
         #expect(TuningPreset.standard.tuning == .standard)
     }

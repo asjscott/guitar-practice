@@ -27,6 +27,10 @@ final class AudioInputService {
     /// Why the engine couldn't start, if it couldn't.
     private(set) var failure: String?
 
+    /// False while microphone access is denied or there's no input device: nothing can be heard, so a
+    /// listening exercise shouldn't start.
+    var canListen: Bool { permission != .denied && choice != nil }
+
     /// Shown when the saved device isn't connected and the system default stands in.
     var fallbackNotice: String? {
         guard let choice, choice.isFallback else { return nil }

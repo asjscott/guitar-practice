@@ -6,7 +6,6 @@ import SwiftUI
 struct TunerView: View {
     @State private var model = TunerViewModel()
     @Environment(AudioInputService.self) private var audioInput
-    @AppStorage(InstrumentSettings.Key.openPitches) private var storedOpenPitches = InstrumentSettings.defaultOpenPitches
 
     var body: some View {
         Group {
@@ -20,9 +19,7 @@ struct TunerView: View {
         .navigationSubtitle(model.windowSubtitle)
         .listensToAudioInput(model.audioConsumer)
         .onDisappear { model.stopSounding() }
-        .onChange(of: storedOpenPitches, initial: true) {
-            model.tuning = InstrumentSettings.tuning(from: storedOpenPitches)
-        }
+        .followsInstrumentSettings { tuning, _ in model.tuning = tuning }
     }
 
     private var tuner: some View {

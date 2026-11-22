@@ -34,7 +34,7 @@ struct WrongAndTimeoutTests {
         drill.handle(.tick(at: s(9.95)))
         #expect(drill.phase == .wrong(PitchClass(7)))
         #expect(drill.timeRemaining(at: s(9.95)) == s(0.05))
-        drill.handle(.tick(at: s(10)))
+        drill.handle(.tick(at: s(10.2)))
         #expect(drill.phase == .timedOut)
         #expect(drill.revealedLocations == [FretboardLocation(string: 0, fret: 0), FretboardLocation(string: 0, fret: 12)])
         #expect(drill.attempts.count == 1)
@@ -47,11 +47,11 @@ struct WrongAndTimeoutTests {
 
     @Test func aNoteDuringTheRevealIsIgnoredThenTheNextPromptFollows() {
         var drill = lowEDrill()
-        drill.handle(.tick(at: s(10)))
+        drill.handle(.tick(at: s(10.2)))
         drill.handle(.played(Pitch(40), onset: s(10.5), at: s(10.6)))
         #expect(drill.phase == .timedOut)
         #expect(drill.attempts.count == 1)
-        drill.handle(.tick(at: s(10 + 1.8)))
+        drill.handle(.tick(at: s(10.2 + 1.8)))
         #expect(drill.phase == .waiting)
         #expect(drill.prompt?.target == FretboardLocation(string: 0, fret: 1))
         #expect(drill.revealedLocations.isEmpty)
@@ -59,7 +59,7 @@ struct WrongAndTimeoutTests {
 
     @Test func revealedLocationsStayInTheFretRange() {
         var drill = lowEDrill(frets: 0...5)
-        drill.handle(.tick(at: s(10)))
+        drill.handle(.tick(at: s(10.2)))
         #expect(drill.revealedLocations == [FretboardLocation(string: 0, fret: 0)])
     }
 }
@@ -128,6 +128,31 @@ struct TimingTests {
         drill.handle(.played(Pitch(40), onset: s(9.95), at: s(10.05)))
         #expect(drill.phase == .correct(FretboardLocation(string: 0, fret: 0)))
         #expect(drill.attempts.first?.responseTime == s(9.95))
+    }
+
+    @Test func aTickJustAfterTheTimeoutWaitsForANoteStillBeingDetected() {
+        // Played at 9.9 s, but detection takes ~130 ms: a tick at 10.0 s mustn't time it out first.
+        var drill = lowEDrill()
+        drill.handle(.tick(at: s(10)))
+        drill.handle(.tick(at: s(10.1)))
+        #expect(drill.phase == .waiting)
+        #expect(drill.timeRemaining(at: s(10.1)) == .zero)
+        drill.handle(.played(Pitch(40), onset: s(9.9), at: s(10.13)))
+        #expect(drill.phase == .correct(FretboardLocation(string: 0, fret: 0)))
+        #expect(drill.attempts.first?.responseTime == s(9.9))
+    }
+
+    @Test func aRightNoteWithAnOnsetAfterTheTimeoutDoesNotCount() {
+        var drill = lowEDrill()
+        drill.handle(.played(Pitch(40), onset: s(10.05), at: s(10.15)))
+        #expect(drill.phase == .timedOut)
+        #expect(drill.attempts.first?.timedOut == true)
+    }
+
+    @Test func theTimeoutHappensOnceTheDetectionGraceIsOver() {
+        var drill = lowEDrill()
+        drill.handle(.tick(at: NotePlayItDrill.timeout + NotePlayItDrill.detectionGrace))
+        #expect(drill.phase == .timedOut)
     }
 
     @Test func stopEndsTheRunAndKeepsTheAttempts() {

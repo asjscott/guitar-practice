@@ -50,6 +50,11 @@ extension Tuning {
         TuningPreset.allCases.first { $0.tuning == self }
     }
 
+    /// The tuning's name for window subtitles: "Standard tuning", or "Custom tuning" for no preset.
+    public var displayName: String {
+        "\(preset?.name ?? "Custom") tuning"
+    }
+
     /// The open strings' names with octave, string 6 first, with no key as context (for
     /// Settings): flats when the tuning is a flat-named preset ("E♭2"), else sharps ("D♯2").
     public var openPitchNames: [String] {
@@ -83,8 +88,11 @@ extension Tuning {
     }
 
     /// A string named by its guitarist number and open note, as drills show it: "string 3 (G)".
-    /// Names exactly one string even when open notes repeat (DADGAD). Ignores any capo.
+    /// Spelled with sharps in every tuning, like the drill's notes (no key applies): "string 6 (D♯)"
+    /// in E♭ standard, where the tuner and Settings say E♭. Names exactly one string even when open
+    /// notes repeat (DADGAD). Ignores any capo.
     public func stringLabel(ofString string: Int) -> String {
-        "string \(stringNumber(ofString: string)) (\(openNoteName(ofString: string)))"
+        let open = NoteName(sharpSpelling: openPitch(ofString: string).pitchClass)
+        return "string \(stringNumber(ofString: string)) (\(open))"
     }
 }

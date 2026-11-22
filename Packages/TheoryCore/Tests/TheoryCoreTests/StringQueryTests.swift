@@ -89,6 +89,15 @@ struct StringLabelTests {
     @Test func openNoteNamesFollowTheTuningsSpelling() {
         #expect(TuningPreset.openD.tuning.openNoteName(ofString: 3).description == "F♯")
         #expect(TuningPreset.eFlatStandard.tuning.openNoteName(ofString: 0).description == "E♭")
-        #expect(TuningPreset.eFlatStandard.tuning.stringLabel(ofString: 3) == "string 3 (G♭)")
+    }
+
+    @Test func drillLabelsUseSharpsEvenInAFlatNamedTuning() {
+        // Drill prompts have no key, so they're all sharps: "D♯ on string 6 (D♯)" in E♭ standard.
+        let eFlat = TuningPreset.eFlatStandard.tuning
+        #expect(eFlat.stringLabel(ofString: 0) == "string 6 (D♯)")
+        #expect(eFlat.stringLabel(ofString: 3) == "string 3 (F♯)")
+        // The tuner and Settings keep the preset's flats.
+        #expect(eFlat.openNoteName(ofString: 0).description == "E♭")
+        #expect(eFlat.openPitchNames[0] == "E♭2")
     }
 }

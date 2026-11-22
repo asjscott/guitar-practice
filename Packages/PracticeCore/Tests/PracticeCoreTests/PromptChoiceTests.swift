@@ -139,14 +139,17 @@ struct InOrderTests {
         #expect(shown.allSatisfy { $0.string == 3 })
     }
 
-    @Test func checkFollowsTheFiltersAndTheCapo() {
+    @Test func checkFollowsTheStringsFretsAndCapoButIgnoresTheNotesFilter() {
+        // Default Notes filter is naturals; a check run still walks every location in range.
         var check = drill(capo: 2) { $0.order = .inOrder; $0.strings = [0, 5]; $0.frets = 0...5 }
         let shown = promptsShown(by: &check, count: 100)
-        // Naturals on string 6 frets 2–5 (F♯ G G♯ A → G, A), then string 1 (same).
-        #expect(shown.compactMap(\.target) == [
-            FretboardLocation(string: 0, fret: 3), FretboardLocation(string: 0, fret: 5),
-            FretboardLocation(string: 5, fret: 3), FretboardLocation(string: 5, fret: 5),
-        ])
+        // String 6 frets 2–5 (F♯ G G♯ A), then string 1 (same).
+        var expected: [FretboardLocation] = []
+        for string in [0, 5] {
+            for fret in 2...5 { expected.append(FretboardLocation(string: string, fret: fret)) }
+        }
+        #expect(shown.compactMap(\.target) == expected)
+        #expect(shown.map(\.noteName) == ["F♯", "G", "G♯", "A", "F♯", "G", "G♯", "A"])
     }
 }
 
@@ -155,6 +158,12 @@ struct PromptTextTests {
     @Test func spelledWithSharpsAndNamedByStringNumberAndOpenNote() {
         let prompt = NotePrompt(pitchClass: PitchClass(6), string: 3)
         #expect(prompt.text(in: .standard) == "F♯ on string 3 (G)")
+    }
+
+    @Test func allSharpsInEFlatStandard() {
+        let eFlat = TuningPreset.eFlatStandard.tuning
+        #expect(NotePrompt(pitchClass: PitchClass(3), string: 0).text(in: eFlat) == "D♯ on string 6 (D♯)")
+        #expect(NotePrompt(pitchClass: PitchClass(6), string: 3).text(in: eFlat) == "F♯ on string 3 (F♯)")
     }
 
     @Test func dadgadLabels() {

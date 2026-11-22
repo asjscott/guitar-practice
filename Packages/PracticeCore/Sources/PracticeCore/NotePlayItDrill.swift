@@ -9,6 +9,13 @@ public struct NotePlayItDrill: Sendable {
     /// With no right note this long after a prompt appears, the attempt times out.
     public static let timeout: Duration = .seconds(10)
 
+    /// How long past the timeout a tick waits before timing the attempt out. A played note reaches the
+    /// engine about 130 ms after its onset (detection, plus the hop to the main actor), so without this a
+    /// tick at 10.0 s would time out a right note played at 9.9 s that is still being detected. The grace
+    /// only delays ticks: a played note still has to have its onset before the timeout to count, and the
+    /// countdown still reaches zero at the timeout.
+    public static let detectionGrace: Duration = .milliseconds(200)
+
     /// How long a right answer stays lit before the next prompt.
     public static let correctPause: Duration = .milliseconds(400)
 
@@ -118,7 +125,8 @@ public struct NotePlayItDrill: Sendable {
         case .stop:
             stop()
         case .played(let pitch, let onset, let now):
-            advance(to: onset)
+            // Up to the onset with no grace: a note played after the timeout doesn't count.
+            advance(to: onset, grace: .zero)
             play(pitch, onset: onset, at: max(onset, now))
             advance(to: now)
         case .tick(let now):
@@ -176,13 +184,13 @@ public struct NotePlayItDrill: Sendable {
         }
     }
 
-    /// Moves the clock to `now`: a due timeout, then a due next prompt.
-    private mutating func advance(to now: Duration) {
-        if isAnswerable, let prompt, let promptStart, now - promptStart >= Self.timeout {
+    /// Moves the clock to `now`: a due timeout (once `grace` past the timeout), then a due next prompt.
+    private mutating func advance(to now: Duration, grace: Duration = detectionGrace) {
+        if isAnswerable, let prompt, let promptStart, now - promptStart >= Self.timeout + grace {
             attempts.append(Attempt(prompt: prompt, firstRight: false, responseTime: nil,
                                     wrongNotes: wrongSoFar, location: nil))
             phase = .timedOut
-            nextPromptAt = promptStart + Self.timeout + Self.revealPause
+            nextPromptAt = promptStart + Self.timeout + Self.detectionGrace + Self.revealPause
         }
         if phase != .paused, let nextPromptAt, now >= nextPromptAt {
             showNextPrompt(at: now)
@@ -191,17 +199,22 @@ public struct NotePlayItDrill: Sendable {
 
     // MARK: - Choosing prompts
 
-    /// The locations the run can prompt: included strings, fret range, capo, note filter.
-    private var candidateLocations: [FretboardLocation] {
+    /// Every location in range: included strings, fret range, at or above the capo.
+    private var locationsInRange: [FretboardLocation] {
         fretboard.strings
             .filter { options.strings?.contains($0) ?? true }
             .flatMap { fretboard.locations(onString: $0, frets: options.frets) }
-            .filter { options.notes == .all || fretboard.pitch(at: $0).pitchClass.isNatural }
     }
 
-    /// "In order (check)": one prompt per location, string 6 first, fret by fret.
+    /// The locations a random run can prompt: those in range that pass the Notes filter.
+    private var candidateLocations: [FretboardLocation] {
+        locationsInRange.filter { options.notes == .all || fretboard.pitch(at: $0).pitchClass.isNatural }
+    }
+
+    /// "In order (check)": one prompt per location in range, string 6 first, fret by fret.
+    /// It ignores the Notes filter: a check walks every location.
     private var checkPrompts: [NotePrompt] {
-        candidateLocations.map {
+        locationsInRange.map {
             NotePrompt(pitchClass: fretboard.pitch(at: $0).pitchClass, string: $0.string, target: $0)
         }
     }

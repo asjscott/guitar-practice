@@ -1,7 +1,6 @@
 import Foundation
 import ListenCore
 import Observation
-import os
 import PracticeCore
 import TheoryCore
 
@@ -43,7 +42,7 @@ final class DrillViewModel {
 
     @ObservationIgnored private var drill = NotePlayItDrill(fretboard: Fretboard(tuning: .standard), options: .init(), seed: 0)
     @ObservationIgnored private var ticker: Task<Void, Never>?
-    @ObservationIgnored private let listener = OSAllocatedUnfairLock(initialState: Listener())
+    @ObservationIgnored private let listener = LockedListener()
 
     /// How often the engine is ticked while running.
     private static let tickInterval: Duration = .milliseconds(33)
@@ -84,7 +83,7 @@ final class DrillViewModel {
     /// The screen is closing: end the run (no summary is shown) and forget what the listener was tracking.
     func leave() {
         stop()
-        listener.withLock { $0 = Listener() }
+        listener.reset()
     }
 
     private func fretboardChanged() {
@@ -128,10 +127,7 @@ final class DrillViewModel {
     var audioConsumer: AudioInputConsumer {
         let listener = self.listener
         return { [weak self] block in
-            let playedNotes = listener.withLock { listener in
-                if block.startsNewStream { listener = Listener() }
-                return listener.process(block.samples, sampleRate: block.sampleRate, time: block.streamTime).playedNotes
-            }
+            let playedNotes = listener.process(block).playedNotes
             guard !playedNotes.isEmpty else { return }
             let clock = StreamClock(block: block)
             let heard = playedNotes.map { HeardNote(pitch: Pitch($0.midiNote), onset: clock.hostTime(ofStreamTime: $0.onset)) }
@@ -151,7 +147,7 @@ final class DrillViewModel {
 
     /// "Standard tuning", plus " · capo 2" with a capo.
     var windowSubtitle: String {
-        "\(tuning.preset?.name ?? "Custom") tuning" + (capo > 0 ? " · capo \(capo)" : "")
+        tuning.displayName + (capo > 0 ? " · capo \(capo)" : "")
     }
 
     /// The neck: no labels except on the answer, the prompted string highlighted while running, the played
@@ -177,12 +173,12 @@ final class DrillViewModel {
         return "on \(prompt.stringLabel(in: tuning))\(fret)"
     }
 
-    /// Seconds since the prompt appeared, and the fraction of the timeout used, while it awaits an answer.
-    var countdown: (elapsed: Double, fraction: Double)? {
+    /// Seconds left before the timeout, and the fraction of the timeout used, while the prompt awaits an answer.
+    var countdown: (remaining: Double, fraction: Double)? {
         guard let remaining = drill.timeRemaining(at: .seconds(now)) else { return nil }
         let timeout = NotePlayItDrill.timeout / .seconds(1)
-        let elapsed = timeout - remaining / .seconds(1)
-        return (elapsed, min(1, max(0, elapsed / timeout)))
+        let left = remaining / .seconds(1)
+        return (left, min(1, max(0, (timeout - left) / timeout)))
     }
 
     var stats: RunStats { RunStats(attempts: snapshot.attempts) }
