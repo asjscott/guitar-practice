@@ -196,7 +196,7 @@ private struct DrillFlashcard: View {
     }
 }
 
-/// The 10 s timeout: a ring that empties as time runs out (orange in the last 30%), with the seconds so far.
+/// The 10 s timeout: a ring that empties as time runs out (orange in the last 30%), with the seconds left.
 private struct DrillCountdownRing: View {
     let model: DrillViewModel
 
@@ -209,12 +209,12 @@ private struct DrillCountdownRing: View {
                 .trim(from: 0, to: 1 - fraction)
                 .stroke(fraction > 0.7 ? Color.orange : Color.accentColor, style: StrokeStyle(lineWidth: 6, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-            Text(countdown.map { String(format: "%.1f", $0.elapsed) } ?? "")
+            Text(countdown.map { String(format: "%.1f", $0.remaining) } ?? "")
                 .font(.callout.monospacedDigit())
         }
         .accessibilityElement()
-        .accessibilityLabel("Time")
-        .accessibilityValue(countdown.map { Text("\(Int($0.elapsed)) seconds") } ?? Text("Not running"))
+        .accessibilityLabel("Time left")
+        .accessibilityValue(countdown.map { Text("\(Int($0.remaining.rounded(.up))) seconds") } ?? Text("Not running"))
     }
 }
 

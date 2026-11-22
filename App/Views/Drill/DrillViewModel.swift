@@ -177,12 +177,12 @@ final class DrillViewModel {
         return "on \(prompt.stringLabel(in: tuning))\(fret)"
     }
 
-    /// Seconds since the prompt appeared, and the fraction of the timeout used, while it awaits an answer.
-    var countdown: (elapsed: Double, fraction: Double)? {
+    /// Seconds left before the timeout, and the fraction of the timeout used, while the prompt awaits an answer.
+    var countdown: (remaining: Double, fraction: Double)? {
         guard let remaining = drill.timeRemaining(at: .seconds(now)) else { return nil }
         let timeout = NotePlayItDrill.timeout / .seconds(1)
-        let elapsed = timeout - remaining / .seconds(1)
-        return (elapsed, min(1, max(0, elapsed / timeout)))
+        let left = remaining / .seconds(1)
+        return (left, min(1, max(0, (timeout - left) / timeout)))
     }
 
     var stats: RunStats { RunStats(attempts: snapshot.attempts) }
