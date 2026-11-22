@@ -17,6 +17,10 @@ settings:
 packages:
   TheoryCore:
     path: Packages/TheoryCore
+  PracticeCore:
+    path: Packages/PracticeCore
+  ListenCore:
+    path: Packages/ListenCore
 
 targets:
   GuitarPractice:
@@ -28,6 +32,8 @@ targets:
           - "**/.gitkeep"
     dependencies:
       - package: TheoryCore
+      - package: PracticeCore
+      - package: ListenCore
     entitlements:                   # hardened runtime, not sandboxed
       path: App/GuitarPractice.entitlements
       properties:
