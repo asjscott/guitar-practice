@@ -34,6 +34,10 @@ targets:
       - package: TheoryCore
       - package: PracticeCore
       - package: ListenCore
+    entitlements:                   # hardened runtime, not sandboxed
+      path: App/GuitarPractice.entitlements
+      properties:
+        com.apple.security.device.audio-input: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.alecscott.GuitarPractice
@@ -41,6 +45,7 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: GuitarPractice
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.music
         INFOPLIST_KEY_NSPrincipalClass: NSApplication
+        INFOPLIST_KEY_NSMicrophoneUsageDescription: "GuitarPractice listens to your guitar through your audio interface to tune and check the notes you play."
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_IDENTITY: "-"       # ad-hoc signing: runs locally, no Apple team needed
         ENABLE_HARDENED_RUNTIME: YES
