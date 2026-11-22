@@ -28,3 +28,5 @@ Sounds/
 # Claude Code local settings
 .claude/settings.local.json
 Guitar Practice App*.md
+# Exception (ADR 0002): small self-recorded ListenCore test clips.
+!Packages/ListenCore/Tests/ListenCoreTests/Fixtures/*.wav

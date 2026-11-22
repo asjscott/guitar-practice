@@ -5,4 +5,4 @@ The spec named AudioKit's PitchTap for pitch detection. We use our own MPM (McLe
 ## Consequences
 
 - `ListenCore` is pure like TheoryCore (samples in, pitch estimates and played notes out); only device selection and the engine tap live in the app.
-- Small self-recorded guitar clips (< 1 MB each) may be committed as test fixtures under `Packages/ListenCore/Tests/Fixtures/`, a narrow exception to the no-audio-in-git rule.
+- Small self-recorded guitar clips (< 1 MB each) may be committed as test fixtures under `Packages/ListenCore/Tests/ListenCoreTests/Fixtures/`, a narrow exception to the no-audio-in-git rule.

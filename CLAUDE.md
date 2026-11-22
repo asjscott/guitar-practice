@@ -17,7 +17,7 @@ Phase order: 0 Foundations → 1 Hear the guitar → 2 Session MVP → 3 Scales 
 
 - Swift 6 (strict concurrency), SwiftUI, macOS 14+, Apple silicon
 - SwiftData for persistence (app target only)
-- AVAudioEngine + AudioKit for audio (from Phase 1; not in Phase 0)
+- AVAudioEngine for audio input (Phase 1), with our own pitch detector in ListenCore (ADR 0002); AudioKit for backing from Phase 4
 - XcodeGen: `project.yml` is the source of truth for the Xcode project
 - Personal use, run from Xcode; public GitHub repo (MIT licence)
 
@@ -33,9 +33,12 @@ GuitarPractice/
 │   ├── Models/                 # SwiftData models
 │   └── Resources/
 ├── Packages/
-│   └── TheoryCore/             # Pure Swift package: no UI, no audio, no SwiftData
-│       ├── Sources/TheoryCore/
-│       └── Tests/TheoryCoreTests/
+│   ├── TheoryCore/             # Pure Swift package: no UI, no audio, no SwiftData
+│   │   ├── Sources/TheoryCore/
+│   │   └── Tests/TheoryCoreTests/
+│   ├── ListenCore/             # Pure: audio samples in → tuner readings + played notes out (Phase 1)
+│   │   └── Tests/ListenCoreTests/Fixtures/   # small self-recorded clips allowed (see Repo rules)
+│   └── PracticeCore/           # Pure: drill engines; depends on TheoryCore only (Phase 1)
 ├── Sounds/                     # git-ignored; filled by scripts/fetch-sounds
 ├── sounds.json                 # (Phase 4) sound pack manifest: url, licence, credit
 ├── scripts/
@@ -47,13 +50,16 @@ GuitarPractice/
 ```bash
 xcodegen generate                                    # after any change to project.yml
 cd Packages/TheoryCore && swift test                 # theory tests (run often)
+cd Packages/ListenCore && swift test                 # detection tests
+cd Packages/PracticeCore && swift test               # drill engine tests
 xcodebuild -scheme GuitarPractice -destination 'platform=macOS' build
 ```
 
-Run `swift test` after every TheoryCore change and `xcodebuild … build` after app changes. Fix failures before moving on.
+Run `swift test` after every change to a package and `xcodebuild … build` after app changes. Fix failures before moving on.
 
 ## Architecture rules
 
+- **ListenCore and PracticeCore are pure too.** ListenCore: samples in, tuner readings and played notes out; no AVFoundation (the engine tap and Core Audio device code live in the app). PracticeCore: drill engines driven by played notes (a `Pitch` and an onset time) and a clock; depends on TheoryCore only, never on ListenCore. The app connects them.
 - **TheoryCore is pure.** Value types, no side effects, no imports beyond Foundation. Every public function has tests. Exercises ask TheoryCore what is correct; they never do note or fret maths themselves.
 - **Layers:** Views → Session engine / Exercise modules / Progress engine → TheoryCore + Audio engine → SwiftData. Lower layers never import higher ones.
 - Use `@Observable` for view state; keep views thin.
@@ -87,7 +93,7 @@ Use the terms in `GLOSSARY.md`. Phase 0 decisions are recorded there and in `doc
 
 ## Repo rules
 
-- Never commit sound files (`Sounds/`, `*.sf2`, `*.sfz`, audio samples). They are git-ignored and fetched by script.
+- Never commit sound files (`Sounds/`, `*.sf2`, `*.sfz`, audio samples). They are git-ignored and fetched by script. One exception: small self-recorded guitar clips (< 1 MB each) used as ListenCore test fixtures, under `Packages/ListenCore/Tests/ListenCoreTests/Fixtures/` (ADR 0002).
 - Small, focused commits with clear messages.
 - Keep `CREDITS.md` up to date when any third-party asset is added.
 
