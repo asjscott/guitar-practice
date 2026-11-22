@@ -3,10 +3,14 @@ import SwiftUI
 
 @main
 struct GuitarPracticeApp: App {
+    /// The app's one audio input, shared by every listening screen in every window.
+    @State private var audioInput = AudioInputService()
+
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .frame(minWidth: 1100, minHeight: 400)
+                .environment(audioInput)
         }
         .commands {
             // Replace the system "Settings…" item with one that explicitly activates
@@ -18,6 +22,7 @@ struct GuitarPracticeApp: App {
 
         Settings {
             SettingsView()
+                .environment(audioInput)
         }
     }
 }
