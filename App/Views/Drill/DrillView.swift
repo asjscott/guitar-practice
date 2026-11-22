@@ -29,7 +29,7 @@ struct DrillView: View {
                 DrillOptionsBar(model: model).disabled(model.isRunning)
             }
             ToolbarItemGroup(placement: .primaryAction) {
-                DrillRunButtons(model: model)
+                DrillRunButtons(model: model, canStart: audioInput.canListen)
             }
         }
         .listensToAudioInput(model.audioConsumer)
@@ -143,9 +143,11 @@ private struct DrillOptionsBar: View {
     }
 }
 
-/// Start (↩) when idle; Pause/Resume (P) and Stop (Esc) during a run.
+/// Start (↩) when idle; Pause/Resume (P) and Stop (Esc) during a run. Start (and ↩) is disabled while
+/// microphone access is denied or there's no input device.
 private struct DrillRunButtons: View {
     let model: DrillViewModel
+    let canStart: Bool
 
     var body: some View {
         if model.isRunning {
@@ -157,6 +159,7 @@ private struct DrillRunButtons: View {
             Button("Start") { model.start() }
                 .keyboardShortcut(.return, modifiers: [])
                 .buttonStyle(.borderedProminent)
+                .disabled(!canStart)
         }
     }
 }
