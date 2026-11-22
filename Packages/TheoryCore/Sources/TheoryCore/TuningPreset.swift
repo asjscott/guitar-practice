@@ -62,9 +62,24 @@ extension Tuning {
     /// A string's open note name without octave, spelled as in `openPitchNames`: flats for a
     /// flat-named preset, else sharps. Ignores any capo.
     public func openNoteName(ofString string: Int) -> NoteName {
-        let pitchClass = openPitch(ofString: string).pitchClass
+        noteName(of: openPitch(ofString: string).pitchClass)
+    }
+
+    /// A note named with no key as context, spelled like the open strings: flats for a
+    /// flat-named preset (E♭ standard), else sharps. For the tuner.
+    public func noteName(of pitchClass: PitchClass) -> NoteName {
         let flats = preset?.spellsWithFlats ?? false
         return flats ? NoteName(flatSpelling: pitchClass) : NoteName(sharpSpelling: pitchClass)
+    }
+
+    /// The string whose open pitch is nearest a sounding note, ignoring any capo: the string a
+    /// tuner thinks is being tuned. `cents` (from `pitch`) settles a note midway between two
+    /// strings; an exact tie goes to the lower string index (nearer string 6).
+    public func nearestString(to pitch: Pitch, cents: Double = 0) -> Int {
+        let sounding = Double(pitch.midi) + cents / 100
+        return strings.min { a, b in
+            abs(Double(openPitch(ofString: a).midi) - sounding) < abs(Double(openPitch(ofString: b).midi) - sounding)
+        } ?? 0
     }
 
     /// A string named by its guitarist number and open note, as drills show it: "string 3 (G)".
