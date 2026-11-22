@@ -53,11 +53,23 @@ extension Tuning {
     /// The open strings' names with octave, string 6 first, with no key as context (for
     /// Settings): flats when the tuning is a flat-named preset ("E♭2"), else sharps ("D♯2").
     public var openPitchNames: [String] {
-        let flats = preset?.spellsWithFlats ?? false
-        return openPitches.map { pitch in
-            let name = flats ? NoteName(flatSpelling: pitch.pitchClass) : NoteName(sharpSpelling: pitch.pitchClass)
+        strings.map { string in
             // Flat and sharp spellings never cross B–C, so the pitch's octave number holds.
-            return "\(name)\(pitch.octave)"
+            "\(openNoteName(ofString: string))\(openPitch(ofString: string).octave)"
         }
+    }
+
+    /// A string's open note name without octave, spelled as in `openPitchNames`: flats for a
+    /// flat-named preset, else sharps. Ignores any capo.
+    public func openNoteName(ofString string: Int) -> NoteName {
+        let pitchClass = openPitch(ofString: string).pitchClass
+        let flats = preset?.spellsWithFlats ?? false
+        return flats ? NoteName(flatSpelling: pitchClass) : NoteName(sharpSpelling: pitchClass)
+    }
+
+    /// A string named by its guitarist number and open note, as drills show it: "string 3 (G)".
+    /// Names exactly one string even when open notes repeat (DADGAD). Ignores any capo.
+    public func stringLabel(ofString string: Int) -> String {
+        "string \(stringNumber(ofString: string)) (\(openNoteName(ofString: string)))"
     }
 }
