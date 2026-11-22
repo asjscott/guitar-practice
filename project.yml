@@ -19,6 +19,8 @@ packages:
     path: Packages/TheoryCore
   PracticeCore:
     path: Packages/PracticeCore
+  ListenCore:
+    path: Packages/ListenCore
 
 targets:
   GuitarPractice:
@@ -31,6 +33,7 @@ targets:
     dependencies:
       - package: TheoryCore
       - package: PracticeCore
+      - package: ListenCore
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.alecscott.GuitarPractice
