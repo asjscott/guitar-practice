@@ -5,6 +5,7 @@ import Foundation
 ///
 /// Fixed for Phase 1: A4 = 440 Hz, equal temperament, a noise gate at
 /// about −50 dBFS. The pitch detector and smoothing are internal.
+/// Tuner smoothing never affects played notes: they come from the raw estimates.
 public struct Listener: Sendable {
     /// Signal below this RMS level (dBFS) counts as no signal.
     public static let noiseGate = -50.0
@@ -18,6 +19,9 @@ public struct Listener: Sendable {
     private var samplesSinceAnalysis = 0
     private var smoother = PitchSmoother()
     private var tunerReading: TunerReading?
+    private var onsets = OnsetDetector(sampleRate: 48_000, gate: Listener.noiseGate)
+    private var notes = NoteTracker(windowDuration: 0)
+    private var playedNotes: [PlayedNote] = []
 
     /// A listener with nothing heard yet.
     public init() {}
@@ -31,16 +35,20 @@ public struct Listener: Sendable {
     /// - Returns: what the listener reports after this block.
     public mutating func process(_ samples: some Collection<Float>, sampleRate: Double, time: Double) -> ListenerOutput {
         if sampleRate != self.sampleRate { reset(sampleRate: sampleRate) }
-        for sample in samples {
+        playedNotes.removeAll()
+        for (index, sample) in samples.enumerated() {
+            let sampleTime = time + Double(index) / sampleRate
+            if onsets.add(sample, time: sampleTime) { notes.onsetDetected(at: sampleTime) }
             window.append(sample)
             samplesSinceAnalysis += 1
             if window.count >= windowSize, samplesSinceAnalysis >= hopSize {
                 samplesSinceAnalysis = 0
                 if window.count > 4 * windowSize { window.removeFirst(window.count - windowSize) }
-                analyse(Array(window.suffix(windowSize)))
+                let end = sampleTime + 1 / sampleRate
+                analyse(Array(window.suffix(windowSize)), start: end - Double(windowSize) / sampleRate, end: end)
             }
         }
-        return ListenerOutput(tunerReading: tunerReading)
+        return ListenerOutput(tunerReading: tunerReading, playedNotes: playedNotes)
     }
 
     private mutating func reset(sampleRate: Double) {
@@ -54,14 +62,26 @@ public struct Listener: Sendable {
         samplesSinceAnalysis = 0
         smoother = PitchSmoother()
         tunerReading = nil
+        onsets = OnsetDetector(sampleRate: sampleRate, gate: Self.noiseGate)
+        notes = NoteTracker(windowDuration: Double(windowSize) / sampleRate)
     }
 
-    private mutating func analyse(_ samples: [Float]) {
-        guard Self.level(of: samples) >= Self.noiseGate,
-              let estimate = detector.estimate(samples) else {
+    /// Analyses one window, from `start` to `end` in stream seconds.
+    private mutating func analyse(_ samples: [Float], start: Double, end: Double) {
+        guard Self.level(of: samples) >= Self.noiseGate else {
+            notes.silence()
             smoother = PitchSmoother()
             tunerReading = nil
             return
+        }
+        guard let estimate = detector.estimate(samples) else {
+            notes.noPitch()
+            smoother = PitchSmoother()
+            tunerReading = nil
+            return
+        }
+        if let note = notes.estimate(frequency: estimate.frequency, start: start, end: end) {
+            playedNotes.append(note)
         }
         tunerReading = TunerReading(frequency: smoother.add(estimate.frequency))
     }
@@ -78,4 +98,6 @@ public struct Listener: Sendable {
 public struct ListenerOutput: Sendable, Equatable {
     /// The current tuner reading; nil when there is no signal.
     public let tunerReading: TunerReading?
+    /// Played notes completed during this block, oldest first; usually none.
+    public let playedNotes: [PlayedNote]
 }

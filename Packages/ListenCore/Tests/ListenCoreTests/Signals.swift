@@ -58,4 +58,9 @@ enum Signals {
             (i < a.count ? a[i] : 0) + (i < b.count ? b[i] : 0)
         }
     }
+
+    /// Silence of the given length.
+    static func silence(_ duration: Double, sampleRate: Double = sampleRate) -> [Float] {
+        [Float](repeating: 0, count: Int(duration * sampleRate))
+    }
 }

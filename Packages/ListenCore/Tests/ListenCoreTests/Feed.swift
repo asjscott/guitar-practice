@@ -40,3 +40,31 @@ func tunerReadings(
         .filter { $0.time >= from && $0.time <= to }
         .map(\.output.tunerReading)
 }
+
+/// One played note, with the stream time of the block end where it was reported.
+struct ReportedNote {
+    let reportedAt: Double
+    let note: PlayedNote
+}
+
+/// Feeds samples to a fresh listener and returns every played note it reports.
+func reportedNotes(
+    _ samples: [Float],
+    sampleRate: Double = Signals.sampleRate,
+    blockSize: Int = 512,
+    startTime: Double = 0
+) -> [ReportedNote] {
+    var listener = Listener()
+    return feed(samples, to: &listener, sampleRate: sampleRate, blockSize: blockSize, startTime: startTime)
+        .flatMap { timed in timed.output.playedNotes.map { ReportedNote(reportedAt: timed.time, note: $0) } }
+}
+
+/// Feeds samples to a fresh listener and returns every played note it reports.
+func playedNotes(
+    _ samples: [Float],
+    sampleRate: Double = Signals.sampleRate,
+    blockSize: Int = 512,
+    startTime: Double = 0
+) -> [PlayedNote] {
+    reportedNotes(samples, sampleRate: sampleRate, blockSize: blockSize, startTime: startTime).map(\.note)
+}
