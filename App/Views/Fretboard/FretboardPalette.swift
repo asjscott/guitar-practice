@@ -13,6 +13,8 @@ enum FretboardPalette {
     static let plainString = Color(red: 0.88, green: 0.88, blue: 0.88)
     static let capoLight = Color(white: 0.35)
     static let capoDark = Color(white: 0.18)
+    /// The band along a highlighted string (a drill's target string).
+    static let stringHighlight = Color.yellow.opacity(0.22)
 
     static let root = Color(red: 0.91, green: 0.45, blue: 0.23)
     static let tone = Color(red: 0.23, green: 0.51, blue: 0.96)
