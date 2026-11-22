@@ -9,8 +9,6 @@ import TheoryCore
 struct ContentView: View {
     @SceneStorage("main.screen") private var screen: Screen = .explorer
     @State private var explorer = ExplorerViewModel()
-    @AppStorage(InstrumentSettings.Key.openPitches) private var storedOpenPitches = InstrumentSettings.defaultOpenPitches
-    @AppStorage(InstrumentSettings.Key.capo) private var storedCapo = InstrumentSettings.defaultCapo
     @AppStorage(InstrumentSettings.Key.positionSystem) private var positionSystem = InstrumentSettings.defaultPositionSystem
 
     var body: some View {
@@ -27,11 +25,9 @@ struct ContentView: View {
             detail
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .onChange(of: storedOpenPitches, initial: true) {
-            explorer.tuning = InstrumentSettings.tuning(from: storedOpenPitches)
-        }
-        .onChange(of: storedCapo, initial: true) {
-            explorer.capo = InstrumentSettings.capo(from: storedCapo)
+        .followsInstrumentSettings { tuning, capo in
+            explorer.tuning = tuning
+            explorer.capo = capo
         }
         .onChange(of: positionSystem, initial: true) {
             explorer.positionSystem = positionSystem

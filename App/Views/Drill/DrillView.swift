@@ -11,8 +11,6 @@ struct DrillView: View {
     @State private var model = DrillViewModel()
     @State private var showSummary = false
     @Environment(AudioInputService.self) private var audioInput
-    @AppStorage(InstrumentSettings.Key.openPitches) private var storedOpenPitches = InstrumentSettings.defaultOpenPitches
-    @AppStorage(InstrumentSettings.Key.capo) private var storedCapo = InstrumentSettings.defaultCapo
 
     var body: some View {
         Group {
@@ -34,11 +32,9 @@ struct DrillView: View {
         }
         .listensToAudioInput(model.audioConsumer)
         .onDisappear { model.leave() }
-        .onChange(of: storedOpenPitches, initial: true) {
-            model.tuning = InstrumentSettings.tuning(from: storedOpenPitches)
-        }
-        .onChange(of: storedCapo, initial: true) {
-            model.capo = InstrumentSettings.capo(from: storedCapo)
+        .followsInstrumentSettings { tuning, capo in
+            model.tuning = tuning
+            model.capo = capo
         }
         .onChange(of: model.isRunning) {
             if !model.isRunning, !model.snapshot.attempts.isEmpty { showSummary = true }
