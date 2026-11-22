@@ -101,7 +101,8 @@ private struct DrillOptionsBar: View {
             Text("Naturals").tag(NotePlayItOptions.Notes.naturals)
             Text("All notes").tag(NotePlayItOptions.Notes.all)
         }
-        .help("Notes")
+        .help("Notes (an In order check walks every note)")
+        .disabled(model.options.order == .inOrder)
         Picker("Frets", selection: $model.options.frets) {
             ForEach(NotePlayItOptions.fretRanges, id: \.self) { range in
                 Text("\(range.lowerBound)–\(range.upperBound)").tag(range)

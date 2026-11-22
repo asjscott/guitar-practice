@@ -2,7 +2,7 @@ import TheoryCore
 
 /// The Note → play it drill's options, chosen before a run and fixed while it goes.
 public struct NotePlayItOptions: Hashable, Sendable {
-    /// Which notes the drill prompts.
+    /// Which notes a random run prompts. "In order (check)" ignores it.
     public enum Notes: Hashable, Sendable {
         /// C D E F G A B only.
         case naturals

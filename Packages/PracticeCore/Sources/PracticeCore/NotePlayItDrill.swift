@@ -191,17 +191,22 @@ public struct NotePlayItDrill: Sendable {
 
     // MARK: - Choosing prompts
 
-    /// The locations the run can prompt: included strings, fret range, capo, note filter.
-    private var candidateLocations: [FretboardLocation] {
+    /// Every location in range: included strings, fret range, at or above the capo.
+    private var locationsInRange: [FretboardLocation] {
         fretboard.strings
             .filter { options.strings?.contains($0) ?? true }
             .flatMap { fretboard.locations(onString: $0, frets: options.frets) }
-            .filter { options.notes == .all || fretboard.pitch(at: $0).pitchClass.isNatural }
     }
 
-    /// "In order (check)": one prompt per location, string 6 first, fret by fret.
+    /// The locations a random run can prompt: those in range that pass the Notes filter.
+    private var candidateLocations: [FretboardLocation] {
+        locationsInRange.filter { options.notes == .all || fretboard.pitch(at: $0).pitchClass.isNatural }
+    }
+
+    /// "In order (check)": one prompt per location in range, string 6 first, fret by fret.
+    /// It ignores the Notes filter: a check walks every location.
     private var checkPrompts: [NotePrompt] {
-        candidateLocations.map {
+        locationsInRange.map {
             NotePrompt(pitchClass: fretboard.pitch(at: $0).pitchClass, string: $0.string, target: $0)
         }
     }
