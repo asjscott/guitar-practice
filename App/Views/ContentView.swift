@@ -1,29 +1,81 @@
 import SwiftUI
 import TheoryCore
 
-/// The main window's root: hosts the fretboard explorer and owns its (unpersisted) state.
-/// Feeds the persisted tuning, capo and position system from Settings into the explorer, live.
+/// The main window's root: a sidebar of screens (Explorer · Tuner · Drill) and the selected
+/// screen as the detail. Remembers the selected screen per window; Explorer on first launch.
+///
+/// Owns the explorer's (unpersisted) state, so it survives switching screens, and feeds the
+/// persisted tuning, capo and position system from Settings into it, live.
 struct ContentView: View {
-    @State private var model = ExplorerViewModel()
+    @SceneStorage("main.screen") private var screen: Screen = .explorer
+    @State private var explorer = ExplorerViewModel()
     @AppStorage(InstrumentSettings.Key.openPitches) private var storedOpenPitches = InstrumentSettings.defaultOpenPitches
     @AppStorage(InstrumentSettings.Key.capo) private var storedCapo = InstrumentSettings.defaultCapo
     @AppStorage(InstrumentSettings.Key.positionSystem) private var positionSystem = InstrumentSettings.defaultPositionSystem
 
     var body: some View {
-        ExplorerView(model: model)
-            .onChange(of: storedOpenPitches, initial: true) {
-                model.tuning = InstrumentSettings.tuning(from: storedOpenPitches)
+        NavigationSplitView {
+            List(selection: selection) {
+                Section("Practice") {
+                    ForEach(Screen.allCases) { screen in
+                        Label(screen.title, systemImage: screen.icon).tag(screen)
+                    }
+                }
             }
-            .onChange(of: storedCapo, initial: true) {
-                model.capo = InstrumentSettings.capo(from: storedCapo)
-            }
-            .onChange(of: positionSystem, initial: true) {
-                model.positionSystem = positionSystem
-            }
+            .navigationSplitViewColumnWidth(min: 160, ideal: 180)
+        } detail: {
+            detail
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .onChange(of: storedOpenPitches, initial: true) {
+            explorer.tuning = InstrumentSettings.tuning(from: storedOpenPitches)
+        }
+        .onChange(of: storedCapo, initial: true) {
+            explorer.capo = InstrumentSettings.capo(from: storedCapo)
+        }
+        .onChange(of: positionSystem, initial: true) {
+            explorer.positionSystem = positionSystem
+        }
+    }
+
+    /// The list's selection; clicking empty space can't deselect into "no screen".
+    private var selection: Binding<Screen?> {
+        Binding(get: { screen }, set: { if let newScreen = $0 { screen = newScreen } })
+    }
+
+    @ViewBuilder private var detail: some View {
+        switch screen {
+        case .explorer: ExplorerView(model: explorer)
+        case .tuner: TunerView()
+        case .drill: DrillView()
+        }
+    }
+}
+
+/// A screen in the main window's sidebar. The raw value is what `@SceneStorage` saves.
+enum Screen: String, CaseIterable, Identifiable {
+    case explorer, tuner, drill
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .explorer: "Explorer"
+        case .tuner: "Tuner"
+        case .drill: "Drill"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .explorer: "guitars"
+        case .tuner: "tuningfork"
+        case .drill: "target"
+        }
     }
 }
 
 #Preview {
     ContentView()
-        .frame(width: 900, height: 420)
+        .frame(width: 1100, height: 420)
 }

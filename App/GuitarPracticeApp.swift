@@ -6,7 +6,7 @@ struct GuitarPracticeApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .frame(minWidth: 900, minHeight: 400)
+                .frame(minWidth: 1100, minHeight: 400)
         }
         .commands {
             // Replace the system "Settings…" item with one that explicitly activates
