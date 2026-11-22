@@ -1,6 +1,5 @@
 import ListenCore
 import Observation
-import os
 import TheoryCore
 
 /// The Tuner screen's state. Adapts the ListenCore listener (fed by the audio input service) to what the
@@ -47,7 +46,7 @@ final class TunerViewModel {
     /// True while the listener hears a pitch; false keeps `reading` on screen, greyed out.
     private(set) var isSounding = false
 
-    @ObservationIgnored private let listener = OSAllocatedUnfairLock(initialState: Listener())
+    @ObservationIgnored private let listener = LockedListener()
 
     // MARK: - Display
 
@@ -109,11 +108,8 @@ final class TunerViewModel {
     var audioConsumer: AudioInputConsumer {
         let listener = self.listener
         return { [weak self] block in
-            let output = listener.withLock { listener in
-                if block.startsNewStream { listener = Listener() }
-                return listener.process(block.samples, sampleRate: block.sampleRate, time: block.streamTime)
-            }
-            Task { @MainActor [weak self] in self?.show(output.tunerReading) }
+            let reading = listener.process(block).tunerReading
+            Task { @MainActor [weak self] in self?.show(reading) }
         }
     }
 
