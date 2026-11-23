@@ -33,8 +33,7 @@ public struct AllInstancesRules: DrillRules {
             startSweep(of: next)
         }
         let location = queue.removeFirst()
-        return NotePrompt(name: setup.fretboard.name(at: location, in: setup.key), string: location.string,
-                          target: location, sweep: sweep)
+        return setup.prompt(at: location, sweep: sweep)
     }
 
     private mutating func startSweep(of note: PitchClass) {
@@ -50,8 +49,7 @@ public struct AllInstancesRules: DrillRules {
     }
 
     public func judge(_ answer: DrillAnswer, for prompt: NotePrompt) -> DrillJudgement {
-        guard case .played(let pitch) = answer, let target = prompt.target else { return .ignored }
-        return pitch == setup.fretboard.pitch(at: target) ? .right(target) : .wrong(.pitch(pitch))
+        setup.judgeExactPitch(answer, for: prompt)
     }
 
     public func correctLocations(for prompt: NotePrompt) -> [FretboardLocation] {
@@ -91,7 +89,7 @@ public struct AllInstancesRules: DrillRules {
             chip(for: location, attempt: index < dealtWith.count ? dealtWith[index] : nil, isCurrent: index == dealtWith.count)
         }
         if display.result != .wrong, let last = dealtWith.last {
-            display.feedback = feedback(after: last)
+            display.feedback = feedback(after: last) ?? display.feedback
             if isOver, let total = SweepResult(attempts: dealtWith, in: setup)?.summaryLine {
                 display.feedback = last.timedOut ? "\(display.feedback) · \(total)" : total
             }
@@ -99,9 +97,9 @@ public struct AllInstancesRules: DrillRules {
         return display
     }
 
-    private func feedback(after attempt: Attempt) -> String {
+    private func feedback(after attempt: Attempt) -> String? {
         if attempt.timedOut, let target = attempt.prompt.target { return "Time's up — it was fret \(target.fret)" }
-        return attempt.rightAnswerText ?? "Listening…"
+        return attempt.rightAnswerText
     }
 
     private func chip(for location: FretboardLocation, attempt: Attempt?, isCurrent: Bool) -> DrillDisplay.Chip {
@@ -116,7 +114,9 @@ public struct AllInstancesRules: DrillRules {
         case .skipped: "skip"
         case .current, .waiting: "–"
         }
-        return DrillDisplay.Chip(title: "\(setup.fretboard.tuning.stringNumber(ofString: location.string))", text: text, state: state)
+        let tuning = setup.fretboard.tuning
+        return DrillDisplay.Chip(title: "\(tuning.stringNumber(ofString: location.string))",
+                                 spokenTitle: tuning.stringLabel(ofString: location.string), text: text, state: state)
     }
 }
 

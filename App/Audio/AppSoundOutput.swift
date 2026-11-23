@@ -60,7 +60,7 @@ final class AppSoundOutput {
         guard let engine else { return nil }
         engine.play(sound)
         let latency = Duration.seconds(engine.latency)
-        if case .tones = sound {} else { chimeEnd = .now + latency + sound.duration }
+        if sound.isChime { chimeEnd = .now + latency + sound.duration }
         return latency
     }
 
@@ -139,7 +139,7 @@ final class AppSoundOutput {
                   let channel = buffer.floatChannelData?[0] else { return }
             buffer.frameLength = AVAudioFrameCount(samples.count)
             for (index, sample) in samples.enumerated() { channel[index] = sample }
-            let player = if case .tones = sound { tones } else { chimes }
+            let player = sound.isChime ? chimes : tones
             player.scheduleBuffer(buffer, at: nil, options: .interrupts)
             if !player.isPlaying { player.play() }
         }

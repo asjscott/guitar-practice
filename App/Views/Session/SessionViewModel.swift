@@ -70,6 +70,9 @@ final class SessionViewModel {
     /// Where drills' sounds go; the view sets it. None (in `LogCheck`): no drill that needs sound.
     var soundOutput: AppSoundOutput?
 
+    /// The audio input, while the screen is open; nil (in `LogCheck`) is no problem.
+    private var input: AudioInputState?
+
     private(set) var snapshot = Snapshot()
 
     /// The note name being typed, in a drill answered by typing.
@@ -104,10 +107,8 @@ final class SessionViewModel {
     @ObservationIgnored private var player: SessionPlayer?
     @ObservationIgnored private var record: PracticeSession?
     @ObservationIgnored private var runLog: (blockIndex: Int, log: RunLog)?
-    @ObservationIgnored private var ticker: Task<Void, Never>?
+    @ObservationIgnored private let ticker = DrillTicker()
     @ObservationIgnored private let feed = PlayedNoteFeed()
-
-    private static let tickInterval: Duration = .milliseconds(33)
 
     var stage: SessionStage { snapshot.stage }
 
@@ -145,6 +146,20 @@ final class SessionViewModel {
         return reasons.contains(nil) ? nil : reasons.compactMap { $0 }.first
     }
 
+    /// Why nothing can be heard: a session can't start or resume. Nil when it can.
+    var inputProblem: AudioInputProblem? { input?.problem }
+
+    /// Why a session can't start; nil when it can.
+    var problem: SessionProblem? {
+        inputProblem.map(SessionProblem.input) ?? nothingToPromptReason.map(SessionProblem.nothingToPrompt)
+    }
+
+    /// The audio input changed. Losing it pauses.
+    func inputChanged(_ new: AudioInputState) {
+        defer { input = new }
+        if let notice = input.flatMap(new.lossNotice) { pause(notice: notice) }
+    }
+
     // MARK: - Theme
 
     /// When it changes, the theme to show may have changed too.
@@ -177,7 +192,7 @@ final class SessionViewModel {
     // MARK: - Control
 
     func start(on date: Date = .now, seed: UInt64 = .random(in: .min ... .max)) {
-        guard stage == .idle, nothingToPromptReason == nil else { return }
+        guard stage == .idle, problem == nil else { return }
         showTheme(on: date)
         // Tried before planning, so that a session without sound is planned as one.
         soundOutput?.prepare()
@@ -198,7 +213,10 @@ final class SessionViewModel {
     func next() { send(.next(at: clockNow())) }
 
     /// +: 2 minutes more for the block.
-    func extend() { send(.extend(at: clockNow())) }
+    func extend() {
+        send(.extend(at: clockNow()))
+        if let player { updateRecord(from: player) }
+    }
 
     /// S.
     func skip() { send(.skip(at: clockNow())) }
@@ -216,7 +234,7 @@ final class SessionViewModel {
 
     /// P while paused.
     func resume() {
-        guard stage == .paused else { return }
+        guard stage == .paused, inputProblem == nil else { return }
         // Ready before the clock is read, so that the first sound and its timer aren't late.
         soundOutput?.prepare()
         soundChanged()
@@ -259,6 +277,7 @@ final class SessionViewModel {
     func leave() {
         pause()
         asksToEnd = false
+        input = nil
         feed.reset()
     }
 
@@ -273,13 +292,8 @@ final class SessionViewModel {
     }
 
     private func startTicking() {
-        ticker?.cancel()
-        ticker = Task { [weak self] in
-            while !Task.isCancelled {
-                try? await Task.sleep(for: Self.tickInterval)
-                guard let self, !Task.isCancelled else { return }
-                send(.tick(at: clockNow()))
-            }
+        ticker.start { [weak self] in
+            if let self { send(.tick(at: clockNow())) }
         }
     }
 
@@ -314,8 +328,7 @@ final class SessionViewModel {
             updateRecord(from: player)
         }
         if player.stage == .paused || player.stage == .finished {
-            ticker?.cancel()
-            ticker = nil
+            ticker.stop()
         } else if before.stage == .paused {
             startTicking()
         }
@@ -348,7 +361,7 @@ final class SessionViewModel {
         let start = hostTimeNow()
         if let latency = soundOutput?.play(sound) {
             player?.handle(.soundStarted(sound, at: .seconds(start), latency: latency))
-        } else if sound == .chime || sound == .softChime {
+        } else if sound.isChime {
             flash = sound
             flashEnd?.cancel()
             flashEnd = Task { [weak self] in
@@ -373,6 +386,7 @@ final class SessionViewModel {
         guard let record else { return }
         record.blocks = record.blocks.enumerated().map { index, block in
             var block = block
+            block.extends = player.extends(ofBlock: index)
             block.spentSeconds = player.spent(inBlock: index).map { $0 / .seconds(1) }
             return block
         }
@@ -398,8 +412,7 @@ final class SessionViewModel {
     }
 
     private func followTyping(_ drill: any Drill) {
-        var entry = nameEntry
-        entry.follow(drill)
+        let entry = nameEntry.following(drill)
         if entry != nameEntry { nameEntry = entry }
     }
 
@@ -476,13 +489,4 @@ extension SessionViewModel.Snapshot {
 /// "Ends 18:42".
 func sessionFinishText(_ timeLeft: Duration, after date: Date) -> String {
     "Ends " + (date + timeLeft / .seconds(1)).formatted(date: .omitted, time: .shortened)
-}
-
-extension Calendar {
-    /// A count of local calendar days, one more each day.
-    static func dayNumber(of date: Date) -> Int {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = .current
-        return calendar.ordinality(of: .day, in: .era, for: date) ?? 0
-    }
 }

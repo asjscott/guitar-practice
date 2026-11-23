@@ -25,6 +25,13 @@ extension SessionPlayer {
         if let name = drill?.prompt?.name { handle(.typed(name, at: s(time))) }
     }
 
+    /// The right answer, as a played note.
+    fileprivate mutating func play(onset: Double, at time: Double) {
+        if let name = drill?.prompt?.name {
+            handle(.played(Pitch(48 + name.pitchClass.value), onset: s(onset), at: s(time)))
+        }
+    }
+
     /// As the app does: plays whatever chime there is.
     fileprivate mutating func playChime(at time: Double) -> AppSound? {
         let chime = takeChime()
@@ -99,8 +106,109 @@ struct SessionChimeTests {
         #expect(player.display == next)
         player.handle(.tick(at: s(255.4)))
         #expect(player.drill?.phase == .waiting)
-        #expect(player.drill?.promptStart == s(255.4))
+        #expect(player.drill?.promptStart == s(255.3))      // 254 + 0.1 + 0.9 + 0.3
         #expect(player.attempts(inBlock: 0).count == count)
+    }
+
+    /// Between two locations, with a chime from 254.1 to the end of its tail at 255.4.
+    private func chimingInASweep() -> SessionPlayer {
+        var player = playing(capo: 1)
+        player.skip(at: 250)
+        player.handle(.tick(at: s(252)))
+        player.play(onset: 254, at: 254.1)
+        #expect(player.playChime(at: 254.1) == .chime)
+        return player
+    }
+
+    @Test func withinASweepANoteFromBeforeTheChimeIsJudged() {
+        var player = chimingInASweep()
+        let count = player.attempts(inBlock: 0).count
+        player.play(onset: 254.08, at: 254.2)
+        #expect(player.attempts(inBlock: 0).count == count + 1)
+        #expect(player.attempts(inBlock: 0).last?.responseTime == s(254.08) - s(254))
+        // The one after it is timed from the chime's end.
+        player.play(onset: 254.3, at: 254.4)
+        #expect(player.attempts(inBlock: 0).count == count + 1)
+        player.handle(.tick(at: s(255.5)))
+        player.play(onset: 256.4, at: 256.5)
+        #expect(player.attempts(inBlock: 0).last?.responseTime == s(1))
+    }
+
+    @Test func withinASweepAWrongNoteFromBeforeTheChimeIsJudged() {
+        var player = chimingInASweep()
+        player.handle(.played(Pitch(59), onset: s(254.08), at: s(254.2)))
+        #expect(player.drill?.phase == .waiting)        // the toy drill ignores it, but the prompt stays up
+        player.handle(.typed(.b, at: s(254.2)))
+        #expect(player.drill?.phase == .wrong(NoteName.b.pitchClass))
+    }
+
+    @Test func withinASweepSkipAndRepeatWorkWhileTheChimeSounds() {
+        var player = chimingInASweep()
+        let count = player.attempts(inBlock: 0).count
+        var prompt = player.drill?.prompt
+        player.handle(.skip(at: s(254.5)))
+        #expect(player.attempts(inBlock: 0).count == count + 1)
+        #expect(player.attempts(inBlock: 0).last?.skipped == true)
+        #expect(player.drill?.prompt != prompt)
+        prompt = player.drill?.prompt
+        player.handle(.repeat(at: s(254.7)))
+        #expect(player.drill?.prompt != prompt)
+        #expect(player.display?.feedback == "Wait for the chime")
+        #expect(player.drill?.timeRemaining(at: s(254.8)) == nil)
+        player.handle(.tick(at: s(255.5)))
+        #expect(player.drill?.promptStart == s(255.4))
+        #expect(player.display?.feedback == "Listening…")
+    }
+
+    @Test func aPromptSkippedToWhileTheChimeSoundsWaitsForItsEnd() {
+        var player = playing()
+        player.skip(at: 250)
+        player.handle(.tick(at: s(252)))
+        player.answer(at: 254)
+        #expect(player.playChime(at: 254) == .chime)
+        _ = player.takeSounds()
+        player.handle(.skip(at: s(254.5)))
+        #expect(player.display == nil)
+        #expect(player.takeSounds().isEmpty)
+        player.handle(.tick(at: s(255.4)))
+        #expect(player.drill?.promptStart == s(256))
+    }
+
+    @Test func aBlockStartedWhileTheChimeSoundsWaitsForItsEnd() {
+        var player = playing()
+        player.skip(at: 250)
+        player.handle(.tick(at: s(252)))
+        player.answer(at: 254)
+        #expect(player.playChime(at: 254) == .chime)
+        player.handle(.next(at: s(254.2)))
+        player.handle(.next(at: s(254.4)))
+        #expect(player.display == nil)
+        player.handle(.tick(at: s(255.4)))
+        #expect(player.drill?.promptStart == s(256))
+    }
+
+    @Test func resumingASweepWhileTheChimeSoundsWaitsForItsEnd() {
+        var player = chimingInASweep()
+        player.handle(.pause(at: s(254.3)))
+        player.handle(.resume(at: s(254.6)))
+        #expect(player.drill?.phase == .waiting)
+        #expect(player.drill?.timeRemaining(at: s(254.7)) == nil)
+        player.handle(.tick(at: s(255.5)))
+        #expect(player.drill?.promptStart == s(255.4))
+    }
+
+    @Test func aChimeHeldThroughAPauseInASweepLeavesTheLocationUp() {
+        var player = playing(capo: 1)
+        player.skip(at: 250)
+        player.handle(.tick(at: s(252)))
+        player.handle(.pause(at: s(253)))
+        player.handle(.resume(at: s(260)))
+        #expect(player.playChime(at: 260) == .chime)
+        let prompt = player.drill?.prompt
+        #expect(prompt != nil)
+        player.handle(.skip(at: s(260.5)))
+        #expect(player.drill?.prompt != prompt)
+        #expect(player.drill?.timeRemaining(at: s(260.5)) == nil)
     }
 
     @Test func skippingMakesAGap() {
@@ -223,6 +331,18 @@ struct SessionExtendTests {
         #expect(player.timeLeft(inBlock: 0) == s(409))
         player.handle(.next(at: s(114)))
         #expect(player.length(ofBlock: 1) == s(180))
+    }
+
+    @Test func extendsAreCounted() {
+        var player = playing()
+        #expect(player.extends(ofBlock: 0) == 0)
+        player.handle(.extend(at: s(110)))
+        player.handle(.extend(at: s(120)))
+        player.handle(.pause(at: s(121)))
+        player.handle(.extend(at: s(122)))      // not while paused
+        #expect(player.extends(ofBlock: 0) == 2)
+        #expect(player.extends(ofBlock: 1) == 0)
+        #expect(player.length(ofBlock: 0) == s(420))
     }
 
     @Test func extendMovesBothChimes() {

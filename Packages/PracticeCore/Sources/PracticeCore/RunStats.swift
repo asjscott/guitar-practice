@@ -9,21 +9,24 @@ public struct RunStats: Hashable, Sendable {
     /// The attempts that count: answered or timed out.
     private var done: [Attempt] { attempts.filter { !$0.skipped } }
 
-    /// Prompts done (answered or timed out).
-    public var prompts: Int { done.count }
+    /// Prompts done (answered or timed out). A sweep is one, as soon as it has an attempt; everything else here is per
+    /// attempt.
+    public var prompts: Int {
+        Set(attempts.compactMap(\.prompt.sweep)).count + done.filter { $0.prompt.sweep == nil }.count
+    }
 
-    /// Prompts skipped. They count in nothing else.
+    /// Attempts skipped. They count in nothing else.
     public var skips: Int { attempts.filter(\.skipped).count }
 
     /// Attempts whose first answer was right.
     public var firstTryRight: Int { attempts.filter(\.firstRight).count }
 
-    /// First-try right as a fraction 0–1; nil before any prompt is done.
+    /// First-try right as a fraction 0–1; nil before any is done.
     public var firstTryAccuracy: Double? {
-        prompts == 0 ? nil : Double(firstTryRight) / Double(prompts)
+        done.isEmpty ? nil : Double(firstTryRight) / Double(done.count)
     }
 
-    /// The median response time of the answered prompts (timeouts and skips left out); nil if none.
+    /// The median response time of the answered attempts (timeouts and skips left out); nil if none.
     public var medianResponseTime: Duration? {
         let times = attempts.compactMap(\.responseTime).sorted()
         guard !times.isEmpty else { return nil }
@@ -31,7 +34,7 @@ public struct RunStats: Hashable, Sendable {
         return times.count.isMultiple(of: 2) ? (times[middle - 1] + times[middle]) / 2 : times[middle]
     }
 
-    /// Prompts that timed out.
+    /// Attempts that timed out.
     public var timeouts: Int { attempts.filter(\.timedOut).count }
 
     /// The slowest attempts, slowest first: timeouts (in the order they happened), then the

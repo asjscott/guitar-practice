@@ -3,16 +3,8 @@ import SwiftUI
 
 /// Why a session can't start.
 enum SessionProblem: Equatable {
-    case noAccess, noInput
+    case input(AudioInputProblem)
     case nothingToPrompt(String)
-
-    var text: String {
-        switch self {
-        case .noAccess: "Microphone access is off"
-        case .noInput: "No input device"
-        case .nothingToPrompt(let reason): reason
-        }
-    }
 }
 
 /// Before a session: the theme, minutes, difficulty, the blocks they give, and Start (↩).
@@ -116,17 +108,13 @@ struct SessionSetupView: View {
     }
 }
 
-struct SessionProblemNotice: View {
+private struct SessionProblemNotice: View {
     let problem: SessionProblem
 
-    @Environment(AudioInputService.self) private var audioInput
-
     var body: some View {
-        HStack {
-            Label(problem.text, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-            if problem == .noAccess {
-                Button("Open System Settings") { audioInput.openMicrophonePrivacySettings() }
-            }
+        switch problem {
+        case .input(let problem): AudioInputProblemNotice(problem: problem)
+        case .nothingToPrompt(let reason): Label(reason, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
         }
     }
 }

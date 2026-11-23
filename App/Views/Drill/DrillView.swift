@@ -6,17 +6,13 @@ import TheoryCore
 /// Skip (S) and Stop (Esc), plus Repeat (R) where the drill has one; the neck card with the target string lit; under
 /// it the target card with its countdown ring, a feedback line and a strip of recent attempts; a status bar with
 /// running stats and the input meter; a summary sheet on Stop. A listening screen: audio input runs while it is
-/// open, and leaving it ends the run. Follows the tuning and capo in Settings.
+/// open. Leaving it pauses the run, as do sleep and losing the input. Follows the tuning and capo in Settings.
 struct DrillView: View {
-    @State private var model: DrillViewModel
+    let model: DrillViewModel
     @State private var showSummary = false
     @Environment(AudioInputService.self) private var audioInput
     @Environment(AppSoundOutput.self) private var soundOutput
     @Environment(AttemptLog.self) private var log
-
-    init(model: DrillViewModel = DrillViewModel()) {
-        _model = State(initialValue: model)
-    }
 
     var body: some View {
         Group {
@@ -33,12 +29,12 @@ struct DrillView: View {
                 DrillOptionsBar(model: model).disabled(model.isRunning)
             }
             ToolbarItemGroup(placement: .primaryAction) {
-                DrillRunButtons(model: model, canStart: audioInput.canListen && (!model.kind.needsSound || soundOutput.hasDevice),
-                                soundProblem: model.kind.needsSound ? soundOutput.problem : nil)
+                DrillRunButtons(model: model)
             }
         }
         .typesNoteNames(isActive: model.takesNoteNames) { model.press($0) }
         .listensToAudioInput(model.audioConsumer)
+        .noticesInterruptions(input: model.inputChanged, sleep: model.pause(notice:))
         .onAppear {
             model.log = log
             model.soundOutput = soundOutput
@@ -72,14 +68,14 @@ struct DrillView: View {
             if let display = model.snapshot.display {
                 DrillTarget(display: display, countdown: model.countdown, typed: model.nameEntry.text)
             } else {
-                DrillRestingCard(model: model, soundProblem: model.kind.needsSound ? soundOutput.problem : nil)
+                DrillRestingCard(model: model)
             }
             DrillAttemptStrip(model: model).padding(.top, 10)
             Spacer(minLength: 12)
 
             Divider()
             HStack(spacing: 18) {
-                Text("\(model.stats.prompts) prompts")
+                Text("\(model.stats.prompts) \(model.stats.prompts == 1 ? "prompt" : "prompts")")
                 Text("first-try \(model.stats.firstTryText)")
                 Text("median \(model.stats.medianText)")
                 if model.stats.skips > 0 { Text("\(model.stats.skips) skipped") }
@@ -88,11 +84,7 @@ struct DrillView: View {
                 AudioInputFallbackNotice()
                 AudioInputLine()
             }
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 24)
-            .frame(height: 32)
-            .background(.bar)
+            .sessionStatusBar()
         }
     }
 }
@@ -173,17 +165,16 @@ private struct DrillOptionsBar: View {
 }
 
 /// Start (↩) when idle; Pause/Resume (P), Skip (S), Repeat (R) and Stop (Esc) during a run. Start (and ↩) is
-/// disabled while microphone access is denied, there's no input device (or no output, for a drill that needs sound), or
+/// disabled until microphone access is given, while there's no input device (or no output, for a drill that needs sound), or
 /// nothing can be prompted.
 private struct DrillRunButtons: View {
     let model: DrillViewModel
-    let canStart: Bool
-    let soundProblem: String?
 
     var body: some View {
         if model.isRunning {
             Button(model.isPaused ? "Resume" : "Pause") { model.togglePause() }
                 .keyboardShortcut("p", modifiers: [])
+                .disabled(model.isPaused && model.inputProblem != nil)
             Button("Skip") { model.skip() }
                 .keyboardShortcut("s", modifiers: [])
                 .disabled(model.isPaused)
@@ -198,8 +189,8 @@ private struct DrillRunButtons: View {
             Button("Start") { model.start() }
                 .keyboardShortcut(.return, modifiers: [])
                 .buttonStyle(.borderedProminent)
-                .disabled(!canStart || model.nothingToPromptReason != nil)
-                .help(model.nothingToPromptReason ?? soundProblem ?? "Start")
+                .disabled(model.startProblem != nil)
+                .help(model.startProblem ?? model.soundProblem ?? "Start")
         }
     }
 }
@@ -209,7 +200,6 @@ private struct DrillRunButtons: View {
 /// In place of a prompt: the drill and how to start (or why it can't), or Paused.
 private struct DrillRestingCard: View {
     let model: DrillViewModel
-    let soundProblem: String?
 
     var body: some View {
         // The same layout as DrillTarget, so nothing jumps.
@@ -225,14 +215,14 @@ private struct DrillRestingCard: View {
     @ViewBuilder private var content: some View {
         if model.isPaused {
             Label("Paused", systemImage: "pause.circle").font(.title.weight(.semibold))
-            if let soundProblem {
-                Text(soundProblem).font(.title3).foregroundStyle(.orange)
+            if let reason = model.inputProblem?.text ?? model.soundProblem ?? model.pauseNotice {
+                Text(reason).font(.title3).foregroundStyle(.orange)
             } else {
                 Text(model.resumesSamePrompt ? "Resume (P) to carry on" : "Resume (P) for a new prompt").font(.title3).foregroundStyle(.secondary)
             }
         } else {
             Text(model.kind.title).font(.title.weight(.semibold))
-            if let reason = model.nothingToPromptReason ?? soundProblem {
+            if let reason = model.startProblem ?? model.soundProblem {
                 Text(reason).font(.title3).foregroundStyle(.orange)
             } else {
                 Text("Press Start (↩)").font(.title3).foregroundStyle(.secondary)
@@ -344,7 +334,7 @@ private extension String {
 }
 
 #Preview {
-    DrillView()
+    DrillView(model: DrillViewModel())
         .environment(AudioInputService())
         .environment(AppSoundOutput(isInert: true))
         .environment(AttemptLog.inMemory())

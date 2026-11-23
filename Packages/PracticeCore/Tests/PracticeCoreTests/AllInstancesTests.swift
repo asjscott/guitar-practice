@@ -144,7 +144,7 @@ struct SweepAnswerTests {
         let display = try #require(drill.display)
         #expect(display.markers == [.init(location: at(0, 8), label: "C", isAnswer: false)])
         #expect(display.feedback == "Time's up — it was fret 8")
-        #expect(display.chips[0] == .init(title: "6", text: "fret 8", state: .timedOut))
+        #expect(display.chips[0] == .init(title: "6", spokenTitle: "string 6 (E)", text: "fret 8", state: .timedOut))
     }
 
     @Test func skipLeavesOneLocationUnrevealed() throws {
@@ -155,7 +155,7 @@ struct SweepAnswerTests {
         #expect(drill.promptStart == s(4))
         let display = try #require(drill.display)
         #expect(display.markers.isEmpty)
-        #expect(display.chips[0] == .init(title: "6", text: "skip", state: .skipped))
+        #expect(display.chips[0] == .init(title: "6", spokenTitle: "string 6 (E)", text: "skip", state: .skipped))
     }
 
     @Test func attemptsShareTheirSweepsNumberAndTheNextSweepHasAnother() {

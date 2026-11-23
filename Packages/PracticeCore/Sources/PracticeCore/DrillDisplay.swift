@@ -7,6 +7,9 @@ public struct DrillMoment: Hashable, Sendable {
     /// Never idle or paused.
     public let phase: DrillPhase
 
+    /// Waiting, but not listening yet.
+    public let isHeld: Bool
+
     /// Wrong answers to this prompt so far.
     public let wrongAnswers: [WrongAnswer]
 
@@ -43,11 +46,14 @@ public struct DrillDisplay: Hashable, Sendable {
         }
 
         public var title: String
+        /// The title in full: "string 6 (E)".
+        public var spokenTitle: String
         public var text: String
         public var state: State
 
-        public init(title: String, text: String, state: State) {
+        public init(title: String, spokenTitle: String, text: String, state: State) {
             self.title = title
+            self.spokenTitle = spokenTitle
             self.text = text
             self.state = state
         }
@@ -97,7 +103,7 @@ public struct DrillDisplay: Hashable, Sendable {
             markers = moment.correctLocations.map { Marker(location: $0, label: prompt.noteName, isAnswer: false) }
         case .waiting, .idle, .paused:
             result = .waiting
-            feedback = "Listening…"
+            feedback = moment.isHeld ? "Wait for the chime" : "Listening…"
         }
     }
 }

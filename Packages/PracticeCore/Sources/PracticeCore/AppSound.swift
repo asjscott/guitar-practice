@@ -9,6 +9,13 @@ public enum AppSound: Hashable, Sendable {
     /// The same, softer: a block's planned end.
     case softChime
 
+    public var isChime: Bool {
+        switch self {
+        case .tones: false
+        case .chime, .softChime: true
+        }
+    }
+
     public var duration: Duration {
         switch self {
         case .tones(let tones): tones.reduce(.zero) { $0 + $1.duration }
@@ -27,7 +34,7 @@ public struct AppSoundFilter: Sendable {
     private static let memory: Duration = .seconds(5)
 
     private struct Window {
-        let isTones: Bool
+        let isChime: Bool
         let start: Duration
         let latency: Duration
         var end: Duration
@@ -40,20 +47,22 @@ public struct AppSoundFilter: Sendable {
     /// A sound was sent to the output, to be heard `latency` later. The wait counts as sound.
     public mutating func started(_ sound: AppSound, at start: Duration, latency: Duration) {
         windows.removeAll { $0.end + Self.memory < start }
-        let isTones = if case .tones = sound { true } else { false }
-        windows.append(Window(isTones: isTones, start: start, latency: latency, end: start + latency + sound.duration))
+        windows.append(Window(isChime: sound.isChime, start: start, latency: latency, end: start + latency + sound.duration))
     }
 
     /// The tones were cut off; a chime plays on.
     public mutating func tonesStopped(at time: Duration) {
-        for index in windows.indices where windows[index].isTones {
+        for index in windows.indices where !windows[index].isChime {
             windows[index].end = min(windows[index].end, time + windows[index].latency)
         }
     }
 
     /// Whether a chime, or the tail after it, would hide the player's notes now.
-    func isChiming(at time: Duration) -> Bool {
-        windows.contains { !$0.isTones && $0.start <= time && time <= $0.end + Self.tail }
+    func isChiming(at time: Duration) -> Bool { chimeEnd(at: time) != nil }
+
+    /// When a chime, tail included, stops hiding them; nil if none does now.
+    func chimeEnd(at time: Duration) -> Duration? {
+        windows.filter { $0.isChime && $0.start <= time && time <= $0.end + Self.tail }.map { $0.end + Self.tail }.max()
     }
 
     /// Whether a played note with this onset may be the app's own sound.

@@ -36,6 +36,9 @@ public struct PromptDrill<Rules: DrillRules>: Drill {
     private var next: (at: Duration, timerStart: Duration?)?
     private var wasAnswerableBeforePause = false
     private var pendingSounds: [DrillSoundRequest] = []
+    /// The prompt's own sounds were asked for and haven't started; a replay's don't count.
+    private var awaitsSound = false
+    private var heldUntil: Duration?
 
     public init(setup: DrillSetup) {
         rules = Rules(setup: setup)
@@ -60,6 +63,10 @@ public struct PromptDrill<Rules: DrillRules>: Drill {
         return true
     }
 
+    public var canHold: Bool {
+        if case .samePrompt = rules.resumeRule { true } else { false }
+    }
+
     /// The location to light on a right answer.
     public var litLocation: FretboardLocation? {
         if case .correct(let location) = phase { location } else { nil }
@@ -76,14 +83,15 @@ public struct PromptDrill<Rules: DrillRules>: Drill {
     }
 
     public func timeRemaining(at now: Duration) -> Duration? {
-        guard isAnswerable, let timerStart else { return nil }
+        guard isAnswerable, heldUntil == nil, let timerStart else { return nil }
         return min(timeLimit, max(.zero, timeLimit - (now - timerStart)))
     }
 
     public var display: DrillDisplay? {
         guard isRunning, let prompt else { return nil }
-        return rules.display(of: DrillMoment(prompt: prompt, phase: phase, wrongAnswers: wrongSoFar,
-                                             attempts: attempts, correctLocations: correctLocations))
+        return rules.display(of: DrillMoment(prompt: prompt, phase: phase, isHeld: heldUntil != nil,
+                                             wrongAnswers: wrongSoFar, attempts: attempts,
+                                             correctLocations: correctLocations))
     }
 
     public mutating func takeSounds() -> [DrillSoundRequest] {
@@ -111,6 +119,10 @@ public struct PromptDrill<Rules: DrillRules>: Drill {
             skip(at: now)
         case .repeat(let now):
             repeatPrompt(at: now)
+        case .soundStarted(let start, let latency):
+            soundStarted(at: start, latency: latency)
+        case .hold(let end):
+            if canHold, isAnswerable { heldUntil = end }
         case .tick(let now):
             advance(to: now)
         }
@@ -135,6 +147,7 @@ public struct PromptDrill<Rules: DrillRules>: Drill {
         guard isRunning, phase != .paused else { return }
         wasAnswerableBeforePause = isAnswerable
         phase = .paused
+        heldUntil = nil
         pendingSounds = []
     }
 
@@ -153,6 +166,7 @@ public struct PromptDrill<Rules: DrillRules>: Drill {
 
     private mutating func stop() {
         phase = .idle
+        heldUntil = nil
         current = nil
         timerStart = nil
         next = nil
@@ -176,7 +190,11 @@ public struct PromptDrill<Rules: DrillRules>: Drill {
         guard isRunning, phase != .paused, let current else { return }
         switch rules.repeated() {
         case .ignored: break
-        case .replaySounds: if isAnswerable { requestSounds(for: current, at: now) }
+        case .replaySounds:
+            if isAnswerable {
+                awaitsSound = false
+                requestSounds(for: current, at: now)
+            }
         case .newPrompt: showNextPrompt(at: now)
         }
     }
@@ -207,9 +225,21 @@ public struct PromptDrill<Rules: DrillRules>: Drill {
         }
     }
 
-    /// Moves the clock to `now`: a due timeout (once `grace` past the timeout), then a due next prompt.
+    /// The prompt's timer runs from its sounds being heard, not from their being sent.
+    private mutating func soundStarted(at start: Duration, latency: Duration) {
+        guard awaitsSound, isAnswerable, let current, let timerStart else { return }
+        awaitsSound = false
+        self.timerStart = max(timerStart, start + latency + rules.timerDelay(for: current))
+    }
+
+    /// Moves the clock to `now`: the end of a hold, a due timeout (once `grace` past the timeout), then a due next
+    /// prompt.
     private mutating func advance(to now: Duration, grace: Duration = DrillTiming.detectionGrace) {
-        if isAnswerable, let current, let timerStart, now - timerStart >= timeLimit + grace {
+        if let end = heldUntil, now >= end {
+            heldUntil = nil
+            if let start = timerStart, isAnswerable { timerStart = max(start, end) }
+        }
+        if isAnswerable, heldUntil == nil, let current, let timerStart, now - timerStart >= timeLimit + grace {
             let attempt = Attempt(prompt: current, outcome: .timedOut, wrongAnswers: wrongSoFar,
                                   rawWrongAnswers: rawWrongSoFar)
             attempts.append(attempt)
@@ -238,6 +268,7 @@ public struct PromptDrill<Rules: DrillRules>: Drill {
         phase = .waiting
         pendingSounds = []
         requestSounds(for: prompt, at: now)
+        awaitsSound = !pendingSounds.isEmpty && rules.timerDelay(for: prompt) > .zero
     }
 
     private mutating func requestSounds(for prompt: NotePrompt, at now: Duration) {

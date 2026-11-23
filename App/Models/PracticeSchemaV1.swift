@@ -90,7 +90,7 @@ enum PracticeSchemaV1: VersionedSchema {
         // What happened.
         /// A PracticeCore `Attempt.Outcome` raw value.
         var outcomeRaw: String
-        var firstTryRight: Bool
+        var firstRight: Bool
         /// Nil unless answered.
         var responseSeconds: Double?
         /// In the order they were given.
@@ -106,7 +106,7 @@ enum PracticeSchemaV1: VersionedSchema {
 
         init(date: Date, sourceRaw: String, drill: String, tuning: [Int], capo: Int, targetName: String,
              targetPitchClass: Int, targetString: Int, targetFret: Int?, targetPitch: Int?, outcomeRaw: String,
-             firstTryRight: Bool, responseSeconds: Double?, wrongAnswers: [WrongAnswerRecord], sweepID: UUID?,
+             firstRight: Bool, responseSeconds: Double?, wrongAnswers: [WrongAnswerRecord], sweepID: UUID?,
              blockIndex: Int?) {
             id = UUID()
             self.date = date
@@ -120,7 +120,7 @@ enum PracticeSchemaV1: VersionedSchema {
             self.targetFret = targetFret
             self.targetPitch = targetPitch
             self.outcomeRaw = outcomeRaw
-            self.firstTryRight = firstTryRight
+            self.firstRight = firstRight
             self.responseSeconds = responseSeconds
             self.wrongAnswers = wrongAnswers
             self.sweepID = sweepID

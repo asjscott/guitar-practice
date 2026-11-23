@@ -6,9 +6,6 @@ import TheoryCore
 /// jumps.
 struct SessionPlayingView: View {
     let model: SessionViewModel
-    /// Why it can't resume; nil when it can.
-    let inputProblem: SessionProblem?
-    let resume: () -> Void
 
     var body: some View {
         let snapshot = model.snapshot
@@ -22,7 +19,7 @@ struct SessionPlayingView: View {
                 Spacer(minLength: 8)
             } else if snapshot.stage == .paused {
                 Spacer(minLength: 8)
-                SessionPausedCard(model: model, inputProblem: inputProblem, resume: resume)
+                SessionPausedCard(model: model)
                 Spacer(minLength: 8)
             } else {
                 DrillNeck(display: snapshot.display, fretboard: model.fretboard, height: 190)
@@ -41,7 +38,7 @@ struct SessionPlayingView: View {
                     if let repeatTitle = block.kind.repeatTitle { SessionKey(key: "R", action: repeatTitle.lowercased()) }
                 }
                 if snapshot.stage == .paused {
-                    if inputProblem == nil { SessionKey(key: "P", action: "resume") }
+                    if model.inputProblem == nil { SessionKey(key: "P", action: "resume") }
                     if model.asksToEnd { SessionKey(key: "↩", action: "end session") }
                     SessionKey(key: "Esc", action: model.asksToEnd ? "stay paused" : "end")
                 } else {
@@ -173,8 +170,6 @@ private struct SessionReadyCard: View {
 /// Paused, and after Esc the question whether to end.
 private struct SessionPausedCard: View {
     let model: SessionViewModel
-    let inputProblem: SessionProblem?
-    let resume: () -> Void
 
     var body: some View {
         VStack(spacing: 16) {
@@ -185,12 +180,12 @@ private struct SessionPausedCard: View {
                     Button("End session ↩", action: model.end)
                     Button("Stay paused (Esc)", action: model.cancelEnd)
                 } else {
-                    Button("Resume (P)", action: resume).disabled(inputProblem != nil)
+                    Button("Resume (P)", action: model.resume).disabled(model.inputProblem != nil)
                     Button("End session", action: model.end)
                 }
             }
             .controlSize(.large)
-            if let inputProblem { SessionProblemNotice(problem: inputProblem) }
+            if let problem = model.inputProblem { AudioInputProblemNotice(problem: problem) }
         }
         .multilineTextAlignment(.center)
         .padding(.horizontal, 24)
