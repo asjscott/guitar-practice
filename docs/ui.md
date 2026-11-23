@@ -22,6 +22,8 @@ The look and behaviour settled in Phase 0. Keep to these when changing a screen.
 - The neck and target card (`App/Views/Drill/DrillTarget.swift`) draw a `DrillDisplay`, for any drill, on both the Drill and session screens.
 - Pause hides the prompt; Resume gives a new one and drops the old. An "In order (check)" run asks for the same location again, as a new prompt, so that none is missed.
 - S skips with no reveal: grey in the attempt strip, and in neither accuracy nor median.
+- A drill that hides its note (Hear → find it) shows ♪ on the card until the prompt ends, and – in the attempt strip for a skip.
+- A drill that needs sound pauses if the output fails, with the reason on the card. No output device disables Start.
 - Start is disabled, with the reason on the card, when nothing can be prompted.
 
 ## Settings

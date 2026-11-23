@@ -94,7 +94,9 @@ public struct DrillSetup: Hashable, Sendable {
     /// Why no location can be prompted, for next to a disabled Start; nil when some can.
     public var nothingToPromptReason: String? {
         if !candidateLocations.isEmpty { return nil }
-        if locationsInRange.isEmpty { return "The capo leaves no frets to play in this range." }
-        return "No natural notes in these frets and strings. Choose All notes."
+        return locationsInRange.isEmpty ? Self.noFretsReason : Self.noNaturalsReason
     }
+
+    static let noFretsReason = "The capo leaves no frets to play in this range."
+    static let noNaturalsReason = "No natural notes in these frets and strings. Choose All notes."
 }

@@ -71,6 +71,27 @@ enum Snapshots {
             drill.capo = 12
         }
 
+        let hear = DrillViewModel()
+        hear.kind = .hearFindIt
+        try await save("hear-waiting", DrillView(model: hear)) { hear.start(seed: 1) }
+        try await save("hear-wrong", DrillView(model: hear)) {
+            hear.start(seed: 1)
+            hear.playForSnapshot(right: false)
+        }
+        try await save("hear-correct", DrillView(model: hear), settle: .milliseconds(150)) {
+            hear.start(seed: 1)
+            hear.skip()
+            hear.playForSnapshot(right: true)
+        }
+        try await save("hear-timed-out", DrillView(model: hear)) {
+            hear.start(seed: 1)
+            hear.timeOutForSnapshot()
+        }
+        let unheard = DrillViewModel()
+        unheard.kind = .hearFindIt
+        try await save("hear-no-output", DrillView(model: unheard),
+                       sound: AppSoundOutput(isInert: true, problem: "There’s no sound output device."))
+
         try await save("drill-not-saving", DrillView(), log: .inMemory(problem: "The file couldn’t be opened."))
 
         try await save("settings-instrument", InstrumentSettingsView(), size: CGSize(width: 520, height: 640))
@@ -79,8 +100,9 @@ enum Snapshots {
 
     /// Hosts `view` in an offscreen window, lets it lay out, applies `prepare`, and writes `<name>.png`.
     private static func save(_ name: String, _ view: some View, size: CGSize = screenSize, log: AttemptLog = .inMemory(),
+                             sound: AppSoundOutput = AppSoundOutput(isInert: true),
                              settle: Duration = .milliseconds(400), prepare: () -> Void = {}) async throws {
-        let host = NSHostingController(rootView: view.frame(width: size.width, height: size.height).environment(audioInput).environment(log))
+        let host = NSHostingController(rootView: view.frame(width: size.width, height: size.height).environment(audioInput).environment(sound).environment(log))
         host.sceneBridgingOptions = [.title, .toolbars]
         let window = NSWindow(contentViewController: host)
         window.isReleasedWhenClosed = false
