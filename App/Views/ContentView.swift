@@ -73,5 +73,7 @@ enum Screen: String, CaseIterable, Identifiable {
 
 #Preview {
     ContentView()
+        .environment(AudioInputService(isInert: true))
+        .environment(AttemptLog.inMemory())
         .frame(width: 1100, height: 420)
 }

@@ -7,7 +7,7 @@ import TheoryCore
 /// Renders the app's screens to PNGs and quits, when `GP_SNAPSHOT=<dir>` is set (see `scripts/snapshot`).
 ///
 /// Draws the app's own offscreen windows, native controls included, so it needs no screen-recording permission.
-/// Audio input is inert, so it never asks for the microphone either. Add a `save` for each new screen or state.
+/// Audio input is inert, so it never asks for the microphone, and the attempt log is in memory. Add a `save` for each new screen or state.
 /// Not faithful: window titles ("Untitled"), and toolbar buttons in dark mode (white blobs).
 @MainActor
 enum Snapshots {
@@ -71,14 +71,16 @@ enum Snapshots {
             drill.capo = 12
         }
 
+        try await save("drill-not-saving", DrillView(), log: .inMemory(problem: "The file couldn’t be opened."))
+
         try await save("settings-instrument", InstrumentSettingsView(), size: CGSize(width: 520, height: 640))
         try await save("settings-audio", AudioSettingsView(), size: CGSize(width: 520, height: 480))
     }
 
     /// Hosts `view` in an offscreen window, lets it lay out, applies `prepare`, and writes `<name>.png`.
-    private static func save(_ name: String, _ view: some View, size: CGSize = screenSize,
+    private static func save(_ name: String, _ view: some View, size: CGSize = screenSize, log: AttemptLog = .inMemory(),
                              settle: Duration = .milliseconds(400), prepare: () -> Void = {}) async throws {
-        let host = NSHostingController(rootView: view.frame(width: size.width, height: size.height).environment(audioInput))
+        let host = NSHostingController(rootView: view.frame(width: size.width, height: size.height).environment(audioInput).environment(log))
         host.sceneBridgingOptions = [.title, .toolbars]
         let window = NSWindow(contentViewController: host)
         window.isReleasedWhenClosed = false

@@ -31,6 +31,9 @@ final class DrillViewModel {
     /// The drill to practise. The view locks it during a run.
     var kind = DrillKind.all[0]
 
+    /// Where attempts are saved; the view sets it before a run can start.
+    @ObservationIgnored var log: AttemptLog?
+
     /// The toolbar's options, shared by every drill. The view locks them during a run; a run uses the options it
     /// started with.
     var options = DrillOptions()
@@ -41,6 +44,7 @@ final class DrillViewModel {
     private(set) var now: Double = 0
 
     @ObservationIgnored private var drill = DrillKind.all[0].makeDrill(DrillSetup(fretboard: Fretboard(tuning: .standard), seed: 0))
+    @ObservationIgnored private var runLog: RunLog?
     @ObservationIgnored private var ticker: Task<Void, Never>?
     @ObservationIgnored private let feed = PlayedNoteFeed()
 
@@ -69,6 +73,7 @@ final class DrillViewModel {
     func start(seed: UInt64 = .random(in: .min ... .max)) {
         guard !isRunning, nothingToPromptReason == nil else { return }
         drill = newDrill(seed: seed)
+        runLog = log?.run()
         send(.start(at: clockNow()))
         startTicking()
     }
@@ -127,6 +132,7 @@ final class DrillViewModel {
 
     private func send(_ event: DrillEvent) {
         drill.handle(event)
+        runLog?.update(from: drill)
         let new = Snapshot(phase: drill.phase, display: drill.display, attempts: drill.attempts)
         if new != snapshot { snapshot = new }
     }
@@ -146,7 +152,7 @@ final class DrillViewModel {
     }
 
     #if DEBUG
-    /// Answers the current prompt, as if a right or wrong note had been played now (see `Snapshots`).
+    /// Answers the current prompt, as if a right or wrong note had been played now (see `Snapshots` and `LogCheck`).
     func playForSnapshot(right: Bool) {
         guard let prompt = drill.prompt,
               let location = prompt.target ?? fretboard.locations(of: prompt.pitchClass, onString: prompt.string,

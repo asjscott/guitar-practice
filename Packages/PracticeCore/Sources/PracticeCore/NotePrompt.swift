@@ -12,10 +12,14 @@ public struct NotePrompt: Hashable, Sendable {
     /// will do. In Note → play it, "In order (check)" sets it but any such fret still answers.
     public let target: FretboardLocation?
 
-    public init(name: NoteName, string: Int, target: FretboardLocation? = nil) {
+    /// Which of the run's sweeps this is in, in All instances; nil in other drills. The log groups attempts by it.
+    public let sweep: Int?
+
+    public init(name: NoteName, string: Int, target: FretboardLocation? = nil, sweep: Int? = nil) {
         self.name = name
         self.string = string
         self.target = target
+        self.sweep = sweep
     }
 
     /// Spelled with sharps, since no key applies.

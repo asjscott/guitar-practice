@@ -11,6 +11,7 @@ struct DrillView: View {
     @State private var model: DrillViewModel
     @State private var showSummary = false
     @Environment(AudioInputService.self) private var audioInput
+    @Environment(AttemptLog.self) private var log
 
     init(model: DrillViewModel = DrillViewModel()) {
         _model = State(initialValue: model)
@@ -35,6 +36,7 @@ struct DrillView: View {
             }
         }
         .listensToAudioInput(model.audioConsumer)
+        .onAppear { model.log = log }
         .onDisappear { model.leave() }
         .followsInstrumentSettings { tuning, capo in
             model.tuning = tuning
@@ -75,6 +77,7 @@ struct DrillView: View {
                 Text("median \(model.stats.medianText)")
                 if model.stats.skips > 0 { Text("\(model.stats.skips) skipped") }
                 Spacer()
+                AttemptLogNotice()
                 AudioInputFallbackNotice()
                 AudioInputLine()
             }
@@ -83,6 +86,22 @@ struct DrillView: View {
             .padding(.horizontal, 24)
             .frame(height: 32)
             .background(.bar)
+        }
+    }
+}
+
+/// Warns that attempts aren't being saved; otherwise nothing.
+struct AttemptLogNotice: View {
+    @Environment(AttemptLog.self) private var log
+
+    var body: some View {
+        if let problem = log.problem {
+            Label {
+                Text("Practice isn’t being saved")
+            } icon: {
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.yellow)
+            }
+            .help(problem)
         }
     }
 }
@@ -301,5 +320,6 @@ private extension String {
 #Preview {
     DrillView()
         .environment(AudioInputService())
+        .environment(AttemptLog.inMemory())
         .frame(width: 1100, height: 600)
 }

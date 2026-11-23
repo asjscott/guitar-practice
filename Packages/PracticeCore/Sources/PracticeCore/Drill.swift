@@ -100,6 +100,9 @@ extension Drill {
     /// An "In order (check)" run, which is never logged.
     public var isCheckRun: Bool { kind.offersOrder && setup.options.order == .inOrder }
 
+    /// This run's attempts as the attempt log wants them, oldest first: none from a check run (ADR 0003).
+    public var attemptsToLog: [Attempt] { isCheckRun ? [] : attempts }
+
     public var fretboard: Fretboard { setup.fretboard }
     public var options: DrillOptions { setup.options }
 
