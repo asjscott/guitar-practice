@@ -34,6 +34,9 @@ final class DrillViewModel {
     /// Where attempts are saved; the view sets it before a run can start.
     @ObservationIgnored var log: AttemptLog?
 
+    /// Where the drill's sounds go; the view sets it before a run can start. None (in `LogCheck`) is silent.
+    @ObservationIgnored var soundOutput: AppSoundOutput?
+
     /// The toolbar's options, shared by every drill. The view locks them during a run; a run uses the options it
     /// started with.
     var options = DrillOptions()
@@ -49,6 +52,7 @@ final class DrillViewModel {
     @ObservationIgnored private var drill = DrillKind.all[0].makeDrill(DrillSetup(fretboard: Fretboard(tuning: .standard), seed: 0))
     @ObservationIgnored private var runLog: RunLog?
     @ObservationIgnored private var ticker: Task<Void, Never>?
+    @ObservationIgnored private var soundFilter = AppSoundFilter()
     @ObservationIgnored private let feed = PlayedNoteFeed()
 
     /// How often the engine is ticked while running.
@@ -69,12 +73,15 @@ final class DrillViewModel {
     /// Why Start is disabled with these options; nil when something can be prompted.
     var nothingToPromptReason: String? { newDrill(seed: 0).nothingToPromptReason }
 
+    /// Why this drill can't be heard, if it needs to be.
+    var soundProblem: String? { kind.needsSound ? soundOutput?.problem : nil }
+
     private func newDrill(seed: UInt64) -> any Drill {
         kind.makeDrill(DrillSetup(fretboard: fretboard, options: options, seed: seed))
     }
 
     func start(seed: UInt64 = .random(in: .min ... .max)) {
-        guard !isRunning, nothingToPromptReason == nil else { return }
+        guard !isRunning, nothingToPromptReason == nil, prepareSound() else { return }
         drill = newDrill(seed: seed)
         runLog = log?.run()
         send(.start(at: clockNow()))
@@ -84,6 +91,7 @@ final class DrillViewModel {
     func togglePause() {
         guard isRunning else { return }
         if isPaused {
+            guard prepareSound() else { return }
             send(.resume(at: clockNow()))
             startTicking()
         } else {
@@ -102,6 +110,18 @@ final class DrillViewModel {
         guard isRunning else { return }
         send(.stop(at: clockNow()))
         stopTicking()
+    }
+
+    /// The sound output failed or came back: a run that needs it pauses.
+    func soundProblemChanged() {
+        if soundProblem != nil, isRunning, !isPaused { togglePause() }
+    }
+
+    /// True unless the drill needs sound and there is none. Ready before the clock is read, so that the first sound
+    /// and its timer aren't late.
+    private func prepareSound() -> Bool {
+        guard kind.needsSound, let soundOutput else { return true }
+        return soundOutput.prepare()
     }
 
     /// The screen is closing: end the run (no summary is shown) and forget what was being heard.
@@ -134,7 +154,9 @@ final class DrillViewModel {
     }
 
     private func send(_ event: DrillEvent) {
+        let oldStart = drill.promptStart
         drill.handle(event)
+        playSounds(isNewPrompt: drill.promptStart != oldStart)
         runLog?.update(from: drill)
         let new = Snapshot(phase: drill.phase, display: drill.display, attempts: drill.attempts)
         if new != snapshot { snapshot = new }
@@ -155,6 +177,26 @@ final class DrillViewModel {
         return true
     }
 
+    // MARK: - Sound
+
+    /// Plays what the drill asks for. A new prompt, pausing and stopping cut off what is playing.
+    private func playSounds(isNewPrompt: Bool) {
+        let requests = drill.takeSounds()
+        guard kind.needsSound, let soundOutput else { return }
+        if isNewPrompt {
+            soundOutput.stopTones()
+            soundFilter.tonesStopped(at: .seconds(AudioInputService.hostTimeNow()))
+        }
+        for request in requests {
+            let sound = AppSound.tones(request.tones)
+            let start = AudioInputService.hostTimeNow()
+            // A failure reaches the screen as the output's problem, which pauses the run.
+            guard let latency = soundOutput.play(sound) else { return }
+            soundFilter.started(sound, at: .seconds(start), latency: latency)
+        }
+        if !drill.isRunning { soundOutput.release() }
+    }
+
     // MARK: - Listening
 
     /// The consumer for `.listensToAudioInput(_:)`.
@@ -164,7 +206,7 @@ final class DrillViewModel {
 
     private func heard(_ notes: [HeardNote]) {
         guard isRunning else { return }
-        for note in notes {
+        for note in notes where !soundFilter.ignores(onset: .seconds(note.onset)) {
             send(.played(note.pitch, onset: .seconds(note.onset), at: .seconds(note.detected)))
         }
     }
@@ -176,8 +218,14 @@ final class DrillViewModel {
               let location = prompt.target ?? fretboard.locations(of: prompt.pitchClass, onString: prompt.string,
                                                                   frets: options.frets).first else { return }
         let pitch = fretboard.pitch(at: location)
-        let now = clockNow()
+        let now = max(clockNow(), drill.promptStart ?? .zero)
         send(.played(right ? pitch : pitch + Interval(1), onset: now, at: now))
+    }
+
+    /// Lets the current prompt's time run out now.
+    func timeOutForSnapshot() {
+        guard let start = drill.promptStart else { return }
+        send(.tick(at: start + drill.timeLimit + DrillTiming.detectionGrace))
     }
 
     /// Names the current prompt, as if typed and submitted now.

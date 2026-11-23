@@ -9,6 +9,7 @@ struct SessionView: View {
     let model: SessionViewModel
 
     @Environment(AudioInputService.self) private var audioInput
+    @Environment(AppSoundOutput.self) private var soundOutput
     @Environment(AttemptLog.self) private var log
     @AppStorage("session.minutes") private var minutes = SessionSetup().minutes
     @AppStorage("session.naturalsOnly") private var naturalsOnly = true
@@ -21,7 +22,10 @@ struct SessionView: View {
             .onPlainKey(press)
             .typesNoteNames(isActive: model.takesNoteNames) { model.press($0) }
             .listensToAudioInput(model.audioConsumer)
-            .onAppear { model.log = log }
+            .onAppear {
+                model.log = log
+                model.soundOutput = soundOutput
+            }
             .onDisappear { model.leave() }
             .followsInstrumentSettings { tuning, capo in
                 model.tuning = tuning
@@ -75,6 +79,7 @@ struct SessionView: View {
 #Preview {
     SessionView(model: SessionViewModel())
         .environment(AudioInputService(isInert: true))
+        .environment(AppSoundOutput(isInert: true))
         .environment(AttemptLog.inMemory())
         .frame(width: 1100, height: 620)
 }

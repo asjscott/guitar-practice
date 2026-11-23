@@ -7,6 +7,7 @@ public struct DrillKind: Identifiable, Sendable {
     public static let all: [DrillKind] = [
         .notePlayIt,
         .allInstances,
+        .hearFindIt,
         .fretNameIt,
     ]
 
@@ -28,6 +29,9 @@ public struct DrillKind: Identifiable, Sendable {
     /// Can't run without sound output.
     public let needsSound: Bool
 
+    /// The note isn't shown while it is prompted, so a skip must not show it either.
+    public let hidesNote: Bool
+
     /// Whether "In order (check)" applies to it.
     public let offersOrder: Bool
 
@@ -37,14 +41,15 @@ public struct DrillKind: Identifiable, Sendable {
     private let make: @Sendable (DrillSetup) -> any Drill
 
     public init<Rules: DrillRules>(id: String, title: String, instructions: String, symbol: String,
-                                   usesKeyboard: Bool = false, needsSound: Bool = false, offersOrder: Bool = false,
-                                   repeatTitle: String? = nil, rules: Rules.Type) {
+                                   usesKeyboard: Bool = false, needsSound: Bool = false, hidesNote: Bool = false,
+                                   offersOrder: Bool = false, repeatTitle: String? = nil, rules: Rules.Type) {
         self.id = id
         self.title = title
         self.instructions = instructions
         self.symbol = symbol
         self.usesKeyboard = usesKeyboard
         self.needsSound = needsSound
+        self.hidesNote = hidesNote
         self.offersOrder = offersOrder
         self.repeatTitle = repeatTitle
         make = { PromptDrill<Rules>(setup: $0) }

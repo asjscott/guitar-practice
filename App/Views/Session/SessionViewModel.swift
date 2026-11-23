@@ -38,8 +38,8 @@ final class SessionViewModel {
     /// Where attempts are saved; the view sets it before a session can start.
     @ObservationIgnored var log: AttemptLog?
 
-    /// Plays the sounds a drill asks for; nil = silence. An empty list stops what is playing.
-    @ObservationIgnored var playSounds: (([DrillSoundRequest]) -> Void)?
+    /// Where drills' sounds go; the view sets it. None (in `LogCheck`): no drill that needs sound.
+    var soundOutput: AppSoundOutput?
 
     private(set) var snapshot = Snapshot()
 
@@ -58,7 +58,6 @@ final class SessionViewModel {
     @ObservationIgnored private var player: SessionPlayer?
     @ObservationIgnored private var record: PracticeSession?
     @ObservationIgnored private var runLog: (blockIndex: Int, log: RunLog)?
-    @ObservationIgnored private var lastPromptStart: Duration?
     @ObservationIgnored private var ticker: Task<Void, Never>?
     @ObservationIgnored private let feed = PlayedNoteFeed()
 
@@ -79,7 +78,10 @@ final class SessionViewModel {
         return DrillSetup(fretboard: fretboard, options: setup.drillOptions(on: fretboard), seed: seed)
     }
 
-    private var usableDrills: [DrillKind] { DrillKind.all.filter { !$0.needsSound || playSounds != nil } }
+    private var usableDrills: [DrillKind] {
+        let canPlay = soundOutput.map { $0.problem == nil } ?? false
+        return DrillKind.all.filter { canPlay || !$0.needsSound }
+    }
 
     /// The blocks a session would have: every drill that has something to prompt, and can be heard if it needs to be.
     func plan(on date: Date = .now) -> [SessionBlock] {
@@ -157,14 +159,17 @@ final class SessionViewModel {
 
     private func send(_ event: SessionEvent) {
         guard var player, player.stage != .finished else { return }
-        let stageBefore = player.stage
+        let before = (stage: player.stage, promptStart: player.drill?.promptStart)
         player.handle(event)
         let sounds = player.takeSounds()
         self.player = player
 
+        playSounds(sounds, isNewPrompt: player.drill?.promptStart != before.promptStart)
         logAttempts(of: player)
-        requestSounds(sounds, from: player)
-        if player.stage != stageBefore { updateRecord(from: player) }
+        if player.stage != before.stage {
+            prepareSound(for: player)
+            updateRecord(from: player)
+        }
         if player.stage == .finished {
             ticker?.cancel()
             ticker = nil
@@ -183,11 +188,28 @@ final class SessionViewModel {
         runLog?.log.update(from: drill)
     }
 
-    /// A new prompt, or none, also stops what is playing.
-    private func requestSounds(_ sounds: [DrillSoundRequest], from player: SessionPlayer) {
-        let promptStart = player.drill?.promptStart
-        if promptStart != lastPromptStart || !sounds.isEmpty { playSounds?(sounds) }
-        lastPromptStart = promptStart
+    /// Plays what the drill asks for. A new prompt, or none, cuts off what is playing.
+    private func playSounds(_ requests: [DrillSoundRequest], isNewPrompt: Bool) {
+        guard let soundOutput, player?.blocks.contains(where: \.kind.needsSound) == true else { return }
+        if isNewPrompt {
+            soundOutput.stopTones()
+            player?.handle(.tonesStopped(at: .seconds(AudioInputService.hostTimeNow())))
+        }
+        for request in requests {
+            let sound = AppSound.tones(request.tones)
+            let start = AudioInputService.hostTimeNow()
+            guard let latency = soundOutput.play(sound) else { return }
+            player?.handle(.soundStarted(sound, at: .seconds(start), latency: latency))
+        }
+    }
+
+    /// The output starts on the Ready card of a block that needs it, so that its first sound and timer aren't late.
+    private func prepareSound(for player: SessionPlayer) {
+        if player.stage != .finished, player.blocks[player.blockIndex].kind.needsSound {
+            soundOutput?.prepare()
+        } else {
+            soundOutput?.release()
+        }
     }
 
     /// Only a session with attempts has been inserted, and only then is there anything to save.

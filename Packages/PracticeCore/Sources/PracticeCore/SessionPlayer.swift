@@ -22,6 +22,10 @@ public enum SessionEvent: Hashable, Sendable {
     /// The clock moved on.
     case tick(at: Duration)
 
+    // What the app does with sounds, so that they are never taken for answers.
+    case soundStarted(AppSound, at: Duration, latency: Duration)
+    case tonesStopped(at: Duration)
+
     // For the drill: ignored unless a block is playing.
     case played(Pitch, onset: Duration, at: Duration)
     case typed(NoteName, at: Duration)
@@ -56,6 +60,7 @@ public struct SessionPlayer: Sendable {
 
     private let setup: DrillSetup
     private var progress: [Progress]
+    private var soundFilter = AppSoundFilter()
     private var lastEvent: Duration = .zero
 
     /// A block as played.
@@ -119,9 +124,13 @@ public struct SessionPlayer: Sendable {
         case .tick(let now):
             passTime(to: now)
             if let readyRemaining, readyRemaining <= .zero { startBlock(at: now) } else { send(.tick(at: now)) }
+        case .soundStarted(let sound, let now, let latency):
+            soundFilter.started(sound, at: now, latency: latency)
+        case .tonesStopped(let now):
+            soundFilter.tonesStopped(at: now)
         case .played(let pitch, let onset, let now):
             passTime(to: now)
-            send(.played(pitch, onset: onset, at: now))
+            if !soundFilter.ignores(onset: onset) { send(.played(pitch, onset: onset, at: now)) }
         case .typed(let name, let now):
             passTime(to: now)
             send(.typed(name, at: now))

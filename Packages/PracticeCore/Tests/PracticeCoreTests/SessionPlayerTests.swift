@@ -179,6 +179,33 @@ struct SessionDrillTests {
         #expect(player.elapsed == s(11))
     }
 
+    @Test func notesDuringAppSoundAreIgnoredEvenInTheNextBlock() {
+        let tones = AppSound.tones([DrillTone(pitch: Pitch(40), duration: s(0.6))])
+        var player = playing()
+        player.handle(.soundStarted(tones, at: s(105), latency: s(0.1)))
+        player.handle(.played(Pitch(40), onset: s(106), at: s(106.1)))      // 0.7 s + 0.3 s tail
+        #expect(player.drill?.phase == .waiting)
+        player.handle(.played(Pitch(40), onset: s(106.05), at: s(106.1)))
+        #expect(player.attempts(inBlock: 0).count == 1)
+
+        player.handle(.next(at: s(107)))
+        player.handle(.soundStarted(.softChime, at: s(107), latency: .zero))
+        player.handle(.next(at: s(107.1)))
+        player.handle(.played(Pitch(40), onset: s(108.1), at: s(108.2)))    // until 108.2
+        #expect(player.drill?.phase == .waiting)
+        player.handle(.played(Pitch(40), onset: s(108.3), at: s(108.4)))
+        #expect(player.attempts(inBlock: 1).count == 1)
+    }
+
+    @Test func tonesCutOffStopBeingIgnored() {
+        let tones = AppSound.tones([DrillTone(pitch: Pitch(40), duration: s(5))])
+        var player = playing()
+        player.handle(.soundStarted(tones, at: s(103), latency: .zero))
+        player.handle(.tonesStopped(at: s(104)))
+        player.handle(.played(Pitch(40), onset: s(104.4), at: s(104.5)))
+        #expect(player.attempts(inBlock: 0).count == 1)
+    }
+
     @Test func eachBlockUsesTheSetupWithItsOwnSeed() {
         var options = DrillOptions()
         options.frets = 3...15
