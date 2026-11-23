@@ -31,6 +31,7 @@ struct FretboardView: View {
         drawNut(in: &context, geometry)
         drawStrings(in: &context, geometry)
         drawCapo(in: &context, geometry)
+        drawStringHighlight(in: &context, geometry)
         drawStringNames(in: &context, geometry)
         drawFretRuler(in: &context, geometry)
         drawMarkers(in: &context, geometry)
@@ -121,6 +122,15 @@ struct FretboardView: View {
         context.fill(Path(roundedRect: bar, cornerRadius: 4),
                      with: .linearGradient(Gradient(colors: [FretboardPalette.capoLight, FretboardPalette.capoDark]),
                                            startPoint: CGPoint(x: bar.minX, y: 0), endPoint: CGPoint(x: bar.maxX, y: 0)))
+    }
+
+    /// A soft yellow band along `diagram.highlightedString`, from its name to the end of the neck,
+    /// over the strings and capo but under the markers. Off when nil.
+    private func drawStringHighlight(in context: inout GraphicsContext, _ g: FretboardGeometry) {
+        guard let string = diagram.highlightedString, (0..<diagram.stringCount).contains(string) else { return }
+        let height = g.rowHeight * 0.9
+        let band = CGRect(x: 0, y: g.y(ofString: string) - height / 2, width: g.neck.maxX, height: height)
+        context.fill(Path(roundedRect: band, cornerRadius: 3), with: .color(FretboardPalette.stringHighlight))
     }
 
     private func drawStringNames(in context: inout GraphicsContext, _ g: FretboardGeometry) {

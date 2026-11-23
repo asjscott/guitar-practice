@@ -50,14 +50,49 @@ extension Tuning {
         TuningPreset.allCases.first { $0.tuning == self }
     }
 
+    /// The tuning's name for window subtitles: "Standard tuning", or "Custom tuning" for no preset.
+    public var displayName: String {
+        "\(preset?.name ?? "Custom") tuning"
+    }
+
     /// The open strings' names with octave, string 6 first, with no key as context (for
     /// Settings): flats when the tuning is a flat-named preset ("E♭2"), else sharps ("D♯2").
     public var openPitchNames: [String] {
-        let flats = preset?.spellsWithFlats ?? false
-        return openPitches.map { pitch in
-            let name = flats ? NoteName(flatSpelling: pitch.pitchClass) : NoteName(sharpSpelling: pitch.pitchClass)
+        strings.map { string in
             // Flat and sharp spellings never cross B–C, so the pitch's octave number holds.
-            return "\(name)\(pitch.octave)"
+            "\(openNoteName(ofString: string))\(openPitch(ofString: string).octave)"
         }
+    }
+
+    /// A string's open note name without octave, spelled as in `openPitchNames`: flats for a
+    /// flat-named preset, else sharps. Ignores any capo.
+    public func openNoteName(ofString string: Int) -> NoteName {
+        noteName(of: openPitch(ofString: string).pitchClass)
+    }
+
+    /// A note named with no key as context, spelled like the open strings: flats for a
+    /// flat-named preset (E♭ standard), else sharps. For the tuner.
+    public func noteName(of pitchClass: PitchClass) -> NoteName {
+        let flats = preset?.spellsWithFlats ?? false
+        return flats ? NoteName(flatSpelling: pitchClass) : NoteName(sharpSpelling: pitchClass)
+    }
+
+    /// The string whose open pitch is nearest a sounding note, ignoring any capo: the string a
+    /// tuner thinks is being tuned. `cents` (from `pitch`) settles a note midway between two
+    /// strings; an exact tie goes to the lower string index (nearer string 6).
+    public func nearestString(to pitch: Pitch, cents: Double = 0) -> Int {
+        let sounding = Double(pitch.midi) + cents / 100
+        return strings.min { a, b in
+            abs(Double(openPitch(ofString: a).midi) - sounding) < abs(Double(openPitch(ofString: b).midi) - sounding)
+        } ?? 0
+    }
+
+    /// A string named by its guitarist number and open note, as drills show it: "string 3 (G)".
+    /// Spelled with sharps in every tuning, like the drill's notes (no key applies): "string 6 (D♯)"
+    /// in E♭ standard, where the tuner and Settings say E♭. Names exactly one string even when open
+    /// notes repeat (DADGAD). Ignores any capo.
+    public func stringLabel(ofString string: Int) -> String {
+        let open = NoteName(sharpSpelling: openPitch(ofString: string).pitchClass)
+        return "string \(stringNumber(ofString: string)) (\(open))"
     }
 }

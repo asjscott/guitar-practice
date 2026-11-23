@@ -109,7 +109,7 @@ final class ExplorerViewModel {
     /// The window subtitle, as in the A2 prototype: "Drop D tuning · capo 2" (no capo part
     /// without a capo; "Custom tuning" when the tuning is not a preset).
     var windowSubtitle: String {
-        "\(tuning.preset?.name ?? "Custom") tuning" + (capo > 0 ? " · capo \(capo)" : "")
+        tuning.displayName + (capo > 0 ? " · capo \(capo)" : "")
     }
 
     /// One mode's share of `content`: the legend differs only in what a non-root dot is.
