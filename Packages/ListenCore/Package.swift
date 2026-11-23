@@ -11,6 +11,10 @@ let package = Package(
     ],
     targets: [
         .target(name: "ListenCore"),
-        .testTarget(name: "ListenCoreTests", dependencies: ["ListenCore"]),
+        .testTarget(
+            name: "ListenCoreTests",
+            dependencies: ["ListenCore"],
+            resources: [.copy("Fixtures")]      // self-recorded clips (ADR 0002)
+        ),
     ]
 )
