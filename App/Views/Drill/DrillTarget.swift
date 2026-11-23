@@ -53,17 +53,19 @@ struct DrillCountdown: Equatable {
 struct DrillTarget: View {
     let display: DrillDisplay
     let countdown: DrillCountdown?
+    /// The note name typed so far (`NoteNameEntry.text`).
+    var typed = ""
 
     var body: some View {
         VStack(spacing: 10) {
             HStack(spacing: 24) {
                 DrillTargetCard(tint: display.result.tint) {
-                    Text(display.headline).font(.system(size: 76, weight: .bold, design: .rounded))
+                    Text(display.acceptsTypedName && !typed.isEmpty ? typed : display.headline).font(.system(size: 76, weight: .bold, design: .rounded))
                     Text(display.subline).font(.title2).foregroundStyle(.secondary)
                 }
                 DrillCountdownRing(countdown: countdown).frame(width: 64, height: 64)
             }
-            Label(display.feedback, systemImage: display.result.symbol)
+            Label(display.feedback, systemImage: display.symbol)
                 .foregroundStyle(display.result.color)
                 .font(.title2.weight(.medium))
         }
@@ -105,6 +107,10 @@ struct DrillCountdownRing: View {
         .accessibilityLabel("Time left")
         .accessibilityValue(countdown.map { Text("\(Int($0.remaining.rounded(.up))) seconds") } ?? Text("Not running"))
     }
+}
+
+private extension DrillDisplay {
+    var symbol: String { result == .waiting && acceptsTypedName ? "keyboard" : result.symbol }
 }
 
 private extension DrillDisplay.Result {

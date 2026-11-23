@@ -21,6 +21,7 @@ The look and behaviour settled in Phase 0. Keep to these when changing a screen.
 - A drill picker at the left of the toolbar, from `DrillKind.all`. Options are shared by every drill and not persisted; Order shows only for drills that offer it.
 - The neck and target card (`App/Views/Drill/DrillTarget.swift`) draw a `DrillDisplay`, for any drill, on both the Drill and session screens.
 - Pause hides the prompt; Resume gives a new one and drops the old. An "In order (check)" run asks for the same location again, as a new prompt, so that none is missed.
+- In a drill answered by typing, `.typesNoteNames` (`App/Views/Drill/NoteNameKeys.swift`) takes A–G, # and b, Backspace and Return before focused controls, the sidebar or shortcuts see them; what is typed replaces the headline. No shortcut uses A–G.
 - S skips with no reveal: grey in the attempt strip, and in neither accuracy nor median.
 - Start is disabled, with the reason on the card, when nothing can be prompted.
 

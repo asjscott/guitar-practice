@@ -35,6 +35,7 @@ struct DrillView: View {
                 DrillRunButtons(model: model, canStart: audioInput.canListen)
             }
         }
+        .typesNoteNames(isActive: model.takesNoteNames) { model.press($0) }
         .listensToAudioInput(model.audioConsumer)
         .onAppear { model.log = log }
         .onDisappear { model.leave() }
@@ -63,7 +64,7 @@ struct DrillView: View {
 
             Spacer(minLength: 12)
             if let display = model.snapshot.display {
-                DrillTarget(display: display, countdown: model.countdown)
+                DrillTarget(display: display, countdown: model.countdown, typed: model.nameEntry.text)
             } else {
                 DrillRestingCard(model: model)
             }

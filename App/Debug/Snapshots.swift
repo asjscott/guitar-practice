@@ -71,10 +71,43 @@ enum Snapshots {
             drill.capo = 12
         }
 
+        // Typed with real key events, so the key handling is exercised too.
+        let naming = DrillViewModel()
+        naming.kind = .fretNameIt
+        try await save("fret-name-it-waiting", DrillView(model: naming)) { naming.start(seed: 1) }
+        try await save("fret-name-it-typed", DrillView(model: naming)) {
+            naming.start(seed: 1)
+            type("gb")
+        }
+        try await save("fret-name-it-wrong", DrillView(model: naming)) {
+            naming.start(seed: 1)
+            type("gb\r")
+        }
+        try await save("fret-name-it-right", DrillView(model: naming), settle: .milliseconds(150)) {
+            naming.start(seed: 1)
+            naming.answerForSnapshot()
+        }
+        try await save("fret-name-it-timed-out", DrillView(model: naming), settle: .milliseconds(10_800)) {
+            naming.start(seed: 1)
+        }
+
         try await save("drill-not-saving", DrillView(), log: .inMemory(problem: "The file couldn’t be opened."))
 
         try await save("settings-instrument", InstrumentSettingsView(), size: CGSize(width: 520, height: 640))
         try await save("settings-audio", AudioSettingsView(), size: CGSize(width: 520, height: 480))
+    }
+
+    /// Sends key presses to the window being saved.
+    private static func type(_ keys: String) {
+        guard let window = NSApp.windows.last(where: \.isVisible) else { return }
+        for key in keys {
+            let code: UInt16 = key == "\r" ? 36 : 0
+            if let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+                                            windowNumber: window.windowNumber, context: nil, characters: String(key),
+                                            charactersIgnoringModifiers: String(key), isARepeat: false, keyCode: code) {
+                NSApp.postEvent(event, atStart: false)
+            }
+        }
     }
 
     /// Hosts `view` in an offscreen window, lets it lay out, applies `prepare`, and writes `<name>.png`.

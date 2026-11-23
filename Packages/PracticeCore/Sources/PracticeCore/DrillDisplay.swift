@@ -53,6 +53,9 @@ public struct DrillDisplay: Hashable, Sendable {
 
     public var markers: [Marker]
 
+    /// Waiting for a typed name: what is typed so far replaces the headline.
+    public var acceptsTypedName = false
+
     /// The display most drills start from, and change what differs.
     public init(standard moment: DrillMoment, in setup: DrillSetup) {
         let prompt = moment.prompt
