@@ -58,6 +58,14 @@ public enum DrillJudgement: Hashable, Sendable {
     case ignored
 }
 
+extension DrillSetup {
+    /// Judges an answer to a prompt for one location: only its exact pitch is right.
+    func judgeExactPitch(_ answer: DrillAnswer, for prompt: NotePrompt) -> DrillJudgement {
+        guard case .played(let pitch) = answer, let target = prompt.target else { return .ignored }
+        return pitch == fretboard.pitch(at: target) ? .right(target) : .wrong(.pitch(pitch))
+    }
+}
+
 public enum DrillRepeat: Hashable, Sendable {
     case ignored
     /// The prompt's sounds again; its timer runs on.

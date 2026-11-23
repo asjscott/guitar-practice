@@ -30,6 +30,11 @@ public enum DrillEvent: Hashable, Sendable {
     case skip(at: Duration)
     /// R: what it does is up to the drill.
     case `repeat`(at: Duration)
+    /// The sounds just asked for were sent to the output, to be heard `latency` later.
+    case soundStarted(at: Duration, latency: Duration)
+    /// Answers can't be heard until then: the prompt that is up, and any that follows, isn't timed before it.
+    /// For drills that can be held (`canHold`); pausing drops it.
+    case hold(until: Duration)
     /// The clock moved on; timeouts and the next prompt happen on ticks.
     case tick(at: Duration)
 }
@@ -82,6 +87,9 @@ public protocol Drill: Sendable {
 
     /// While paused: whether resuming continues the same prompt rather than giving a new one.
     var resumesSamePrompt: Bool { get }
+
+    /// Whether `hold` does anything: the prompt that is up is kept, as it is when resuming.
+    var canHold: Bool { get }
 
     /// What to show for the current prompt; nil when idle or paused.
     var display: DrillDisplay? { get }

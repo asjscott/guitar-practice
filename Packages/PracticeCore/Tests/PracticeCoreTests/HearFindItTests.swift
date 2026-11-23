@@ -81,6 +81,35 @@ struct HearFindItTests {
         #expect(drill.promptStart == s(9.6))
     }
 
+    // MARK: Timing
+
+    @Test func theTimerRunsFromTheTargetBeingHeard() {
+        var drill = lowF()
+        drill.handle(.soundStarted(at: s(0.01), latency: s(0.2)))
+        #expect(drill.promptStart == s(0.81))
+        drill.handle(.played(Pitch(41), onset: s(2.81), at: s(2.9)))
+        #expect(drill.attempts.map(\.responseTime) == [s(2)])
+    }
+
+    @Test func aReplayDoesNotMoveTheTimer() {
+        var drill = lowF()
+        drill.handle(.soundStarted(at: s(0), latency: s(0.2)))
+        drill.handle(.repeat(at: s(5)))
+        drill.handle(.soundStarted(at: s(5), latency: s(0.2)))
+        #expect(drill.promptStart == s(0.8))
+    }
+
+    @Test func aSoundHeardLateInASessionMovesTheTimer() {
+        var player = SessionPlayer(blocks: [SessionBlock(kind: .hearFindIt, length: s(180))],
+                                   setup: DrillSetup(fretboard: Fretboard(tuning: .standard), seed: 1))
+        player.handle(.start(at: s(0)))
+        player.handle(.next(at: s(1)))
+        for request in player.takeSounds() {
+            player.handle(.soundStarted(.tones(request.tones), at: s(1), latency: s(0.25)))
+        }
+        #expect(player.drill?.promptStart == s(1.85))
+    }
+
     // MARK: Answers
 
     @Test func onlyTheExactPitchIsRight() {

@@ -87,8 +87,8 @@ public struct DrillSetup: Hashable, Sendable {
     }
 
     /// A prompt for one location, spelled in the key.
-    public func prompt(at location: FretboardLocation) -> NotePrompt {
-        NotePrompt(name: fretboard.name(at: location, in: key), string: location.string, target: location)
+    public func prompt(at location: FretboardLocation, sweep: Int? = nil) -> NotePrompt {
+        NotePrompt(name: fretboard.name(at: location, in: key), string: location.string, target: location, sweep: sweep)
     }
 
     /// Why no location can be prompted, for next to a disabled Start; nil when some can.

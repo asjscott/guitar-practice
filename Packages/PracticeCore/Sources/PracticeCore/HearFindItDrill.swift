@@ -2,12 +2,12 @@ import TheoryCore
 
 extension DrillKind {
     public static let hearFindIt = DrillKind(
-        id: "hearFindIt", title: "Hear → find it", instructions: "Hear the open string, then a note. Find that note.",
+        id: "hearFindIt", title: "Hear → find it", instructions: "Hear the open string, then a pitch. Find that pitch.",
         symbol: "ear", needsSound: true, hidesNote: true, repeatTitle: "Replay", rules: HearFindItRules.self)
 }
 
-/// Hear → find it: the open string sounds, then a target 1–12 frets above it. Only the exact pitch is right, and the
-/// note stays hidden until the prompt ends. The timer runs from the target sounding.
+/// Hear → find it: the open string sounds, then a target 1–12 frets above it. Only that exact pitch is right, and its
+/// name stays hidden until the prompt ends. The timer runs from the target sounding.
 public struct HearFindItRules: DrillRules {
     public static var kind: DrillKind { .hearFindIt }
     public static let timeout: Duration = .seconds(15)
@@ -39,8 +39,7 @@ public struct HearFindItRules: DrillRules {
     }
 
     public func judge(_ answer: DrillAnswer, for prompt: NotePrompt) -> DrillJudgement {
-        guard case .played(let pitch) = answer, let target = prompt.target else { return .ignored }
-        return pitch == setup.fretboard.pitch(at: target) ? .right(target) : .wrong(.pitch(pitch))
+        setup.judgeExactPitch(answer, for: prompt)
     }
 
     public func correctLocations(for prompt: NotePrompt) -> [FretboardLocation] {

@@ -47,6 +47,20 @@ struct StringQueryTests {
         #expect(frets(capo: 12, within: 0...12) == [])
     }
 
+    @Test(arguments: [TuningPreset.dropD, .dadgad, .openG], [0, 3, 12])
+    func intervalsAboveTheOpenStringInOtherTunings(preset: TuningPreset, capo: Int) {
+        let board = Fretboard(tuning: preset.tuning, capo: capo)
+        let intervals = Interval(1)...Interval(12)
+        for string in board.strings {
+            let found = board.locations(onString: string, frets: 0...22, aboveOpen: intervals)
+            #expect(found.allSatisfy { $0.string == string && (capo...22).contains($0.fret) })
+            #expect(found.allSatisfy { intervals.contains(board.pitch(at: $0) - board.soundingOpenPitch(ofString: string)) })
+            // A fret per semitone, in order and none missing.
+            #expect(found.map(\.fret) == Array(capo + 1...min(capo + 12, 22)))
+            #expect(board.locations(onString: string, frets: 0...12, aboveOpen: intervals) == found.filter { $0.fret <= 12 })
+        }
+    }
+
     @Test func exactPitchOnOneStringWithinFrets() {
         // E3 (52) on string 6 is fret 12; E2 (40) is fret 0.
         #expect(standard.location(of: Pitch(52), onString: 0, frets: 0...12) == FretboardLocation(string: 0, fret: 12))

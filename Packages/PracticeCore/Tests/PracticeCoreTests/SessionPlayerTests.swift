@@ -191,9 +191,10 @@ struct SessionDrillTests {
         player.handle(.next(at: s(107)))
         player.handle(.soundStarted(.softChime, at: s(107), latency: .zero))
         player.handle(.next(at: s(107.1)))
-        player.handle(.played(Pitch(40), onset: s(108.1), at: s(108.2)))    // until 108.2
-        #expect(player.drill?.phase == .waiting)
-        player.handle(.played(Pitch(40), onset: s(108.3), at: s(108.4)))
+        player.handle(.played(Pitch(41), onset: s(108.1), at: s(108.2)))    // until 108.2, and the prompt waits for it
+        #expect(player.drill?.phase == .paused)
+        player.handle(.tick(at: s(108.3)))
+        player.handle(.played(Pitch(41), onset: s(109), at: s(109.1)))
         #expect(player.attempts(inBlock: 1).count == 1)
     }
 

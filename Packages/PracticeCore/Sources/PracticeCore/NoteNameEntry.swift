@@ -54,4 +54,11 @@ public struct NoteNameEntry: Hashable, Sendable {
         if drill.promptStart != promptStart || drill.display?.acceptsTypedName != true { name = nil }
         promptStart = drill.promptStart
     }
+
+    /// The same, as a copy.
+    public func following(_ drill: any Drill) -> NoteNameEntry {
+        var entry = self
+        entry.follow(drill)
+        return entry
+    }
 }
