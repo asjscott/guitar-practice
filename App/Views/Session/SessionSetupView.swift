@@ -1,0 +1,125 @@
+import PracticeCore
+import SwiftUI
+
+/// Why a session can't start.
+enum SessionProblem: Equatable {
+    case noAccess, noInput
+    case nothingToPrompt(String)
+
+    var text: String {
+        switch self {
+        case .noAccess: "Microphone access is off"
+        case .noInput: "No input device"
+        case .nothingToPrompt(let reason): reason
+        }
+    }
+}
+
+/// Before a session: minutes, difficulty, the blocks they give, and Start (↩).
+struct SessionSetupView: View {
+    @Binding var minutes: Int
+    @Binding var naturalsOnly: Bool
+    @Binding var range: SessionRange
+    let blocks: [SessionBlock]
+    let problem: SessionProblem?
+    let start: () -> Void
+
+    @Environment(AudioInputService.self) private var audioInput
+
+    /// What is stored could be anything.
+    private var shownMinutes: Int { SessionSetup(minutes: minutes).minutes }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Spacer(minLength: 8)
+            choices
+            Spacer(minLength: 8)
+            Divider()
+            HStack(spacing: 14) {
+                Spacer()
+                AttemptLogNotice()
+                AudioInputFallbackNotice()
+                AudioInputLine()
+            }
+            .sessionStatusBar()
+        }
+    }
+
+    private var choices: some View {
+        VStack(spacing: 22) {
+            HStack(spacing: 20) {
+                step("minus.circle", "Less time", by: -SessionSetup.minutesStep)
+                Text("\(shownMinutes) min")
+                    .font(.system(size: 64, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .frame(width: 260)
+                step("plus.circle", "More time", by: SessionSetup.minutesStep)
+            }
+            Button(action: start) {
+                Text("Start ↩").font(.title).padding(.horizontal, 48).padding(.vertical, 8)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .disabled(problem != nil)
+            if let problem { notice(problem) }
+            HStack(spacing: 12) {
+                ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
+                    VStack(spacing: 4) {
+                        Image(systemName: block.kind.symbol).font(.title2).foregroundStyle(.secondary)
+                        Text(block.kind.title).font(.callout)
+                        Text(clockText(block.length)).font(.callout.monospacedDigit()).foregroundStyle(.secondary)
+                    }
+                    .frame(width: 150, height: 84)
+                    .sessionCard()
+                    .accessibilityElement(children: .combine)
+                }
+            }
+            HStack {
+                Picker("Notes", selection: $naturalsOnly) {
+                    Text("Naturals").tag(true)
+                    Text("All notes").tag(false)
+                }
+                Picker("Frets", selection: $range) {
+                    ForEach(SessionRange.allCases, id: \.self) { Text($0.title).tag($0) }
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(width: 560)
+        }
+    }
+
+    private func step(_ symbol: String, _ label: String, by change: Int) -> some View {
+        let new = SessionSetup(minutes: shownMinutes + change).minutes
+        return Button { minutes = new } label: {
+            Image(systemName: symbol).font(.largeTitle)
+        }
+        .buttonStyle(.plain)
+        .disabled(new == shownMinutes)
+        .accessibilityLabel(label)
+    }
+
+    private func notice(_ problem: SessionProblem) -> some View {
+        HStack {
+            Label(problem.text, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+            if problem == .noAccess {
+                Button("Open System Settings") { audioInput.openMicrophonePrivacySettings() }
+            }
+        }
+    }
+}
+
+extension View {
+    func sessionCard() -> some View {
+        background(RoundedRectangle(cornerRadius: 12).fill(Color(nsColor: .controlBackgroundColor)))
+            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color(nsColor: .separatorColor)))
+    }
+
+    func sessionStatusBar() -> some View {
+        font(.caption)
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 24)
+            .frame(height: 32)
+            .background(.bar)
+    }
+}

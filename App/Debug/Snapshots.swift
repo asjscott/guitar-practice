@@ -14,7 +14,7 @@ enum Snapshots {
     private static let environment = ProcessInfo.processInfo.environment
     private static let screenSize = CGSize(width: 1100, height: 620)
     private static let audioInput = AudioInputService(defaults: emptyDefaults, isInert: true)
-    /// No saved input device, so the audio line shows the system default rather than a fallback warning.
+    /// Nothing saved: default settings, and the audio line shows the system default rather than a fallback warning.
     private static let emptyDefaults = UserDefaults(suiteName: "GuitarPractice.snapshots") ?? .standard
 
     static var isRequested: Bool { environment["GP_SNAPSHOT"] != nil }
@@ -73,14 +73,87 @@ enum Snapshots {
 
         try await save("drill-not-saving", DrillView(), log: .inMemory(problem: "The file couldn’t be opened."))
 
+        try await saveSession()
+
         try await save("settings-instrument", InstrumentSettingsView(), size: CGSize(width: 520, height: 640))
         try await save("settings-audio", AudioSettingsView(), size: CGSize(width: 520, height: 480))
+    }
+
+    private static func saveSession() async throws {
+        let problems: [(String, SessionProblem)] = [
+            ("access", .noAccess), ("input", .noInput),
+            ("prompts", .nothingToPrompt("No natural notes in these frets and strings. Choose All notes.")),
+        ]
+        for (name, problem) in problems {
+            try await save("session-setup-no-\(name)", SessionSetupView(
+                minutes: .constant(10), naturalsOnly: .constant(false), range: .constant(.wholeNeck),
+                blocks: SessionViewModel().plan(), problem: problem, start: {}))
+        }
+        let session = SessionViewModel()
+        try await save("session-setup", SessionView(model: session))
+
+        // The whole window, with its sidebar focused: Return and Space must get through by themselves.
+        try await save("session-ready-by-keys", ContentView(), settle: .milliseconds(1600)) {
+            focusSidebar()
+            press("\r")
+        }
+        try await save("session-playing-by-keys", ContentView(), settle: .milliseconds(1600)) {
+            focusSidebar()
+            press("\r")
+            press(" ")
+        }
+
+        func play() {
+            session.done()
+            session.start(seed: 1)
+            session.next()
+        }
+        try await save("session-waiting", SessionView(model: session)) { play() }
+        try await save("session-wrong", SessionView(model: session)) {
+            play()
+            session.playForSnapshot(right: false)
+        }
+        try await save("session-right", SessionView(model: session), settle: .milliseconds(150)) {
+            play()
+            session.playForSnapshot(right: true)
+        }
+        try await save("session-summary", SessionView(model: session)) {
+            play()
+            session.skip()
+            session.playForSnapshot(right: false)
+            session.playForSnapshot(right: true)
+            while session.isActive { session.next() }
+        }
+        try await save("session-summary-nothing-done", SessionView(model: session)) {
+            play()
+            session.leave()
+        }
+    }
+
+    private static var newestWindow: NSWindow? { NSApp.windows.last { $0.isVisible } }
+
+    private static func focusSidebar() {
+        func list(in view: NSView) -> NSView? { view is NSTableView ? view : view.subviews.lazy.compactMap(list).first }
+        guard let window = newestWindow, let list = window.contentView.flatMap(list), window.makeFirstResponder(list) else {
+            preconditionFailure("No sidebar to focus")
+        }
+    }
+
+    /// Presses a key in the newest window, as if typed.
+    private static func press(_ key: String) {
+        guard let window = newestWindow,
+              let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
+                                           timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                                           context: nil, characters: key, charactersIgnoringModifiers: key,
+                                           isARepeat: false, keyCode: 0) else { return }
+        NSApp.postEvent(event, atStart: false)
     }
 
     /// Hosts `view` in an offscreen window, lets it lay out, applies `prepare`, and writes `<name>.png`.
     private static func save(_ name: String, _ view: some View, size: CGSize = screenSize, log: AttemptLog = .inMemory(),
                              settle: Duration = .milliseconds(400), prepare: () -> Void = {}) async throws {
-        let host = NSHostingController(rootView: view.frame(width: size.width, height: size.height).environment(audioInput).environment(log))
+        let host = NSHostingController(rootView: view.frame(width: size.width, height: size.height).environment(audioInput).environment(log)
+            .defaultAppStorage(emptyDefaults))
         host.sceneBridgingOptions = [.title, .toolbars]
         let window = NSWindow(contentViewController: host)
         window.isReleasedWhenClosed = false

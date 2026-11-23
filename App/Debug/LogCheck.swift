@@ -20,7 +20,12 @@ enum LogCheck {
         Task {
             do {
                 let log = try AttemptLog.stored(at: URL(fileURLWithPath: environment["GP_LOG_CHECK"] ?? ""))
-                if environment["GP_LOG_CHECK_STEP"] == "read" { try read(log) } else { try await write(log) }
+                if environment["GP_LOG_CHECK_STEP"] == "read" {
+                    try read(log)
+                } else {
+                    try checkSessions()
+                    try await write(log)
+                }
                 if let problem = log.problem { throw LogCheckError.notSaved(problem) }
                 // As abrupt as a crash: nothing gets a chance to save on the way out.
                 fflush(stdout)
@@ -99,6 +104,36 @@ enum LogCheck {
                                  SessionBlockRecord(drill: "b", plannedSeconds: 450)])
     }
 
+    /// Sessions run by the Session screen's model, whatever drills there are: one with attempts in its first block is
+    /// saved with them, and one with none isn't. In memory, since what is prompted varies by day.
+    private static func checkSessions() throws {
+        let log = AttemptLog.inMemory()
+        let session = SessionViewModel()
+        session.log = log
+        session.start()
+        session.next()
+        session.leave()
+        session.done()
+        session.start()
+        session.next()
+        session.skip()
+        session.skip()
+        while session.isActive { session.next() }
+        session.done()
+        session.start()
+        session.next()
+        session.skip()
+        session.leave()
+
+        let saved = try log.context.fetch(FetchDescriptor<PracticeSession>(sortBy: [SortDescriptor(\.startedAt)]))
+        let attempts = try log.context.fetch(FetchDescriptor<LoggedAttempt>())
+        guard saved.map(\.attempts.count) == [2, 1], saved.map(\.state) == [.completed, .endedEarly],
+              saved.allSatisfy({ $0.endedAt != nil && $0.totalSeconds != nil && $0.blocks.first?.spentSeconds != nil }),
+              attempts.count == 3, attempts.allSatisfy({ $0.source == .session && $0.blockIndex == 0 }) else {
+            throw LogCheckError.sessions(saved.map { "\($0.stateRaw) \($0.attempts.count)" })
+        }
+    }
+
     private static func read(_ log: AttemptLog) throws {
         for attempt in try log.context.fetch(FetchDescriptor<LoggedAttempt>(sortBy: [SortDescriptor(\.date)])) {
             let wrong = attempt.wrongAnswers.map { $0.name ?? $0.pitch.map(String.init) ?? "?" }.joined(separator: ",")
@@ -119,6 +154,7 @@ enum LogCheck {
 
     private enum LogCheckError: Error {
         case notSaved(String)
+        case sessions([String])
     }
 }
 #endif
