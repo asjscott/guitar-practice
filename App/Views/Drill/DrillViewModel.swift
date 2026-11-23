@@ -175,6 +175,12 @@ final class DrillViewModel {
 
     var stats: RunStats { RunStats(attempts: snapshot.attempts) }
 
+    /// The run's sweeps, in All instances.
+    var sweeps: [SweepResult] { drill.sweeps }
+
+    /// While paused: whether Resume continues the same prompt.
+    var resumesSamePrompt: Bool { drill.resumesSamePrompt }
+
     /// The last ~14 attempts for the strip under the flashcard, oldest first.
     var recentAttempts: [(id: Int, attempt: Attempt)] {
         let attempts = snapshot.attempts
