@@ -37,6 +37,26 @@ enum Snapshots {
     }
 
     private static func saveAll() async throws {
+        // PROTOTYPE
+        try await save("proto-root", PrototypeSessionRoot(), size: CGSize(width: 920, height: 600))
+        for key in ["S1", "S2", "S3", "S4"] {
+            for stage in [ProtoStage.setup, .ready, .paused, .summary] {
+                let s = ProtoSession()
+                s.stage = stage
+                if stage == .ready { s.elapsedInBlock = 0 }
+                s.index = stage == .ready ? 0 : 1
+                try await save("proto-\(key)-\(stage.rawValue)", PrototypeSessionVariant(key: key, s: s))
+            }
+            for (i, drill) in ProtoDrill.allCases.enumerated() {
+                let s = ProtoSession()
+                s.stage = .playing
+                s.index = i
+                s.result = ProtoResult.allCases[i]
+                if drill == .all { s.elapsedInBlock = 470 }
+                try await save("proto-\(key)-drill\(i)", PrototypeSessionVariant(key: key, s: s))
+            }
+        }
+
         try await save("explorer", ExplorerView(model: ExplorerViewModel()))
 
         let tuner = TunerViewModel()
