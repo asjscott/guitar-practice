@@ -21,7 +21,10 @@ public enum SessionEvent: Hashable, Sendable {
     case next(at: Duration)
     case pause(at: Duration)
     /// Back to what was paused: a Ready card counts down afresh; a drill follows its own resume rule.
+    /// Without sound, a block that needs it is left for the next one.
     case resume(at: Duration)
+    /// +: moves the end of the block that is playing 2 minutes later, in overtime too.
+    case extend(at: Duration)
     /// Ends the session before its last block is over.
     case end(at: Duration)
     /// The clock moved on.
@@ -30,6 +33,8 @@ public enum SessionEvent: Hashable, Sendable {
     // What the app does with sounds, so that they are never taken for answers.
     case soundStarted(AppSound, at: Duration, latency: Duration)
     case tonesStopped(at: Duration)
+    /// Whether sound can be heard. Failing pauses a block that is playing, or the Ready card of one that needs sound.
+    case output(works: Bool, at: Duration)
 
     // For the drill: ignored unless a block is playing.
     case played(Pitch, onset: Duration, at: Duration)
@@ -41,9 +46,18 @@ public enum SessionEvent: Hashable, Sendable {
 /// Runs a session's blocks: a pure state machine driven by events and a clock, like the drills it drives.
 ///
 /// A block ends only when the player moves on. The open prompt is then dropped, unrecorded.
+///
+/// Chimes mark 30 s left and the planned end. Each waits for a gap between prompts, and the next prompt then waits for
+/// it to end, since a note played over it wouldn't count.
 public struct SessionPlayer: Sendable {
     /// How long a Ready card waits before its block starts by itself.
     public static let readyTime: Duration = .seconds(5)
+
+    /// How much an extend adds.
+    public static let extendTime: Duration = .seconds(120)
+
+    /// How long before a block's planned end the first chime is due.
+    public static let warningTime: Duration = .seconds(30)
 
     public let blocks: [SessionBlock]
     public private(set) var stage: SessionStage = .idle
@@ -63,21 +77,32 @@ public struct SessionPlayer: Sendable {
     /// Ended before its last block was over.
     public private(set) var endedEarly = false
 
+    /// Whether sound can be heard.
+    public private(set) var hasSound: Bool
+
     private let setup: DrillSetup
     private var progress: [Progress]
     private var soundFilter = AppSoundFilter()
     private var lastEvent: Duration = .zero
+    /// Waiting for a gap.
+    private var dueChime: AppSound?
+    /// For the app to take.
+    private var chimeToPlay: AppSound?
+    /// On show while a sweep is held between locations for a chime.
+    private var heldDisplay: DrillDisplay?
 
     /// A block as played.
     private struct Progress: Sendable {
         /// Nil until it starts.
         var spent: Duration?
+        var extended: Duration = .zero
         var attempts: [Attempt] = []
     }
 
     /// Every block's drill gets `setup`, with a seed of its own.
-    public init(blocks: [SessionBlock], setup: DrillSetup) {
+    public init(blocks: [SessionBlock], setup: DrillSetup, hasSound: Bool = true) {
         self.blocks = blocks
+        self.hasSound = hasSound
         self.setup = setup
         progress = blocks.map { _ in Progress() }
     }
@@ -87,8 +112,31 @@ public struct SessionPlayer: Sendable {
     /// The block time spent, overtime included; nil if the block hasn't started.
     public func spent(inBlock index: Int) -> Duration? { progress[index].spent }
 
+    /// The block's planned length, extends included.
+    public func length(ofBlock index: Int) -> Duration { blocks[index].length + progress[index].extended }
+
     /// Until the block's planned end; negative in overtime.
-    public func timeLeft(inBlock index: Int) -> Duration { blocks[index].length - (progress[index].spent ?? .zero) }
+    public func timeLeft(inBlock index: Int) -> Duration { length(ofBlock: index) - (progress[index].spent ?? .zero) }
+
+    /// Passed over for want of sound, or going to be.
+    public func isLeftOut(block index: Int) -> Bool {
+        progress[index].spent == nil && (index < blockIndex || !canRun(block: index))
+    }
+
+    private func canRun(block index: Int) -> Bool { hasSound || !blocks[index].kind.needsSound }
+
+    /// Until the session's end, if each block ends on time (or, in overtime, now).
+    public var timeToFinish: Duration {
+        guard stage != .finished else { return .zero }
+        return blocks.indices[blockIndex...].filter { canRun(block: $0) }.reduce(.zero) { total, index in
+            var ready: Duration = progress[index].spent == nil ? Self.readyTime : .zero
+            if index == blockIndex, let readyRemaining { ready = readyRemaining }
+            return total + ready + max(.zero, timeLeft(inBlock: index))
+        }
+    }
+
+    /// What to show for the drill; nil when no prompt is on show.
+    public var display: DrillDisplay? { stage == .playing ? drill?.display ?? heldDisplay : nil }
 
     /// The block's attempts, oldest first.
     public func attempts(inBlock index: Int) -> [Attempt] { progress[index].attempts }
@@ -105,9 +153,21 @@ public struct SessionPlayer: Sendable {
     /// The sounds the drill asked for since the last call: call it after every event, as for a drill.
     public mutating func takeSounds() -> [DrillSoundRequest] { drill?.takeSounds() ?? [] }
 
+    /// The chime to sound now, or to flash if it can't be heard; once. Call it after every event too.
+    public mutating func takeChime() -> AppSound? {
+        defer { chimeToPlay = nil }
+        return chimeToPlay
+    }
+
     // MARK: - Events
 
     public mutating func handle(_ event: SessionEvent) {
+        let attemptCount = drill?.attempts.count ?? 0
+        act(on: event)
+        soundDueChime(afterAttempt: (drill?.attempts.count ?? 0) > attemptCount)
+    }
+
+    private mutating func act(on event: SessionEvent) {
         switch event {
         case .start(let now):
             guard stage == .idle else { return }
@@ -123,18 +183,27 @@ public struct SessionPlayer: Sendable {
         case .pause(let now):
             guard stage == .ready || stage == .playing else { return }
             passTime(to: now)
-            send(.pause(at: now))
-            stage = .paused
-            readyRemaining = nil
+            pause(at: now)
         case .resume(let now):
             guard stage == .paused else { return }
             passTime(to: now)
             if drill == nil {
                 showReady(blockIndex)
-            } else {
+            } else if canRun(block: blockIndex) {
                 stage = .playing
-                send(.resume(at: now))
+                // After a held chime, if there is one to be heard.
+                let waits = dueChime != nil && hasSound
+                releaseChime()
+                if !waits { send(.resume(at: now)) }
+            } else {
+                endBlock(at: now)
             }
+        case .extend(let now):
+            passTime(to: now)
+            guard stage == .playing else { return }
+            progress[blockIndex].extended += Self.extendTime
+            let left = timeLeft(inBlock: blockIndex)
+            if (dueChime == .chime && left > Self.warningTime) || (dueChime == .softChime && left > .zero) { dueChime = nil }
         case .end(let now):
             guard stage == .ready || stage == .playing || stage == .paused else { return }
             passTime(to: now)
@@ -143,17 +212,26 @@ public struct SessionPlayer: Sendable {
             finish()
         case .tick(let now):
             passTime(to: now)
-            if let readyRemaining, readyRemaining <= .zero { startBlock(at: now) } else { send(.tick(at: now)) }
+            if let readyRemaining, readyRemaining <= .zero {
+                startBlock(at: now)
+            } else if !isHeldForChime(at: now) {
+                send(drill?.phase == .paused ? .resume(at: now) : .tick(at: now))
+            }
+        case .output(let works, let now):
+            passTime(to: now)
+            let failed = hasSound && !works
+            hasSound = works
+            if failed, stage == .playing || (stage == .ready && !canRun(block: blockIndex)) { pause(at: now) }
         case .soundStarted(let sound, let now, let latency):
             soundFilter.started(sound, at: now, latency: latency)
         case .tonesStopped(let now):
             soundFilter.tonesStopped(at: now)
         case .played(let pitch, let onset, let now):
             passTime(to: now)
-            if !soundFilter.ignores(onset: onset) { send(.played(pitch, onset: onset, at: now)) }
+            if !soundFilter.ignores(onset: onset), !isHeldForChime(at: now) { send(.played(pitch, onset: onset, at: now)) }
         case .typed(let name, let now):
             passTime(to: now)
-            send(.typed(name, at: now))
+            if !isHeldForChime(at: now) { send(.typed(name, at: now)) }
         case .skip(let now):
             passTime(to: now)
             send(.skip(at: now))
@@ -173,14 +251,62 @@ public struct SessionPlayer: Sendable {
         case .ready:
             readyRemaining = readyRemaining.map { max(.zero, $0 - passed) }
         case .playing:
+            let before = timeLeft(inBlock: blockIndex)
             progress[blockIndex].spent? += passed
+            let after = timeLeft(inBlock: blockIndex)
+            if before > Self.warningTime, after <= Self.warningTime { dueChime = .chime }
+            if before > .zero, after <= .zero { dueChime = .softChime }
         }
         elapsed += passed
     }
 
-    private mutating func showReady(_ index: Int) {
+    private mutating func pause(at now: Duration) {
+        send(.pause(at: now))
+        stage = .paused
+        readyRemaining = nil
+        heldDisplay = nil
+    }
+
+    // MARK: - Chimes
+
+    /// Whether the drill is between prompts with a chime sounding: until it ends, only a skip or repeat moves it on.
+    private func isHeldForChime(at now: Duration) -> Bool {
+        guard soundFilter.isChiming(at: now) else { return false }
+        return switch drill?.phase {
+        case .correct, .timedOut, .paused: true
+        case .waiting, .wrong, .idle, nil: false
+        }
+    }
+
+    /// Sounds the due chime if this is a gap. Where the next prompt is up already (within a sweep, or after a skip), the
+    /// drill is paused; the first tick after the chime resumes it. A flash needs no waiting for.
+    private mutating func soundDueChime(afterAttempt: Bool) {
+        guard stage == .playing, dueChime != nil, let drill else { return }
+        switch drill.phase {
+        case .correct, .timedOut, .paused, .idle:
+            break
+        case .waiting, .wrong:
+            guard afterAttempt else { return }
+            if hasSound {
+                send(.pause(at: lastEvent))
+                heldDisplay = self.drill?.resumesSamePrompt == true ? drill.display : nil
+            }
+        }
+        releaseChime()
+    }
+
+    private mutating func releaseChime() {
+        guard let dueChime else { return }
+        chimeToPlay = dueChime
+        self.dueChime = nil
+    }
+
+    // MARK: - Blocks
+
+    /// Blocks that need sound are passed over when there is none.
+    private mutating func showReady(_ first: Int) {
+        guard let index = blocks.indices.first(where: { $0 >= first && canRun(block: $0) }) else { return finish() }
         drill = nil
-        guard blocks.indices.contains(index) else { return finish() }
         blockIndex = index
         stage = .ready
         readyRemaining = Self.readyTime
@@ -198,7 +324,9 @@ public struct SessionPlayer: Sendable {
 
     private mutating func endBlock(at now: Duration) {
         drill?.handle(.stop(at: now))
-        if blockIndex + 1 < blocks.count { showReady(blockIndex + 1) } else { finish() }
+        dueChime = nil
+        heldDisplay = nil
+        showReady(blockIndex + 1)
     }
 
     private mutating func finish() {

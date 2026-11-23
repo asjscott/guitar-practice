@@ -3,8 +3,8 @@ import TheoryCore
 import PracticeCore
 
 /// Kinds made up for these tests. Their drill plays string 6's frets in order, and can answer a typed name.
-func kind(_ id: String, usesKeyboard: Bool = false) -> DrillKind {
-    DrillKind(id: id, title: id, instructions: "", symbol: "", usesKeyboard: usesKeyboard, rules: ToyRules.self)
+func kind(_ id: String, usesKeyboard: Bool = false, needsSound: Bool = false) -> DrillKind {
+    DrillKind(id: id, title: id, instructions: "", symbol: "", usesKeyboard: usesKeyboard, needsSound: needsSound, rules: ToyRules.self)
 }
 
 private let four = [kind("a"), kind("b"), kind("c"), kind("keys", usesKeyboard: true)]
@@ -74,6 +74,30 @@ struct SessionPlannerTests {
     @Test func oneDrillGetsTheWholeBudgetAndNoneGivesNoBlocks() {
         #expect(plan(10, day: 3, kinds: [four[1]]).map(\.length) == [s(600)])
         #expect(plan(10, day: 3, kinds: []).isEmpty)
+    }
+}
+
+@Suite("Session planner: which drills")
+struct SessionPlannerDrillsTests {
+    private let setup = DrillSetup(fretboard: Fretboard(tuning: .standard), seed: 1)
+
+    @Test func withoutSoundHearFindItIsLeftOutAndTheRestShareTheTime() {
+        let kinds = SessionPlanner.drills(from: DrillKind.all, for: setup, hasSound: false)
+        #expect(kinds == [.notePlayIt, .allInstances, .fretNameIt])
+        #expect(plan(15, day: 1, kinds: kinds).map(\.length) == [s(300), s(300), s(300)])
+        #expect(SessionPlanner.noSoundNotice(from: DrillKind.all)
+                == "No sound: Hear → find it is left out, and chimes flash.")
+    }
+
+    @Test func withSoundEveryDrillIsIn() {
+        #expect(SessionPlanner.drills(from: DrillKind.all, for: setup, hasSound: true) == DrillKind.all)
+    }
+
+    @Test func aDrillWithNothingToPromptIsLeftOut() {
+        var setup = setup
+        setup.options.frets = 0...0     // no target above the open string for Hear → find it
+        #expect(SessionPlanner.drills(from: DrillKind.all, for: setup, hasSound: true)
+                == [.notePlayIt, .allInstances, .fretNameIt])
     }
 }
 

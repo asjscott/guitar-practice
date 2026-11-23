@@ -26,6 +26,18 @@ public enum SessionPlanner {
     /// No block is shorter, unless there is only one.
     public static let minimumLength: Duration = .seconds(180)
 
+    /// The drills a session can use: those with something to prompt and, without sound, that don't need it.
+    public static func drills(from kinds: [DrillKind], for setup: DrillSetup, hasSound: Bool) -> [DrillKind] {
+        kinds.filter { (hasSound || !$0.needsSound) && $0.makeDrill(setup).nothingToPromptReason == nil }
+    }
+
+    /// What a session without sound does differently.
+    public static func noSoundNotice(from kinds: [DrillKind]) -> String {
+        let leftOut = kinds.filter(\.needsSound).map(\.title)
+        guard !leftOut.isEmpty else { return "No sound: chimes flash." }
+        return "No sound: \(leftOut.joined(separator: ", ")) \(leftOut.count == 1 ? "is" : "are") left out, and chimes flash."
+    }
+
     /// One block per drill, with time by weight; drills are dropped, a different one each day, until every block
     /// reaches the minimum. `day` is a count of calendar days: it seeds the order and says which drill is dropped.
     public static func plan(_ drills: [WeightedDrill], budget: Duration, day: Int) -> [SessionBlock] {
