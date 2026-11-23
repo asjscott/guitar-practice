@@ -1,13 +1,14 @@
 import SwiftUI
 import TheoryCore
 
-/// The main window's root: a sidebar of screens (Explorer · Tuner · Drill) and the selected
-/// screen as the detail. Remembers the selected screen per window; Explorer on first launch.
+/// The main window's root: a sidebar of screens (Session · Explorer · Tuner · Drill) and the selected
+/// screen as the detail. Remembers the selected screen per window; Session on first launch.
 ///
-/// Owns the explorer's (unpersisted) state, so it survives switching screens, and feeds the
+/// Owns the session's and the explorer's (unpersisted) state, so it survives switching screens, and feeds the
 /// persisted tuning, capo and position system from Settings into it, live.
 struct ContentView: View {
-    @SceneStorage("main.screen") private var screen: Screen = .explorer
+    @SceneStorage("main.screen") private var screen: Screen = .session
+    @State private var session = SessionViewModel()
     @State private var explorer = ExplorerViewModel()
     @AppStorage(InstrumentSettings.Key.positionSystem) private var positionSystem = InstrumentSettings.defaultPositionSystem
 
@@ -41,6 +42,7 @@ struct ContentView: View {
 
     @ViewBuilder private var detail: some View {
         switch screen {
+        case .session: SessionView(model: session)
         case .explorer: ExplorerView(model: explorer)
         case .tuner: TunerView()
         case .drill: DrillView()
@@ -50,12 +52,13 @@ struct ContentView: View {
 
 /// A screen in the main window's sidebar. The raw value is what `@SceneStorage` saves.
 enum Screen: String, CaseIterable, Identifiable {
-    case explorer, tuner, drill
+    case session, explorer, tuner, drill
 
     var id: Self { self }
 
     var title: String {
         switch self {
+        case .session: "Session"
         case .explorer: "Explorer"
         case .tuner: "Tuner"
         case .drill: "Drill"
@@ -64,6 +67,7 @@ enum Screen: String, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
+        case .session: "timer"
         case .explorer: "guitars"
         case .tuner: "tuningfork"
         case .drill: "target"

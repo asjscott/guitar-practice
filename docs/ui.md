@@ -27,6 +27,15 @@ The look and behaviour settled in Phase 0. Keep to these when changing a screen.
 - A drill that needs sound pauses if the output fails, with the reason on the card. No output device disables Start.
 - Start is disabled, with the reason on the card, when nothing can be prompted.
 
+## Session
+
+- First in the sidebar, and the first-launch default. S4 on branch `prototype/phase2-screens`.
+- Setup: minutes with − and +, Start (↩), the planned blocks, then Naturals / All notes and First 12 frets / Whole neck. Start is disabled, with the reason under it, when nothing can be heard or prompted.
+- The drills bar stays on top through Ready cards and drills: time left per block, or time spent once it is over.
+- Keys go through `onPlainKey`, which sees them before any focused control: Space, Return, S and R work whatever has focus, and held-down repeats do nothing.
+- A session keeps the tuning and capo it started with.
+- The summary shows a card per block that started; one where nothing was answered shows no speed.
+
 ## Settings
 
 - Persisted with `@AppStorage`, not SwiftData.

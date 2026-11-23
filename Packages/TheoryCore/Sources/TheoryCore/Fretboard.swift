@@ -45,6 +45,11 @@ public struct Fretboard: Hashable, Sendable {
     /// The frets that can be played: from the capo (or the nut) to the last fret.
     public var playableFrets: ClosedRange<Int> { capo...Fretboard.frets.upperBound }
 
+    /// The frets from the capo (or the nut) to `count` above it, as far as the last fret.
+    public func playableFrets(upTo count: Int) -> ClosedRange<Int> {
+        capo...max(capo, min(capo + count, Fretboard.frets.upperBound))
+    }
+
     /// What a string sounds when played without fretting: its open pitch raised by the capo.
     public func soundingOpenPitch(ofString string: Int) -> Pitch {
         tuning.openPitch(ofString: string) + Interval(capo)

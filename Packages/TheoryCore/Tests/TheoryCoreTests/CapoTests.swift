@@ -87,3 +87,11 @@ struct AlternateTuningLocationTests {
         }
     }
 }
+
+@Suite("Frets counted from the capo")
+struct FretsFromCapoTests {
+    @Test(arguments: [(0, 0...12), (2, 2...14), (10, 10...22), (12, 12...22)])
+    func twelveFretsFromTheCapoStopAtTheLastFret(capo: Int, frets: ClosedRange<Int>) {
+        #expect(Fretboard(tuning: .standard, capo: capo).playableFrets(upTo: 12) == frets)
+    }
+}

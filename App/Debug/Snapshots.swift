@@ -1,6 +1,7 @@
 #if DEBUG
 import AppKit
 import ListenCore
+import PracticeCore
 import SwiftUI
 import TheoryCore
 
@@ -14,7 +15,7 @@ enum Snapshots {
     private static let environment = ProcessInfo.processInfo.environment
     private static let screenSize = CGSize(width: 1100, height: 620)
     private static let audioInput = AudioInputService(defaults: emptyDefaults, isInert: true)
-    /// No saved input device, so the audio line shows the system default rather than a fallback warning.
+    /// Nothing saved: default settings, and the audio line shows the system default rather than a fallback warning.
     private static let emptyDefaults = UserDefaults(suiteName: "GuitarPractice.snapshots") ?? .standard
 
     static var isRequested: Bool { environment["GP_SNAPSHOT"] != nil }
@@ -134,8 +135,96 @@ enum Snapshots {
 
         try await save("drill-not-saving", DrillView(), log: .inMemory(problem: "The file couldn’t be opened."))
 
+        try await saveSession()
+
         try await save("settings-instrument", InstrumentSettingsView(), size: CGSize(width: 520, height: 640))
         try await save("settings-audio", AudioSettingsView(), size: CGSize(width: 520, height: 480))
+    }
+
+    private static func saveSession() async throws {
+        let problems: [(String, SessionProblem)] = [
+            ("access", .noAccess), ("input", .noInput),
+            ("prompts", .nothingToPrompt("No natural notes in these frets and strings. Choose All notes.")),
+        ]
+        for (name, problem) in problems {
+            try await save("session-setup-no-\(name)", SessionSetupView(
+                minutes: .constant(10), naturalsOnly: .constant(false), range: .constant(.wholeNeck),
+                blocks: SessionViewModel().plan(), problem: problem, start: {}))
+        }
+        let session = SessionViewModel()
+        try await save("session-setup", SessionView(model: session))
+
+        // The whole window, with its sidebar focused: Return and Space must get through by themselves.
+        try await save("session-ready-by-keys", ContentView(), settle: .milliseconds(1600)) {
+            focusSidebar()
+            type("\r")
+        }
+        try await save("session-playing-by-keys", ContentView(), settle: .milliseconds(1600)) {
+            focusSidebar()
+            type("\r ")
+        }
+
+        /// A new session, playing the block of a drill.
+        func play(_ kind: DrillKind) {
+            session.done()
+            session.leave()
+            session.done()
+            session.start(seed: 1)
+            session.next()
+            while session.isActive, session.blockKind != kind {
+                session.next()
+                session.next()
+            }
+        }
+        try await save("session-waiting", SessionView(model: session)) { play(.notePlayIt) }
+        try await save("session-wrong", SessionView(model: session)) {
+            play(.notePlayIt)
+            session.answerForSnapshot(right: false)
+        }
+        try await save("session-right", SessionView(model: session), settle: .milliseconds(150)) {
+            play(.notePlayIt)
+            session.answerForSnapshot(right: true)
+        }
+        try await save("session-sweep", SessionView(model: session)) {
+            play(.allInstances)
+            session.answerForSnapshot(right: true)
+            session.answerForSnapshot(right: true)
+        }
+        try await save("session-typed", SessionView(model: session)) {
+            play(.fretNameIt)
+            type("gb")
+        }
+        try await save("session-typed-wrong", SessionView(model: session)) {
+            play(.fretNameIt)
+            type("f#\r")
+        }
+        try await save("session-hear", SessionView(model: session)) { play(.hearFindIt) }
+        try await save("session-summary", SessionView(model: session)) {
+            play(.notePlayIt)
+            session.leave()
+            session.done()
+            session.start(seed: 1)
+            while session.isActive {
+                session.next()
+                session.skip()
+                session.answerForSnapshot(right: false)
+                session.answerForSnapshot(right: true)
+                session.next()
+            }
+        }
+        try await save("session-summary-nothing-done", SessionView(model: session)) {
+            play(.notePlayIt)
+            session.leave()
+        }
+    }
+
+    private static var newestWindow: NSWindow? { NSApp.windows.last { $0.isVisible } }
+
+    private static func focusSidebar() {
+        func list(in view: NSView) -> NSView? { view is NSTableView ? view : view.subviews.lazy.compactMap(list).first }
+        guard let window = newestWindow, let list = window.contentView.flatMap(list), window.makeFirstResponder(list) else {
+            preconditionFailure("No sidebar to focus")
+        }
     }
 
     /// Sends key presses to the window being saved.
@@ -155,7 +244,8 @@ enum Snapshots {
     private static func save(_ name: String, _ view: some View, size: CGSize = screenSize, log: AttemptLog = .inMemory(),
                              sound: AppSoundOutput = AppSoundOutput(isInert: true),
                              settle: Duration = .milliseconds(400), prepare: () -> Void = {}) async throws {
-        let host = NSHostingController(rootView: view.frame(width: size.width, height: size.height).environment(audioInput).environment(sound).environment(log))
+        let host = NSHostingController(rootView: view.frame(width: size.width, height: size.height).environment(audioInput)
+            .environment(sound).environment(log).defaultAppStorage(emptyDefaults))
         host.sceneBridgingOptions = [.title, .toolbars]
         let window = NSWindow(contentViewController: host)
         window.isReleasedWhenClosed = false
