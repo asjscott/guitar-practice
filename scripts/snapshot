@@ -1,0 +1,14 @@
+#!/bin/bash
+# Builds the Debug app and renders its screens to PNGs, without screen-recording or microphone permission.
+#   scripts/snapshot [output-dir] [light|dark]     default: build/snapshots light
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+out="${1:-build/snapshots}"
+appearance="${2:-light}"
+mkdir -p "$out"
+out="$(cd "$out" && pwd)"
+xcodegen generate --quiet
+derived="$PWD/build/DerivedData"
+xcodebuild -scheme GuitarPractice -configuration Debug -destination 'platform=macOS' -derivedDataPath "$derived" -quiet build
+GP_SNAPSHOT="$out" GP_SNAPSHOT_APPEARANCE="$appearance" \
+  "$derived/Build/Products/Debug/GuitarPractice.app/Contents/MacOS/GuitarPractice"

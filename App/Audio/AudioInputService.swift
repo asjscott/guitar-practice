@@ -58,14 +58,22 @@ final class AudioInputService {
     /// Meter release per block (≈ 1.4 full scale per second at 48 kHz / 1024).
     private static let meterRelease = 0.03
 
-    init(defaults: UserDefaults = .standard) {
+    /// True in `Snapshots`: lists devices and counts as granted, but never asks for access or starts the engine.
+    @ObservationIgnored private let isInert: Bool
+
+    init(defaults: UserDefaults = .standard, isInert: Bool = false) {
         self.defaults = defaults
+        self.isInert = isInert
         savedDeviceUID = defaults.string(forKey: AudioInputSettings.Key.deviceUID) ?? AudioInputSettings.defaultDeviceUID
         savedDeviceName = defaults.string(forKey: AudioInputSettings.Key.deviceName) ?? ""
         savedChannel = defaults.object(forKey: AudioInputSettings.Key.channel) as? Int ?? AudioInputSettings.defaultChannel
-        permission = Self.currentPermission()
+        permission = isInert ? .granted : Self.currentPermission()
 
         refreshDevices()
+        if isInert {
+            reconcile()     // no listeners, so this only resolves the choice
+            return
+        }
         deviceObserver = CoreAudioDevices.observeChanges { [weak self] in
             self?.refreshDevices()
             self?.reconcile()
@@ -83,6 +91,7 @@ final class AudioInputService {
     /// Counts a listening screen in, attaching its consumer (if any), and starts the engine if needed.
     /// Prefer `.listensToAudioInput(…)`, which calls this and `stopListening` for you.
     func startListening(_ listener: UUID, consumer: AudioInputConsumer? = nil) {
+        guard !isInert else { return }
         listeners.insert(listener)
         consumers.set(consumer, for: listener)
         permission = Self.currentPermission()

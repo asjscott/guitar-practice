@@ -8,9 +8,13 @@ import TheoryCore
 /// sheet on Stop. A listening screen: audio input runs while it is open, and leaving it ends the run.
 /// Follows the tuning and capo in Settings.
 struct DrillView: View {
-    @State private var model = DrillViewModel()
+    @State private var model: DrillViewModel
     @State private var showSummary = false
     @Environment(AudioInputService.self) private var audioInput
+
+    init(model: DrillViewModel = DrillViewModel()) {
+        _model = State(initialValue: model)
+    }
 
     var body: some View {
         Group {

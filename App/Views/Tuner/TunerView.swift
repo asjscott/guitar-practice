@@ -4,8 +4,12 @@ import SwiftUI
 /// cents and Hz, the tuning's string chips with the nearest one lit, and the input line at the bottom.
 /// A listening screen: audio input runs while it is open. Follows the tuning in Settings; ignores the capo.
 struct TunerView: View {
-    @State private var model = TunerViewModel()
+    @State private var model: TunerViewModel
     @Environment(AudioInputService.self) private var audioInput
+
+    init(model: TunerViewModel = TunerViewModel()) {
+        _model = State(initialValue: model)
+    }
 
     var body: some View {
         Group {

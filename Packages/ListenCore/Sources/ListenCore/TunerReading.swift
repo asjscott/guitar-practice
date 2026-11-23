@@ -17,7 +17,7 @@ public struct TunerReading: Sendable, Equatable {
     public var isInTune: Bool { abs(cents) <= Self.inTuneCents }
 
     /// The reading for a frequency in Hz.
-    init(frequency: Double) {
+    public init(frequency: Double) {
         let exact = 69 + 12 * log2(frequency / 440)
         let nearest = exact.rounded()
         self.midiNote = Int(nearest)

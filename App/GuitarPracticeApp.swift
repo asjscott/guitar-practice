@@ -2,6 +2,15 @@ import AppKit
 import SwiftUI
 
 @main
+enum Main {
+    @MainActor static func main() {
+        #if DEBUG
+        if Snapshots.isRequested { Snapshots.run() }
+        #endif
+        GuitarPracticeApp.main()
+    }
+}
+
 struct GuitarPracticeApp: App {
     /// The app's one audio input, shared by every listening screen in every window.
     @State private var audioInput = AudioInputService()

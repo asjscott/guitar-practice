@@ -56,9 +56,9 @@ final class DrillViewModel {
     var isPaused: Bool { snapshot.phase == .paused }
     var isCheckRun: Bool { drill.options.order == .inOrder }
 
-    func start() {
+    func start(seed: UInt64 = .random(in: .min ... .max)) {
         guard !isRunning else { return }
-        drill = NotePlayItDrill(fretboard: fretboard, options: options, seed: .random(in: .min ... .max))
+        drill = NotePlayItDrill(fretboard: fretboard, options: options, seed: seed)
         send(.start(at: clockNow()))
         startTicking()
     }
@@ -142,6 +142,16 @@ final class DrillViewModel {
             send(.played(note.pitch, onset: .seconds(note.onset), at: .seconds(detected)))
         }
     }
+
+    #if DEBUG
+    /// Answers the current prompt, as if a right or wrong note had been played now (see `Snapshots`).
+    func playForSnapshot(right: Bool) {
+        guard let location = drill.correctLocations.first else { return }
+        let pitch = fretboard.pitch(at: location)
+        let now = clockNow()
+        send(.played(right ? pitch : pitch + Interval(1), onset: now, at: now))
+    }
+    #endif
 
     // MARK: - Display
 
