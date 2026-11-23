@@ -43,6 +43,9 @@ final class SessionViewModel {
 
     private(set) var snapshot = Snapshot()
 
+    /// The note name being typed, in a drill answered by typing.
+    private(set) var nameEntry = NoteNameEntry()
+
     /// The finished session's, until Done.
     private(set) var summary: SessionSummary?
 
@@ -66,6 +69,9 @@ final class SessionViewModel {
     /// From Start until it is finished.
     var isActive: Bool { stage == .ready || stage == .playing }
 
+    /// The current block's drill; nil before Start.
+    var blockKind: DrillKind? { snapshot.blocks.indices.contains(snapshot.blockIndex) ? snapshot.blocks[snapshot.blockIndex].kind : nil }
+
     // MARK: - Setup
 
     private func drillSetup(seed: UInt64) -> DrillSetup {
@@ -73,17 +79,19 @@ final class SessionViewModel {
         return DrillSetup(fretboard: fretboard, options: setup.drillOptions(on: fretboard), seed: seed)
     }
 
-    /// The blocks a session would have: every drill that has something to prompt.
+    private var usableDrills: [DrillKind] { DrillKind.all.filter { !$0.needsSound || playSounds != nil } }
+
+    /// The blocks a session would have: every drill that has something to prompt, and can be heard if it needs to be.
     func plan(on date: Date = .now) -> [SessionBlock] {
         let drillSetup = drillSetup(seed: 0)
-        let drills = DrillKind.all.filter { $0.makeDrill(drillSetup).nothingToPromptReason == nil }
+        let drills = usableDrills.filter { $0.makeDrill(drillSetup).nothingToPromptReason == nil }
         return SessionPlanner.plan(drills.map { WeightedDrill($0) }, budget: setup.budget, day: Calendar.dayNumber(of: date))
     }
 
     /// Why no drill can prompt anything; nil when one can.
     var nothingToPromptReason: String? {
         let drillSetup = drillSetup(seed: 0)
-        let reasons = DrillKind.all.map { $0.makeDrill(drillSetup).nothingToPromptReason }
+        let reasons = usableDrills.map { $0.makeDrill(drillSetup).nothingToPromptReason }
         return reasons.contains(nil) ? nil : reasons.compactMap { $0 }.first
     }
 
@@ -111,9 +119,6 @@ final class SessionViewModel {
 
     /// R: what it does is up to the drill.
     func repeatPrompt() { send(.repeat(at: clockNow())) }
-
-    /// A note name, typed and submitted.
-    func typed(_ name: NoteName) { send(.typed(name, at: clockNow())) }
 
     /// The screen is closing: a session that is going ends early.
     func leave() {
@@ -167,6 +172,7 @@ final class SessionViewModel {
         }
         let new = Snapshot(of: player)
         if new != snapshot { snapshot = new }
+        if let drill = player.drill { followTyping(drill) } else { nameEntry = NoteNameEntry() }
     }
 
     private func logAttempts(of player: SessionPlayer) {
@@ -200,6 +206,27 @@ final class SessionViewModel {
         if record.modelContext != nil { log?.save() }
     }
 
+    // MARK: - Typing
+
+    /// Whether typed note names go to the drill now.
+    var takesNoteNames: Bool { stage == .playing && blockKind?.usesKeyboard == true }
+
+    /// A key for `.typesNoteNames`: true when it was the drill's.
+    func press(_ key: NoteNameKey) -> Bool {
+        guard takesNoteNames, let drill = player?.drill,
+              case .taken(let event) = nameEntry.press(key, for: drill, at: clockNow()) else { return false }
+        if case .typed(let name, let now) = event { send(.typed(name, at: now)) }
+        return true
+    }
+
+    private func followTyping(_ drill: any Drill) {
+        var entry = nameEntry
+        entry.follow(drill)
+        if entry != nameEntry { nameEntry = entry }
+    }
+
+    // MARK: - Display
+
     /// The prompt's time left, while it awaits an answer.
     var countdown: DrillCountdown? {
         let now = Duration.seconds(now)
@@ -220,14 +247,17 @@ final class SessionViewModel {
     }
 
     #if DEBUG
-    /// Answers the current prompt, as if a right or wrong note had been played now (see `Snapshots`).
-    func playForSnapshot(right: Bool) {
-        guard let drill = player?.drill, let prompt = drill.prompt,
-              let location = prompt.target ?? fretboard.locations(of: prompt.pitchClass, onString: prompt.string,
-                                                                  frets: drill.options.frets).first else { return }
-        let pitch = fretboard.pitch(at: location)
-        let now = clockNow()
-        send(.played(right ? pitch : pitch + Interval(1), onset: now, at: now))
+    /// Answers the current prompt, as if played or typed now (see `Snapshots`).
+    func answerForSnapshot(right: Bool) {
+        guard let drill = player?.drill, let prompt = drill.prompt else { return }
+        let now = max(clockNow(), drill.promptStart ?? .zero)
+        if blockKind?.usesKeyboard == true {
+            send(.typed(right ? prompt.name : prompt.pitchClass == PitchClass(0) ? .g : .c, at: now))
+        } else if let location = prompt.target ?? fretboard.locations(of: prompt.pitchClass, onString: prompt.string,
+                                                                     frets: drill.options.frets).first {
+            let pitch = fretboard.pitch(at: location)
+            send(.played(right ? pitch : pitch + Interval(1), onset: now, at: now))
+        }
     }
     #endif
 }

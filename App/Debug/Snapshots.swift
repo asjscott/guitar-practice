@@ -1,6 +1,7 @@
 #if DEBUG
 import AppKit
 import ListenCore
+import PracticeCore
 import SwiftUI
 import TheoryCore
 
@@ -71,6 +72,46 @@ enum Snapshots {
             drill.capo = 12
         }
 
+        let sweep = DrillViewModel()
+        sweep.kind = .allInstances
+        try await save("drill-sweep", DrillView(model: sweep)) {
+            sweep.start(seed: 1)
+            sweep.playForSnapshot(right: true)
+            sweep.playForSnapshot(right: true)
+            sweep.skip()
+            sweep.playForSnapshot(right: true)
+        }
+        try await save("drill-sweep-wrong", DrillView(model: sweep)) {
+            sweep.stop()
+            sweep.start(seed: 1)
+            sweep.playForSnapshot(right: true)
+            sweep.playForSnapshot(right: false)
+        }
+        try await save("drill-sweep-paused", DrillView(model: sweep)) {
+            sweep.start(seed: 1)
+            sweep.togglePause()
+        }
+
+        // Typed with real key events, so the key handling is exercised too.
+        let naming = DrillViewModel()
+        naming.kind = .fretNameIt
+        try await save("fret-name-it-waiting", DrillView(model: naming)) { naming.start(seed: 1) }
+        try await save("fret-name-it-typed", DrillView(model: naming)) {
+            naming.start(seed: 1)
+            type("gb")
+        }
+        try await save("fret-name-it-wrong", DrillView(model: naming)) {
+            naming.start(seed: 1)
+            type("gb\r")
+        }
+        try await save("fret-name-it-right", DrillView(model: naming), settle: .milliseconds(150)) {
+            naming.start(seed: 1)
+            naming.answerForSnapshot()
+        }
+        try await save("fret-name-it-timed-out", DrillView(model: naming), settle: .milliseconds(10_800)) {
+            naming.start(seed: 1)
+        }
+
         try await save("drill-not-saving", DrillView(), log: .inMemory(problem: "The file couldn’t be opened."))
 
         try await saveSession()
@@ -95,37 +136,62 @@ enum Snapshots {
         // The whole window, with its sidebar focused: Return and Space must get through by themselves.
         try await save("session-ready-by-keys", ContentView(), settle: .milliseconds(1600)) {
             focusSidebar()
-            press("\r")
+            type("\r")
         }
         try await save("session-playing-by-keys", ContentView(), settle: .milliseconds(1600)) {
             focusSidebar()
-            press("\r")
-            press(" ")
+            type("\r ")
         }
 
-        func play() {
+        /// A new session, playing the block of a drill.
+        func play(_ kind: DrillKind) {
+            session.done()
+            session.leave()
             session.done()
             session.start(seed: 1)
             session.next()
+            while session.isActive, session.blockKind != kind {
+                session.next()
+                session.next()
+            }
         }
-        try await save("session-waiting", SessionView(model: session)) { play() }
+        try await save("session-waiting", SessionView(model: session)) { play(.notePlayIt) }
         try await save("session-wrong", SessionView(model: session)) {
-            play()
-            session.playForSnapshot(right: false)
+            play(.notePlayIt)
+            session.answerForSnapshot(right: false)
         }
         try await save("session-right", SessionView(model: session), settle: .milliseconds(150)) {
-            play()
-            session.playForSnapshot(right: true)
+            play(.notePlayIt)
+            session.answerForSnapshot(right: true)
+        }
+        try await save("session-sweep", SessionView(model: session)) {
+            play(.allInstances)
+            session.answerForSnapshot(right: true)
+            session.answerForSnapshot(right: true)
+        }
+        try await save("session-typed", SessionView(model: session)) {
+            play(.fretNameIt)
+            type("gb")
+        }
+        try await save("session-typed-wrong", SessionView(model: session)) {
+            play(.fretNameIt)
+            type("f#\r")
         }
         try await save("session-summary", SessionView(model: session)) {
-            play()
-            session.skip()
-            session.playForSnapshot(right: false)
-            session.playForSnapshot(right: true)
-            while session.isActive { session.next() }
+            play(.notePlayIt)
+            session.leave()
+            session.done()
+            session.start(seed: 1)
+            while session.isActive {
+                session.next()
+                session.skip()
+                session.answerForSnapshot(right: false)
+                session.answerForSnapshot(right: true)
+                session.next()
+            }
         }
         try await save("session-summary-nothing-done", SessionView(model: session)) {
-            play()
+            play(.notePlayIt)
             session.leave()
         }
     }
@@ -139,14 +205,17 @@ enum Snapshots {
         }
     }
 
-    /// Presses a key in the newest window, as if typed.
-    private static func press(_ key: String) {
-        guard let window = newestWindow,
-              let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
-                                           timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
-                                           context: nil, characters: key, charactersIgnoringModifiers: key,
-                                           isARepeat: false, keyCode: 0) else { return }
-        NSApp.postEvent(event, atStart: false)
+    /// Sends key presses to the window being saved.
+    private static func type(_ keys: String) {
+        guard let window = NSApp.windows.last(where: \.isVisible) else { return }
+        for key in keys {
+            let code: UInt16 = key == "\r" ? 36 : 0
+            if let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+                                            windowNumber: window.windowNumber, context: nil, characters: String(key),
+                                            charactersIgnoringModifiers: String(key), isARepeat: false, keyCode: code) {
+                NSApp.postEvent(event, atStart: false)
+            }
+        }
     }
 
     /// Hosts `view` in an offscreen window, lets it lay out, applies `prepare`, and writes `<name>.png`.

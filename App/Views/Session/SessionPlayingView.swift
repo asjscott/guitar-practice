@@ -51,7 +51,7 @@ private struct SessionTarget: View {
     let model: SessionViewModel
     let display: DrillDisplay
 
-    var body: some View { DrillTarget(display: display, countdown: model.countdown) }
+    var body: some View { DrillTarget(display: display, countdown: model.countdown, typed: model.nameEntry.text) }
 }
 
 private struct SessionKey: View {

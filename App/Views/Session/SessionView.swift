@@ -19,6 +19,7 @@ struct SessionView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .navigationTitle("Session")
             .onPlainKey(press)
+            .typesNoteNames(isActive: model.takesNoteNames) { model.press($0) }
             .listensToAudioInput(model.audioConsumer)
             .onAppear { model.log = log }
             .onDisappear { model.leave() }
