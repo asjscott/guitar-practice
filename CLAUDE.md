@@ -7,9 +7,9 @@ Read the relevant spec section before starting any phase.
 
 ## Current phase
 
-**Phase 1 · Hear the guitar.** Scope: interface input (device and channel picker, input meter), pitch detection with stability and cents thresholds, tuner screen, Note → play it drill (timed). Done when: played notes are detected reliably and quickly.
+**Phase 2 · Session MVP.** Scope: All instances, Hear → find it and Fret → name it drills; time budget input, daily theme seed, block planner, block player; auto-advance, keyboard shortcuts, end-of-block chime; SwiftData attempt log and session summary. Done when: a timed notes session runs start to finish.
 
-Phase 0 · Foundations is complete (spec #1); its scope and decisions below stay as reference.
+Phase 0 · Foundations (spec #1) and Phase 1 · Hear the guitar (spec #11) are complete; the Phase 0 scope and decisions below stay as reference, and the Phase 1 decisions are in the spec doc.
 
 Phase order: 0 Foundations → 1 Hear the guitar → 2 Session MVP → 3 Scales and triads → 4 Backing and progressions → 5 Lick → solo → 6 Adaptive and polish. Don't start work from a later phase unless asked.
 
