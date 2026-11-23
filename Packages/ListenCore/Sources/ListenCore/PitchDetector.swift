@@ -16,6 +16,8 @@ struct PitchDetector: Sendable {
     /// Lowest and highest frequency the detector looks for.
     let frequencyRange: ClosedRange<Double>
     /// A key maximum counts if it reaches this fraction of the highest one (MPM's k).
+    /// High, because a ringing low E's 2nd harmonic outlasts its fundamental: at 0.93
+    /// the recorded clip reads an octave up after 3 s. 0.95–0.99 all read it right.
     let peakThreshold: Double
     /// Below this clarity the window has no clear pitch.
     let minimumClarity: Double
@@ -23,7 +25,7 @@ struct PitchDetector: Sendable {
     init(
         sampleRate: Double,
         frequencyRange: ClosedRange<Double> = 60...1500,
-        peakThreshold: Double = 0.93,
+        peakThreshold: Double = 0.97,
         minimumClarity: Double = 0.8
     ) {
         self.sampleRate = sampleRate
