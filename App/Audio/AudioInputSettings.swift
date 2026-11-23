@@ -1,3 +1,5 @@
+import Foundation
+
 /// The persisted audio input choice, in UserDefaults (the same store as `@AppStorage`).
 enum AudioInputSettings {
     /// UserDefaults keys.
@@ -13,4 +15,12 @@ enum AudioInputSettings {
     /// Empty: nothing chosen yet, so the system default input is used (without a fallback notice).
     static let defaultDeviceUID = ""
     static let defaultChannel = 1
+
+    /// Forgets a saved temporary device (#20): it never comes back, so the system default input is used, without
+    /// a fallback notice. The saved channel stays.
+    static func forgetTemporaryDevice(in defaults: UserDefaults) {
+        guard let uid = defaults.string(forKey: Key.deviceUID), AudioInputDevice.isTemporary(uid: uid) else { return }
+        defaults.removeObject(forKey: Key.deviceUID)
+        defaults.removeObject(forKey: Key.deviceName)
+    }
 }

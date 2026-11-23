@@ -11,6 +11,10 @@ struct AudioInputDevice: Identifiable, Hashable, Sendable {
     var channelCount: Int
 
     var id: String { uid }
+
+    /// True for the private aggregate AVAudioEngine can make to join the default input and output.
+    /// Its UID holds the app's process ID, so it is gone on the next launch: never list or save it (#20).
+    static func isTemporary(uid: String) -> Bool { uid.hasPrefix("CADefaultDeviceAggregate-") }
 }
 
 /// The device and channel the app actually listens to.

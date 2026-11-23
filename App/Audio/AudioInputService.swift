@@ -46,6 +46,7 @@ final class AudioInputService {
     @ObservationIgnored private var listeners = Set<UUID>()
     @ObservationIgnored private let consumers = AudioInputConsumers()
     @ObservationIgnored private var engine: AVAudioEngine?
+    @ObservationIgnored private var startedSetup: InputSetup?
     @ObservationIgnored private var tap: AudioInputTap?
     @ObservationIgnored private var levelTask: Task<Void, Never>?
     @ObservationIgnored private var configurationObserver: NSObjectProtocol?
@@ -64,6 +65,7 @@ final class AudioInputService {
     init(defaults: UserDefaults = .standard, isInert: Bool = false) {
         self.defaults = defaults
         self.isInert = isInert
+        AudioInputSettings.forgetTemporaryDevice(in: defaults)
         savedDeviceUID = defaults.string(forKey: AudioInputSettings.Key.deviceUID) ?? AudioInputSettings.defaultDeviceUID
         savedDeviceName = defaults.string(forKey: AudioInputSettings.Key.deviceName) ?? ""
         savedChannel = defaults.object(forKey: AudioInputSettings.Key.channel) as? Int ?? AudioInputSettings.defaultChannel
@@ -193,7 +195,7 @@ final class AudioInputService {
         }
     }
 
-    /// A fresh engine per run: set the device on the input node, tap the node's native format, start.
+    /// A fresh engine per run: set the device on the input node, tap the device's own format, start.
     private func startEngine(on choice: AudioInputChoice) throws(AudioInputError) {
         guard let deviceID = CoreAudioDevices.deviceID(forUID: choice.device.uid) else {
             throw .deviceUnavailable(choice.device.name)
@@ -206,13 +208,15 @@ final class AudioInputService {
                                           &id, UInt32(MemoryLayout<AudioDeviceID>.size))
         guard status == noErr else { throw .couldNotSelectDevice(choice.device.name, status) }
 
-        let format = input.outputFormat(forBus: 0)
+        // Not outputFormat: that still describes the default device, and a tap with the wrong rate hears nothing.
+        let format = input.inputFormat(forBus: 0)
         guard format.channelCount > 0, format.sampleRate > 0 else { throw .noInputChannels(choice.device.name) }
 
         let tap = AudioInputTap(channelIndex: choice.channel - 1, consumers: consumers)
         tap.install(on: input, format: format, bufferSize: Self.bufferSize)
         self.engine = engine
         self.tap = tap
+        startedSetup = InputSetup(of: engine)
         engine.prepare()
         do {
             try engine.start()
@@ -227,7 +231,7 @@ final class AudioInputService {
                 level = max(fraction, level - Self.meterRelease)
             }
         }
-        // The engine stops itself when the device's format or routing changes; start again on the new setup.
+        // The engine stops itself when the device's format or routing changes; see engineConfigurationChanged.
         configurationObserver = NotificationCenter.default.addObserver(
             forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main
         ) { [weak self] _ in
@@ -235,8 +239,13 @@ final class AudioInputService {
         }
     }
 
+    /// Starts again on the new setup, unless the engine is still running on the device and format it was started
+    /// with. Selecting a device on the input node also posts this notice; restarting then selects the device again,
+    /// posts again, and loops before any audio is delivered (#20).
     private func engineConfigurationChanged() {
+        guard let engine else { return }
         refreshDevices()
+        if engine.isRunning, InputSetup(of: engine) == startedSetup { return }
         isRunning = false
         reconcile()
     }
@@ -252,12 +261,24 @@ final class AudioInputService {
         engine?.inputNode.removeTap(onBus: 0)
         engine?.stop()
         engine = nil
+        startedSetup = nil
         tap?.finish()
         tap = nil
         levelTask?.cancel()
         levelTask = nil
         isRunning = false
         level = 0
+    }
+}
+
+/// What an engine's input node listens to: compared to tell a real configuration change from a repeat notice.
+private struct InputSetup: Equatable {
+    var deviceID: AudioDeviceID
+    var format: AVAudioFormat
+
+    init(of engine: AVAudioEngine) {
+        deviceID = engine.inputNode.auAudioUnit.deviceID
+        format = engine.inputNode.inputFormat(forBus: 0)
     }
 }
 

@@ -4,11 +4,13 @@ import Foundation
 /// Thin Core Audio queries: input devices, the system default input, UID → device ID, and change notices.
 /// Hardware code, kept small and not unit-tested (spec #11, Testing Decisions).
 enum CoreAudioDevices {
-    /// Every device with at least one input channel, sorted by name. Output-only devices are left out.
+    /// Every device with at least one input channel, sorted by name. Output-only devices and the engine's
+    /// temporary aggregate are left out.
     static func inputDevices() -> [AudioInputDevice] {
         allDeviceIDs().compactMap { id in
             let channels = inputChannelCount(of: id)
-            guard channels > 0, let uid = string(kAudioDevicePropertyDeviceUID, of: id) else { return nil }
+            guard channels > 0, let uid = string(kAudioDevicePropertyDeviceUID, of: id),
+                  !AudioInputDevice.isTemporary(uid: uid) else { return nil }
             let name = string(kAudioObjectPropertyName, of: id) ?? uid
             return AudioInputDevice(uid: uid, name: name, channelCount: channels)
         }
