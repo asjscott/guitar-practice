@@ -9,7 +9,6 @@ import TheoryCore
 struct SessionView: View {
     let model: SessionViewModel
 
-    @Environment(AudioInputService.self) private var audioInput
     @Environment(AppSoundOutput.self) private var soundOutput
     @Environment(AttemptLog.self) private var log
     @AppStorage("session.minutes") private var minutes = SessionSetup().minutes
@@ -35,12 +34,7 @@ struct SessionView: View {
             }
             .onChange(of: positionSystem, initial: true) { model.positionSystem = positionSystem }
             .onChange(of: soundOutput.problem) { model.soundChanged() }
-            .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.willSleepNotification)) { _ in
-                model.pause(notice: "The Mac went to sleep.")
-            }
-            .onChange(of: InputInUse(audioInput)) { old, new in
-                if let notice = new.notice(after: old, in: audioInput.devices) { model.pause(notice: notice) }
-            }
+            .noticesInterruptions(input: model.inputChanged, sleep: model.pause(notice:))
             .onChange(of: setup, initial: true) { model.setup = setup }
             // After the changes above, so that the first theme is picked for the neck in Settings.
             .task(id: model.themeNeck) { model.showTheme() }
@@ -53,11 +47,11 @@ struct SessionView: View {
         switch model.stage {
         case .idle:
             SessionSetupView(minutes: $minutes, naturalsOnly: $naturalsOnly, range: $range, theme: model.theme,
-                             reroll: model.canReroll ? { model.reroll() } : nil, blocks: model.plan(), problem: problem,
+                             reroll: model.canReroll ? { model.reroll() } : nil, blocks: model.plan(), problem: model.problem,
                              noSoundNotice: model.noSoundNotice,
-                             start: start)
+                             start: { model.start() })
         case .ready, .playing, .paused:
-            SessionPlayingView(model: model, inputProblem: inputProblem, resume: resume)
+            SessionPlayingView(model: model)
         case .finished:
             if let summary = model.summary {
                 SessionSummaryView(summary: summary, tuning: model.fretboard.tuning, key: model.theme?.key,
@@ -70,28 +64,9 @@ struct SessionView: View {
         SessionSetup(minutes: minutes, notes: naturalsOnly ? .naturals : .all, range: range)
     }
 
-    /// Why a session can't start; nil when it can.
-    private var problem: SessionProblem? {
-        inputProblem ?? model.nothingToPromptReason.map(SessionProblem.nothingToPrompt)
-    }
-
-    /// Why nothing can be heard: a session can't start or resume. Nil when it can.
-    private var inputProblem: SessionProblem? {
-        if audioInput.permission == .denied { return .noAccess }
-        return audioInput.canListen ? nil : .noInput
-    }
-
-    private func start() {
-        if problem == nil { model.start() }
-    }
-
-    private func resume() {
-        if inputProblem == nil { model.resume() }
-    }
-
     private func press(_ key: PlainKey) -> Bool {
         switch (key, model.stage) {
-        case (.return, .idle): start()
+        case (.return, .idle): model.start()
         case (.return, .finished): model.done()
         case (.space, .ready), (.space, .playing): model.next()
         case (.character("s"), .playing): model.skip()
@@ -99,30 +74,13 @@ struct SessionView: View {
         // = is + without Shift.
         case (.character("+"), .playing), (.character("="), .playing): model.extend()
         case (.character("p"), .ready), (.character("p"), .playing): model.pause()
-        case (.character("p"), .paused): resume()
+        case (.character("p"), .paused): model.resume()
         case (.escape, .ready), (.escape, .playing): model.askToEnd()
         case (.escape, .paused): model.asksToEnd ? model.cancelEnd() : model.askToEnd()
         case (.return, .paused) where model.asksToEnd: model.end()
         default: return false
         }
         return true
-    }
-}
-
-/// The input being listened to, to notice its loss.
-private struct InputInUse: Equatable {
-    let device: AudioInputDevice?
-    let isRunning: Bool
-
-    @MainActor init(_ audioInput: AudioInputService) {
-        device = audioInput.choice?.device
-        isRunning = audioInput.isRunning
-    }
-
-    /// Says how the input was lost, if it was. Choosing another input in Settings doesn't lose one.
-    func notice(after old: InputInUse, in devices: [AudioInputDevice]) -> String? {
-        if let lost = old.device, !devices.contains(where: { $0.uid == lost.uid }) { return "\(lost.name) was disconnected." }
-        return old.isRunning && !isRunning ? "The audio input stopped." : nil
     }
 }
 

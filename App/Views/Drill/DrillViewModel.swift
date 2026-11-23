@@ -7,8 +7,7 @@ import TheoryCore
 /// turns the drill's state into what the D4 layout shows.
 ///
 /// One clock for everything the drill sees: host time in seconds (`AudioInputService.hostTimeNow()`), as a
-/// `Duration`. Played notes arrive on it from `PlayedNoteFeed`. While a run goes, a main-actor timer ticks the
-/// drill about 30 times a second, so timeouts and the next prompt happen hands-free.
+/// `Duration`. Played notes arrive on it from `PlayedNoteFeed`. It outlives its screen, so a paused run does too.
 @MainActor @Observable
 final class DrillViewModel {
     /// What the view draws from the drill, copied after each event and only replaced when it changes.
@@ -35,13 +34,19 @@ final class DrillViewModel {
     @ObservationIgnored var log: AttemptLog?
 
     /// Where the drill's sounds go; the view sets it before a run can start. None (in `LogCheck`) is silent.
-    @ObservationIgnored var soundOutput: AppSoundOutput?
+    var soundOutput: AppSoundOutput?
 
     /// The toolbar's options, shared by every drill. The view locks them during a run; a run uses the options it
     /// started with.
     var options = DrillOptions()
 
     private(set) var snapshot = Snapshot()
+
+    /// Why the run paused by itself, for the Paused card.
+    private(set) var pauseNotice: String?
+
+    /// The audio input, while the screen is open; nil (in `LogCheck`) is no problem.
+    private var input: AudioInputState?
 
     /// The note name being typed, in a drill answered by typing.
     private(set) var nameEntry = NoteNameEntry()
@@ -51,12 +56,9 @@ final class DrillViewModel {
 
     @ObservationIgnored private var drill = DrillKind.all[0].makeDrill(DrillSetup(fretboard: Fretboard(tuning: .standard), seed: 0))
     @ObservationIgnored private var runLog: RunLog?
-    @ObservationIgnored private var ticker: Task<Void, Never>?
+    @ObservationIgnored private let ticker = DrillTicker()
     @ObservationIgnored private var soundFilter = AppSoundFilter()
     @ObservationIgnored private let feed = PlayedNoteFeed()
-
-    /// How often the engine is ticked while running.
-    private static let tickInterval: Duration = .milliseconds(33)
 
     var fretboard: Fretboard { Fretboard(tuning: tuning, capo: capo) }
 
@@ -73,6 +75,15 @@ final class DrillViewModel {
     /// Why Start is disabled with these options; nil when something can be prompted.
     var nothingToPromptReason: String? { newDrill(seed: 0).nothingToPromptReason }
 
+    /// Why nothing can be heard: a run can't start or resume. Nil when it can.
+    var inputProblem: AudioInputProblem? { input?.problem }
+
+    /// Why Start would do nothing; nil when it would start a run, or try the sound output again.
+    var startProblem: String? {
+        if let reason = inputProblem?.text ?? nothingToPromptReason { return reason }
+        return soundOutput?.hasDevice == false ? soundProblem : nil
+    }
+
     /// Why this drill can't be heard, if it needs to be.
     var soundProblem: String? { kind.needsSound ? soundOutput?.problem : nil }
 
@@ -81,24 +92,30 @@ final class DrillViewModel {
     }
 
     func start(seed: UInt64 = .random(in: .min ... .max)) {
-        guard !isRunning, nothingToPromptReason == nil, prepareSound() else { return }
+        guard !isRunning, inputProblem == nil, nothingToPromptReason == nil, prepareSound() else { return }
         drill = newDrill(seed: seed)
         runLog = log?.run()
         send(.start(at: clockNow()))
         startTicking()
     }
 
-    func togglePause() {
-        guard isRunning else { return }
-        if isPaused {
-            guard prepareSound() else { return }
-            send(.resume(at: clockNow()))
-            startTicking()
-        } else {
-            send(.pause(at: clockNow()))
-            stopTicking()
-        }
+    /// Pauses. By itself, with a notice saying why; that is dropped if it was already paused.
+    func pause(notice: String? = nil) {
+        guard isRunning, !isPaused else { return }
+        pauseNotice = notice
+        send(.pause(at: clockNow()))
+        ticker.stop()
     }
+
+    func resume() {
+        guard isPaused, inputProblem == nil, prepareSound() else { return }
+        pauseNotice = nil
+        send(.resume(at: clockNow()))
+        startTicking()
+    }
+
+    /// P.
+    func togglePause() { isPaused ? resume() : pause() }
 
     /// S: the next prompt, with no reveal.
     func skip() { send(.skip(at: clockNow())) }
@@ -109,12 +126,12 @@ final class DrillViewModel {
     func stop() {
         guard isRunning else { return }
         send(.stop(at: clockNow()))
-        stopTicking()
+        ticker.stop()
     }
 
     /// The sound output failed or came back: a run that needs it pauses.
     func soundProblemChanged() {
-        if soundProblem != nil, isRunning, !isPaused { togglePause() }
+        if soundProblem != nil { pause() }
     }
 
     /// True unless the drill needs sound and there is none. Ready before the clock is read, so that the first sound
@@ -124,27 +141,25 @@ final class DrillViewModel {
         return soundOutput.prepare()
     }
 
-    /// The screen is closing: end the run (no summary is shown) and forget what was being heard.
+    /// The audio input changed. Losing it pauses.
+    func inputChanged(_ new: AudioInputState) {
+        defer { input = new }
+        if let notice = input.flatMap(new.lossNotice) { pause(notice: notice) }
+    }
+
+    /// The screen is closing: a run that is going pauses, and what was being heard is forgotten.
     func leave() {
-        stop()
+        pause()
+        input = nil
         feed.reset()
     }
 
     private func startTicking() {
-        ticker?.cancel()
-        ticker = Task { [weak self] in
-            while !Task.isCancelled {
-                try? await Task.sleep(for: Self.tickInterval)
-                guard let self, !Task.isCancelled else { return }
-                send(.tick(at: clockNow()))
-                if !isRunning { stopTicking() }
-            }
+        ticker.start { [weak self] in
+            guard let self else { return }
+            send(.tick(at: clockNow()))
+            if !isRunning { ticker.stop() }
         }
-    }
-
-    private func stopTicking() {
-        ticker?.cancel()
-        ticker = nil
     }
 
     private func clockNow() -> Duration {
@@ -160,8 +175,7 @@ final class DrillViewModel {
         runLog?.update(from: drill)
         let new = Snapshot(phase: drill.phase, display: drill.display, attempts: drill.attempts)
         if new != snapshot { snapshot = new }
-        var entry = nameEntry
-        entry.follow(drill)
+        let entry = nameEntry.following(drill)
         if entry != nameEntry { nameEntry = entry }
     }
 
@@ -193,8 +207,9 @@ final class DrillViewModel {
             // A failure reaches the screen as the output's problem, which pauses the run.
             guard let latency = soundOutput.play(sound) else { return }
             soundFilter.started(sound, at: .seconds(start), latency: latency)
+            drill.handle(.soundStarted(at: .seconds(start), latency: latency))
         }
-        if !drill.isRunning { soundOutput.release() }
+        if !drill.isRunning || drill.phase == .paused { soundOutput.release() }
     }
 
     // MARK: - Listening
@@ -252,7 +267,7 @@ final class DrillViewModel {
     /// While paused: whether Resume continues the same prompt.
     var resumesSamePrompt: Bool { drill.resumesSamePrompt }
 
-    /// The last ~14 attempts for the strip under the flashcard, oldest first.
+    /// The last ~14 attempts for the strip under the target card, oldest first.
     var recentAttempts: [(id: Int, attempt: Attempt)] {
         let attempts = snapshot.attempts
         let start = max(0, attempts.count - 14)

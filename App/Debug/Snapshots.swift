@@ -48,25 +48,42 @@ enum Snapshots {
 
         let drill = DrillViewModel()
         try await save("drill-idle", DrillView(model: drill))
+        drill.stop()
         try await save("drill-waiting", DrillView(model: drill)) { drill.start(seed: 1) }
+        drill.stop()
         try await save("drill-wrong", DrillView(model: drill)) {
             drill.start(seed: 1)
             drill.playForSnapshot(right: false)
         }
         // Right answers advance after a short pause, so pause the run to hold the lit neck still.
+        drill.stop()
         try await save("drill-correct", DrillView(model: drill), settle: .milliseconds(150)) {
             drill.start(seed: 1)
             drill.playForSnapshot(right: true)
         }
 
+        drill.stop()
         try await save("drill-skipped", DrillView(model: drill)) {
             drill.start(seed: 1)
             drill.skip()
         }
+        drill.stop()
         try await save("drill-paused", DrillView(model: drill)) {
             drill.start(seed: 1)
             drill.togglePause()
         }
+        drill.stop()
+        try await save("drill-paused-no-input", DrillView(model: drill)) {
+            drill.start(seed: 1)
+            drill.inputChanged(AudioInputState(permission: .granted, device: nil, devices: [], isRunning: false))
+        }
+        // Leaving paused it; coming back, the same run is there.
+        try await save("drill-back-while-paused", DrillView(model: drill)) { precondition(drill.isPaused) }
+        drill.stop()
+        try await save("drill-access-asked", DrillView(model: drill)) {
+            drill.inputChanged(AudioInputState(permission: .undetermined, device: nil, devices: [], isRunning: false))
+        }
+        drill.stop()
         try await save("drill-nothing-to-prompt", DrillView(model: drill)) {
             drill.tuning = TuningPreset.eFlatStandard.tuning
             drill.capo = 12
@@ -74,16 +91,20 @@ enum Snapshots {
 
         let hear = DrillViewModel()
         hear.kind = .hearFindIt
+        hear.stop()
         try await save("hear-waiting", DrillView(model: hear)) { hear.start(seed: 1) }
+        hear.stop()
         try await save("hear-wrong", DrillView(model: hear)) {
             hear.start(seed: 1)
             hear.playForSnapshot(right: false)
         }
+        hear.stop()
         try await save("hear-correct", DrillView(model: hear), settle: .milliseconds(150)) {
             hear.start(seed: 1)
             hear.skip()
             hear.playForSnapshot(right: true)
         }
+        hear.stop()
         try await save("hear-timed-out", DrillView(model: hear)) {
             hear.start(seed: 1)
             hear.timeOutForSnapshot()
@@ -95,6 +116,7 @@ enum Snapshots {
 
         let sweep = DrillViewModel()
         sweep.kind = .allInstances
+        sweep.stop()
         try await save("drill-sweep", DrillView(model: sweep)) {
             sweep.start(seed: 1)
             sweep.playForSnapshot(right: true)
@@ -102,12 +124,13 @@ enum Snapshots {
             sweep.skip()
             sweep.playForSnapshot(right: true)
         }
+        sweep.stop()
         try await save("drill-sweep-wrong", DrillView(model: sweep)) {
-            sweep.stop()
             sweep.start(seed: 1)
             sweep.playForSnapshot(right: true)
             sweep.playForSnapshot(right: false)
         }
+        sweep.stop()
         try await save("drill-sweep-paused", DrillView(model: sweep)) {
             sweep.start(seed: 1)
             sweep.togglePause()
@@ -116,24 +139,29 @@ enum Snapshots {
         // Typed with real key events, so the key handling is exercised too.
         let naming = DrillViewModel()
         naming.kind = .fretNameIt
+        naming.stop()
         try await save("fret-name-it-waiting", DrillView(model: naming)) { naming.start(seed: 1) }
+        naming.stop()
         try await save("fret-name-it-typed", DrillView(model: naming)) {
             naming.start(seed: 1)
             type("gb")
         }
+        naming.stop()
         try await save("fret-name-it-wrong", DrillView(model: naming)) {
             naming.start(seed: 1)
             type("gb\r")
         }
+        naming.stop()
         try await save("fret-name-it-right", DrillView(model: naming), settle: .milliseconds(150)) {
             naming.start(seed: 1)
             naming.answerForSnapshot()
         }
+        naming.stop()
         try await save("fret-name-it-timed-out", DrillView(model: naming), settle: .milliseconds(10_800)) {
             naming.start(seed: 1)
         }
 
-        try await save("drill-not-saving", DrillView(), log: .inMemory(problem: "The file couldn’t be opened."))
+        try await save("drill-not-saving", DrillView(model: DrillViewModel()), log: .inMemory(problem: "The file couldn’t be opened."))
 
         try await saveSession()
 
@@ -147,7 +175,7 @@ enum Snapshots {
 
     private static func saveSession() async throws {
         let problems: [(String, SessionProblem)] = [
-            ("access", .noAccess), ("input", .noInput),
+            ("access", .input(.noAccess)), ("access-asked", .input(.accessNotGiven)), ("input", .input(.noInput)),
             ("prompts", .nothingToPrompt("No natural notes in these frets and strings. Choose All notes.")),
         ]
         for (name, problem) in problems {
@@ -251,9 +279,13 @@ enum Snapshots {
             play(.notePlayIt)
             session.pause(notice: "Scarlett 2i2 was disconnected.")
         }
-        try await save("session-paused-no-input", SessionPlayingView(model: session, inputProblem: .noInput, resume: {}))
+        try await save("session-paused-no-input", SessionPlayingView(model: session)) {
+            play(.notePlayIt)
+            session.inputChanged(AudioInputState(permission: .granted, device: nil, devices: [], isRunning: false))
+            session.pause(notice: "Scarlett 2i2 was disconnected.")
+        }
         // By itself, since the window's sidebar isn't drawn.
-        try await save("sidebar-session-paused", Sidebar(selection: .constant(.explorer), sessionIsPaused: true),
+        try await save("sidebar-session-paused", Sidebar(selection: .constant(.explorer), pausedScreens: [.session, .drill]),
                        size: CGSize(width: 200, height: 240))
         // Esc in the drill answered by typing, then keys in the whole window.
         try await save("session-ending", SessionView(model: session)) {

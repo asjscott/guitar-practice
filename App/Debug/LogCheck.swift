@@ -25,6 +25,7 @@ enum LogCheck {
                 } else {
                     try checkSessions()
                     try checkThemes()
+                    try checkFreePractice()
                     try await write(log)
                 }
                 if let problem = log.problem { throw LogCheckError.notSaved(problem) }
@@ -118,6 +119,8 @@ enum LogCheck {
         session.start()
         session.next()
         session.skip()
+        session.extend()
+        session.extend()
         session.skip()
         while session.isActive { session.next() }
         session.done()
@@ -130,6 +133,10 @@ enum LogCheck {
         session.resume()
         session.leave()
         guard session.stage == .paused else { throw LogCheckError.sessions(["leaving didn't pause"]) }
+        let noAccess = AudioInputState(permission: .undetermined, device: nil, devices: [], isRunning: false)
+        session.inputChanged(noAccess)
+        session.resume()
+        guard session.stage == .paused else { throw LogCheckError.sessions(["resumed without access"]) }
         session.askToEnd()
         session.end()
 
@@ -137,9 +144,55 @@ enum LogCheck {
         let attempts = try log.context.fetch(FetchDescriptor<LoggedAttempt>())
         guard saved.map(\.attempts.count) == [2, 1], saved.map(\.state) == [.completed, .endedEarly],
               saved.allSatisfy({ $0.endedAt != nil && $0.totalSeconds != nil && $0.blocks.first?.spentSeconds != nil }),
+              saved.map({ $0.blocks.first?.extends }) == [2, 0],
               attempts.count == 3, attempts.allSatisfy({ $0.source == .session && $0.blockIndex == 0 }) else {
             throw LogCheckError.sessions(saved.map { "\($0.stateRaw) \($0.attempts.count)" })
         }
+    }
+
+    /// Free practice pauses as a session does, and a paused run logs nothing. In memory.
+    private static func checkFreePractice() throws {
+        func require(_ condition: Bool, _ what: String) throws {
+            if !condition { throw LogCheckError.freePractice(what) }
+        }
+        let interface = AudioInputDevice(uid: "a", name: "Interface", channelCount: 2)
+        let ready = AudioInputState(permission: .granted, device: interface, devices: [interface], isRunning: true)
+        var asked = ready
+        asked.permission = .undetermined
+        var denied = ready
+        denied.permission = .denied
+        var gone = ready
+        gone.device = nil
+        gone.devices = []
+
+        let log = AttemptLog.inMemory()
+        let drill = DrillViewModel()
+        drill.log = log
+        drill.inputChanged(asked)
+        drill.start(seed: 1)
+        try require(!drill.isRunning, "started without access")
+        for lost in [denied, gone] {
+            drill.inputChanged(ready)
+            drill.start(seed: 1)
+            if drill.isPaused { drill.resume() }
+            try require(drill.isRunning && !drill.isPaused, "didn't go on")
+            drill.inputChanged(lost)
+            try require(drill.isPaused && drill.pauseNotice != nil, "losing the input didn't pause")
+            drill.resume()
+            try require(drill.isPaused, "resumed without an input")
+        }
+        drill.inputChanged(ready)
+        drill.resume()
+        drill.skip()
+        drill.leave()
+        try require(drill.isRunning && drill.isPaused, "leaving didn't pause")
+        drill.skip()
+        try require(drill.snapshot.attempts.count == 1, "the run survives leaving")
+        try require(try log.context.fetchCount(FetchDescriptor<LoggedAttempt>()) == 1, "a paused run logs nothing")
+        drill.resume()
+        drill.pause(notice: "The Mac went to sleep.")
+        try require(drill.isPaused, "sleep didn't pause")
+        drill.stop()
     }
 
     /// A day's theme through rerolls, a discarded session, a relaunch, a session past midnight, another position
@@ -212,7 +265,7 @@ enum LogCheck {
             let time = attempt.responseSeconds == nil ? "no time" : "timed"
             let session = attempt.session.map { "\($0.day) block \(attempt.blockIndex ?? -1)" } ?? "none"
             print("attempt \(attempt.drill) \(attempt.sourceRaw) \(attempt.outcomeRaw) tuning \(attempt.tuning) capo \(attempt.capo)",
-                  "target \(attempt.targetName) \(target) sweep \(attempt.sweepID != nil) first \(attempt.firstTryRight) wrong [\(wrong)] \(time) session \(session)")
+                  "target \(attempt.targetName) \(target) sweep \(attempt.sweepID != nil) first \(attempt.firstRight) wrong [\(wrong)] \(time) session \(session)")
         }
         for session in try log.context.fetch(FetchDescriptor<PracticeSession>()) {
             print("session \(session.day) \(session.stateRaw) theme \(session.theme?.key.description ?? "none")",
@@ -227,6 +280,7 @@ enum LogCheck {
         case notSaved(String)
         case sessions([String])
         case theme(String)
+        case freePractice(String)
     }
 }
 #endif

@@ -77,7 +77,7 @@ extension LoggedAttempt {
                   targetName: attempt.prompt.noteName, targetPitchClass: attempt.prompt.pitchClass.value,
                   targetString: attempt.prompt.string, targetFret: location?.fret,
                   targetPitch: location.map { fretboard.pitch(at: $0).midi },
-                  outcomeRaw: attempt.outcome.rawValue, firstTryRight: attempt.firstRight,
+                  outcomeRaw: attempt.outcome.rawValue, firstRight: attempt.firstRight,
                   responseSeconds: attempt.responseTime.map { $0 / .seconds(1) },
                   wrongAnswers: attempt.rawWrongAnswers.map(WrongAnswerRecord.init), sweepID: sweepID,
                   blockIndex: blockIndex)
@@ -103,5 +103,12 @@ extension Calendar {
         calendar.timeZone = .current
         let day = calendar.dateComponents([.year, .month, .day], from: date)
         return String(format: "%04d-%02d-%02d", day.year ?? 0, day.month ?? 0, day.day ?? 0)
+    }
+
+    /// A count of local calendar days, one more each day.
+    static func dayNumber(of date: Date) -> Int {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        return calendar.ordinality(of: .day, in: .era, for: date) ?? 0
     }
 }

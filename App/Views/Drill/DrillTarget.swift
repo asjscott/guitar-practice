@@ -29,8 +29,7 @@ struct DrillNeck: View {
         FretboardView(diagram: FretboardDiagram(drill: display, on: fretboard))
             .frame(height: height)
             .padding(16)
-            .background(RoundedRectangle(cornerRadius: 12).fill(Color(nsColor: .controlBackgroundColor)))
-            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color(nsColor: .separatorColor)))
+            .sessionCard()
     }
 }
 
@@ -89,7 +88,7 @@ private struct DrillChips: View {
                 .frame(width: 52, height: 34)
                 .background(RoundedRectangle(cornerRadius: 6).fill(chip.state.fill))
                 .accessibilityElement()
-                .accessibilityLabel("String \(chip.title): \(chip.state.spoken(chip.text))")
+                .accessibilityLabel("\(chip.spokenTitle): \(chip.state.spoken(chip.text))")
             }
         }
     }

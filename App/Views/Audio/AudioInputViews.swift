@@ -24,6 +24,44 @@ private struct ListensToAudioInput: ViewModifier {
     }
 }
 
+extension View {
+    /// Tells a screen's model how the audio input is, at first and whenever it changes, and of the Mac going to sleep,
+    /// so that practice doesn't go on without the player. Leaving the screen is for the screen to notice.
+    func noticesInterruptions(input: @escaping @MainActor (AudioInputState) -> Void,
+                              sleep: @escaping @MainActor (String) -> Void) -> some View {
+        modifier(NoticesInterruptions(input: input, sleep: sleep))
+    }
+}
+
+private struct NoticesInterruptions: ViewModifier {
+    let input: @MainActor (AudioInputState) -> Void
+    let sleep: @MainActor (String) -> Void
+    @Environment(AudioInputService.self) private var audioInput
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: audioInput.state, initial: true) { input(audioInput.state) }
+            .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.willSleepNotification)) { _ in
+                sleep("The Mac went to sleep.")
+            }
+    }
+}
+
+/// Says why nothing can be heard, with a way to put microphone access right.
+struct AudioInputProblemNotice: View {
+    let problem: AudioInputProblem
+    @Environment(AudioInputService.self) private var audioInput
+
+    var body: some View {
+        HStack {
+            Label(problem.text, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+            if problem == .noAccess {
+                Button("Open System Settings") { audioInput.openMicrophonePrivacySettings() }
+            }
+        }
+    }
+}
+
 /// A horizontal input meter: green rising to yellow and red at full scale. `level` is 0–1.
 struct InputMeter: View {
     let level: Double
@@ -67,15 +105,13 @@ struct AudioInputLine: View {
     }
 
     private var icon: String {
-        if audioInput.permission == .denied || audioInput.choice == nil { return "mic.slash" }
+        if audioInput.state.problem != nil { return "mic.slash" }
         if audioInput.choice?.isFallback == true || audioInput.failure != nil { return "exclamationmark.triangle.fill" }
         return "mic.fill"
     }
 
     private var label: String {
-        if audioInput.permission == .denied { return "Microphone access is off" }
-        guard let choice = audioInput.choice else { return "No input device" }
-        return choice.label
+        audioInput.state.problem?.text ?? audioInput.choice?.label ?? ""
     }
 }
 
