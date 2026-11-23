@@ -13,16 +13,8 @@ enum PracticeMigrationPlan: SchemaMigrationPlan {
     static var stages: [MigrationStage] { [] }
 }
 
-/// A key and a position, as `Session` and `DayTheme` save them.
-struct SavedTheme: Hashable, Sendable {
-    var key: Key
-    var position: Position.ID
-
-    init(key: Key, position: Position.ID) {
-        self.key = key
-        self.position = position
-    }
-
+extension Theme {
+    /// As `Session` and `DayTheme` save it; nil if that is unusable.
     fileprivate init?(tonic: Int?, mode: String?, system: String?, number: Int?, octave: Int?) {
         guard let tonic, let mode = mode.flatMap(Key.Mode.init), let system = system.flatMap(Position.System.init),
               let number, let octave else { return nil }
@@ -32,15 +24,15 @@ struct SavedTheme: Hashable, Sendable {
 }
 
 extension DayTheme {
-    convenience init(day: String, theme: SavedTheme, rerolls: Int = 0) {
+    convenience init(day: String, theme: Theme, rerolls: Int = 0) {
         self.init(day: day, rerolls: rerolls, tonic: theme.key.tonic.pitchClass.value, mode: theme.key.mode.rawValue,
                   positionSystem: theme.position.system.rawValue, positionNumber: theme.position.number,
                   positionOctave: theme.position.octave)
     }
 
     /// Nil only if what is saved is unusable.
-    var theme: SavedTheme? {
-        get { SavedTheme(tonic: tonic, mode: mode, system: positionSystem, number: positionNumber, octave: positionOctave) }
+    var theme: Theme? {
+        get { Theme(tonic: tonic, mode: mode, system: positionSystem, number: positionNumber, octave: positionOctave) }
         set {
             guard let newValue else { return }
             tonic = newValue.key.tonic.pitchClass.value
@@ -59,10 +51,10 @@ extension PracticeSession {
     }
 
     /// Nil in a session without a theme.
-    var theme: SavedTheme? {
+    var theme: Theme? {
         get {
-            SavedTheme(tonic: themeTonic, mode: themeMode, system: themePositionSystem, number: themePositionNumber,
-                       octave: themePositionOctave)
+            Theme(tonic: themeTonic, mode: themeMode, system: themePositionSystem, number: themePositionNumber,
+                  octave: themePositionOctave)
         }
         set {
             themeTonic = newValue?.key.tonic.pitchClass.value

@@ -30,10 +30,10 @@ The look and behaviour settled in Phase 0. Keep to these when changing a screen.
 ## Session
 
 - First in the sidebar, and the first-launch default. S4 on branch `prototype/phase2-screens`.
-- Setup: minutes with − and +, Start (↩), the planned blocks, then Naturals / All notes and First 12 frets / Whole neck. Start is disabled, with the reason under it, when nothing can be heard or prompted.
+- Setup: the theme (key large, position under it) with Reroll until the day's first session has started; minutes with − and +, Start (↩), the planned blocks, then Naturals / All notes and First 12 frets / Whole neck. Start is disabled, with the reason under it, when nothing can be heard or prompted.
 - The drills bar stays on top through Ready cards and drills: time left per block, or time spent once it is over.
 - Keys go through `onPlainKey`, which sees them before any focused control: Space, Return, S and R work whatever has focus, and held-down repeats do nothing.
-- A session keeps the tuning and capo it started with.
+- A session keeps the tuning, capo and theme it started with. The theme is in the status bar while it goes.
 - The summary shows a card per block that started; one where nothing was answered shows no speed.
 
 ## Settings

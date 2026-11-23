@@ -4,7 +4,7 @@ import TheoryCore
 
 /// The Session screen, S4: setup, then for each block a Ready card and the drill under a bar of the session's drills,
 /// then a summary. Return starts and leaves the summary; Space goes on; S skips; R is up to the drill. A listening
-/// screen; leaving it ends the session. Follows the tuning and capo in Settings.
+/// screen; leaving it ends the session. Follows the tuning, capo and position system in Settings.
 struct SessionView: View {
     let model: SessionViewModel
 
@@ -14,6 +14,7 @@ struct SessionView: View {
     @AppStorage("session.minutes") private var minutes = SessionSetup().minutes
     @AppStorage("session.naturalsOnly") private var naturalsOnly = true
     @AppStorage("session.range") private var range = SessionRange.first12
+    @AppStorage(InstrumentSettings.Key.positionSystem) private var positionSystem = InstrumentSettings.defaultPositionSystem
 
     var body: some View {
         content
@@ -31,19 +32,27 @@ struct SessionView: View {
                 model.tuning = tuning
                 model.capo = capo
             }
+            .onChange(of: positionSystem, initial: true) { model.positionSystem = positionSystem }
             .onChange(of: setup, initial: true) { model.setup = setup }
+            // After the changes above, so that the first theme is picked for the neck in Settings.
+            .task(id: model.themeNeck) { model.showTheme() }
+            .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged).receive(on: RunLoop.main)) { _ in
+                model.showTheme()
+            }
     }
 
     @ViewBuilder private var content: some View {
         switch model.stage {
         case .idle:
-            SessionSetupView(minutes: $minutes, naturalsOnly: $naturalsOnly, range: $range, blocks: model.plan(),
-                             problem: problem, start: start)
+            SessionSetupView(minutes: $minutes, naturalsOnly: $naturalsOnly, range: $range, theme: model.theme,
+                             reroll: model.canReroll ? { model.reroll() } : nil, blocks: model.plan(), problem: problem,
+                             start: start)
         case .ready, .playing:
             SessionPlayingView(model: model)
         case .finished:
             if let summary = model.summary {
-                SessionSummaryView(summary: summary, tuning: model.fretboard.tuning, done: model.done)
+                SessionSummaryView(summary: summary, tuning: model.fretboard.tuning, key: model.theme?.key,
+                                   done: model.done)
             }
         }
     }

@@ -15,11 +15,15 @@ enum SessionProblem: Equatable {
     }
 }
 
-/// Before a session: minutes, difficulty, the blocks they give, and Start (↩).
+/// Before a session: the theme, minutes, difficulty, the blocks they give, and Start (↩).
 struct SessionSetupView: View {
     @Binding var minutes: Int
     @Binding var naturalsOnly: Bool
     @Binding var range: SessionRange
+    /// Nil until it is known.
+    let theme: SessionTheme?
+    /// Nil once it can't be rerolled.
+    let reroll: (() -> Void)?
     let blocks: [SessionBlock]
     let problem: SessionProblem?
     let start: () -> Void
@@ -47,12 +51,21 @@ struct SessionSetupView: View {
 
     private var choices: some View {
         VStack(spacing: 22) {
+            VStack(spacing: 4) {
+                Text(theme?.key.description ?? " ").font(.system(size: 64, weight: .bold, design: .rounded))
+                HStack {
+                    Text(theme?.positionName ?? "").foregroundStyle(.secondary)
+                    if let reroll { Button("Reroll", action: reroll) }
+                }
+                .font(.title3)
+                .frame(minHeight: 28)
+            }
             HStack(spacing: 20) {
                 step("minus.circle", "Less time", by: -SessionSetup.minutesStep)
                 Text("\(shownMinutes) min")
-                    .font(.system(size: 64, weight: .bold, design: .rounded))
+                    .font(.system(size: 44, weight: .semibold, design: .rounded))
                     .monospacedDigit()
-                    .frame(width: 260)
+                    .frame(width: 190)
                 step("plus.circle", "More time", by: SessionSetup.minutesStep)
             }
             Button(action: start) {

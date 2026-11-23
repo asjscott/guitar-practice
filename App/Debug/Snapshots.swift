@@ -149,7 +149,9 @@ enum Snapshots {
         for (name, problem) in problems {
             try await save("session-setup-no-\(name)", SessionSetupView(
                 minutes: .constant(10), naturalsOnly: .constant(false), range: .constant(.wholeNeck),
-                blocks: SessionViewModel().plan(), problem: problem, start: {}))
+                theme: SessionTheme(Theme(key: .minor(.dSharp), position: Position.ID(system: .threeNotesPerString, number: 2)),
+                                    on: Fretboard(tuning: .standard)),
+                reroll: nil, blocks: SessionViewModel().plan(), problem: problem, start: {}))
         }
         let session = SessionViewModel()
         try await save("session-setup", SessionView(model: session))

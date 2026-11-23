@@ -6,6 +6,8 @@ import TheoryCore
 struct SessionSummaryView: View {
     let summary: SessionSummary
     let tuning: Tuning
+    /// The theme's, for spelling.
+    let key: Key?
     let done: () -> Void
 
     var body: some View {
@@ -32,7 +34,7 @@ struct SessionSummaryView: View {
             VStack {
                 Text("Slowest").font(.headline)
                 ForEach(Array(attempts.enumerated()), id: \.offset) { _, attempt in
-                    Text(attempt.summaryLine(in: tuning)).foregroundStyle(.secondary)
+                    Text(attempt.summaryLine(in: tuning, key: key)).foregroundStyle(.secondary)
                 }
             }
         }

@@ -24,6 +24,7 @@ enum LogCheck {
                     try read(log)
                 } else {
                     try checkSessions()
+                    try checkThemes()
                     try await write(log)
                 }
                 if let problem = log.problem { throw LogCheckError.notSaved(problem) }
@@ -69,7 +70,7 @@ enum LogCheck {
         drill.stop()
 
         // A session is saved with its first attempt, and one with none isn't.
-        let theme = SavedTheme(key: .major(.bFlat), position: Position.ID(system: .caged, number: 3))
+        let theme = Theme(key: .major(.bFlat), position: Position.ID(system: .caged, number: 3))
         let session = newSession()
         session.theme = theme
         session.state = .endedEarly
@@ -134,6 +135,65 @@ enum LogCheck {
         }
     }
 
+    /// A day's theme through rerolls, a discarded session, a relaunch, a session past midnight, another position
+    /// system and the next day. In memory.
+    private static func checkThemes() throws {
+        func require(_ condition: Bool, _ what: String) throws {
+            if !condition { throw LogCheckError.theme(what) }
+        }
+        let log = AttemptLog.inMemory()
+        func launch() -> SessionViewModel {
+            let session = SessionViewModel()
+            session.log = log
+            return session
+        }
+        func themes() throws -> [DayTheme] { try log.context.fetch(FetchDescriptor<DayTheme>(sortBy: [SortDescriptor(\.day)])) }
+        let evening = DateComponents(calendar: .current, year: 2026, month: 9, day: 30, hour: 23, minute: 50).date!
+        let midnight = evening.addingTimeInterval(20 * 60)
+
+        var session = launch()
+        session.showTheme(on: evening)
+        let first = session.theme
+        try require(try themes().map(\.theme) == [first?.theme] && session.canReroll, "saved when first shown")
+        session.start(on: evening)
+        session.leave()
+        session.done()
+        session.showTheme(on: evening)
+        try require(session.theme == first && session.canReroll, "a discarded session isn't a start")
+        session.reroll(on: evening)
+        let rerolled = session.theme
+        try require(rerolled?.key != first?.key && rerolled?.positionName != first?.positionName, "rerolled")
+
+        session = launch()
+        session.showTheme(on: evening)
+        try require(session.theme == rerolled && session.canReroll, "a reroll survives a relaunch")
+        session.positionSystem = .threeNotesPerString
+        session.showTheme(on: evening)
+        try require(session.theme?.key == rerolled?.key && session.theme?.theme.position.system == .threeNotesPerString,
+                    "another position system")
+        session.positionSystem = .caged
+        session.showTheme(on: evening)
+        try require(session.theme == rerolled, "back to the first position system")
+
+        session.start(on: evening)
+        session.next()
+        session.skip()
+        session.showTheme(on: midnight)
+        session.reroll(on: midnight)
+        try require(session.theme == rerolled, "a session past midnight keeps its theme")
+        session.leave()
+        session.done()
+        session.showTheme(on: evening)
+        session.reroll(on: evening)
+        try require(session.theme == rerolled && !session.canReroll, "no reroll after a start")
+        session.showTheme(on: midnight)
+        try require(session.theme?.key != rerolled?.key && session.theme?.positionName != rerolled?.positionName && session.canReroll,
+                    "the next day's theme")
+        let saved = try log.context.fetch(FetchDescriptor<PracticeSession>())
+        try require(saved.map(\.theme) == [rerolled?.theme] && saved.map(\.day) == ["2026-09-30"], "saved with the session")
+        try require(try themes().map(\.rerolls) == [1, 0], "one theme a day")
+    }
+
     private static func read(_ log: AttemptLog) throws {
         for attempt in try log.context.fetch(FetchDescriptor<LoggedAttempt>(sortBy: [SortDescriptor(\.date)])) {
             let wrong = attempt.wrongAnswers.map { $0.name ?? $0.pitch.map(String.init) ?? "?" }.joined(separator: ",")
@@ -155,6 +215,7 @@ enum LogCheck {
     private enum LogCheckError: Error {
         case notSaved(String)
         case sessions([String])
+        case theme(String)
     }
 }
 #endif
