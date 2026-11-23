@@ -66,10 +66,11 @@ public struct Key: Hashable, Sendable, Codable {
         }
     }
 
+    /// The key's own scale: major or natural minor on its tonic.
+    public var scale: Scale { Scale(mode == .major ? .major : .naturalMinor, tonic: tonic) }
+
     /// The seven notes of the key, from the tonic: its major or natural minor scale.
-    public var notes: [NoteName] {
-        Scale(mode == .major ? .major : .naturalMinor, tonic: tonic).notes
-    }
+    public var notes: [NoteName] { scale.notes }
 
     /// Sharps (positive) or flats (negative) in the key signature: F major −1, B major +5.
     public var signature: Int { notes.map(\.accidental).reduce(0, +) }

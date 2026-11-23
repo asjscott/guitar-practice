@@ -44,6 +44,14 @@ struct SplitMix64: Sendable {
         return z ^ (z >> 31)
     }
 
+    mutating func shuffled<Element>(_ elements: [Element]) -> [Element] {
+        var elements = elements
+        for last in elements.indices.dropFirst().reversed() {
+            elements.swapAt(last, Int(next() % UInt64(last + 1)))
+        }
+        return elements
+    }
+
     /// 0 up to (not including) 1.
     mutating func nextFraction() -> Double { Double(next() >> 11) / Double(UInt64(1) << 53) }
 }

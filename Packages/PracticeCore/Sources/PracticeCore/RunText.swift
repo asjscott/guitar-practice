@@ -3,10 +3,11 @@ import TheoryCore
 // Text the drill screen shows for attempts and run stats, worked out here so it can be tested.
 
 extension Attempt {
-    /// One summary row: "F on string 3 (G) — 2.31 s · played E, G first", or "… — timed out".
-    public func summaryLine(in tuning: Tuning) -> String {
+    /// One summary row: "F on string 3 (G) — 2.31 s · played E, G first", or "… — timed out". Wrong
+    /// notes are spelled in the key the prompt was (nil = sharps).
+    public func summaryLine(in tuning: Tuning, key: Key? = nil) -> String {
         let time = responseTime.map { "\(secondsText($0, decimals: 2)) s" } ?? (skipped ? "skipped" : "timed out")
-        let wrong = wrongAnswers.isEmpty ? "" : " · \(wrongVerb) \(wrongAnswers.map(\.text).joined(separator: ", ")) first"
+        let wrong = wrongAnswers.isEmpty ? "" : " · \(wrongVerb) \(wrongAnswers.map { $0.text(in: key) }.joined(separator: ", ")) first"
         return "\(prompt.text(in: tuning)) — \(time)\(wrong)"
     }
 
