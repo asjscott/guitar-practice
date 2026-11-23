@@ -1,0 +1,79 @@
+#!/bin/bash
+# The repo's checks. Run by .githooks/pre-commit and CI.
+#   scripts/check           repo rules + package tests (~10 s)
+#   scripts/check --rules   repo rules only
+#   scripts/check --build   also generates the Xcode project and builds the app
+set -euo pipefail
+
+# Git hooks export GIT_INDEX_FILE etc. The rules must use them (they read what is
+# being committed); SwiftPM and XcodeGen must not.
+cd "$(git rev-parse --show-toplevel)"
+
+mode="${1:-}"
+case "$mode" in
+  ""|--rules|--build) ;;
+  *) echo "usage: scripts/check [--rules|--build]" >&2; exit 2 ;;
+esac
+
+failed=0
+fail() { echo "✗ $*" >&2; failed=1; }
+
+# Rule: each pure package imports only what it is allowed to.
+check_imports() {
+  local package="$1" allowed="$2" dir="Packages/$1/Sources" file module hits
+  [ -n "$(git ls-files -- "$dir")" ] || { fail "$dir has no tracked files: is this rule out of date?"; return; }
+  while IFS= read -r -d '' file; do
+    hits=$(git show ":$file" | sed -nE 's/^[[:space:]]*(@[A-Za-z_]+(\([^)]*\))?[[:space:]]+)*((public|package|internal|fileprivate|private)[[:space:]]+)?import[[:space:]]+((struct|class|enum|protocol|typealias|func|let|var)[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*).*/\7/p')
+    for module in $hits; do
+      case " $allowed " in
+        *" $module "*) ;;
+        *) fail "$file imports $module; $package may import only: $allowed" ;;
+      esac
+    done
+  done < <(git ls-files -z -- "$dir/*.swift")
+}
+check_imports TheoryCore   "Foundation"
+check_imports ListenCore   "Foundation Accelerate"
+check_imports PracticeCore "Foundation TheoryCore"
+
+# Rule: no sound files in git, except self-recorded clips under 1 MB in the ListenCore fixtures (ADR 0002).
+fixtures="Packages/ListenCore/Tests/ListenCoreTests/Fixtures/"
+max_bytes=1000000
+while IFS= read -r -d '' entry; do
+  file="${entry#*$'\t'}"
+  blob="$(printf '%s' "${entry%%$'\t'*}" | cut -d' ' -f2)"
+  lower="$(printf '%s' "$file" | tr '[:upper:]' '[:lower:]')"
+  case "$lower" in
+    sounds/*) fail "$file: nothing under Sounds/ may be committed"; continue ;;
+    *.wav|*.aif|*.aiff|*.mp3|*.flac|*.ogg|*.caf|*.m4a|*.sf2|*.sfz) ;;
+    *) continue ;;
+  esac
+  case "$file" in
+    "$fixtures"*.wav)
+      size="$(git cat-file -s "$blob")"
+      [ "$size" -lt "$max_bytes" ] || fail "$file is $size bytes; test clips must be under $max_bytes" ;;
+    *) fail "$file: sound files may not be committed (only .wav clips in $fixtures)" ;;
+  esac
+done < <(git ls-files -s -z)
+
+[ "$failed" -eq 0 ] || exit 1
+echo "✓ repo rules"
+[ "$mode" != "--rules" ] || exit 0
+
+unset $(git rev-parse --local-env-vars)
+
+for package in TheoryCore ListenCore PracticeCore; do
+  if output="$(cd "Packages/$package" && swift test 2>&1)"; then
+    echo "✓ $package tests"
+  else
+    printf '%s\n' "$output" >&2
+    echo "✗ $package tests" >&2
+    exit 1
+  fi
+done
+
+if [ "$mode" = "--build" ]; then
+  xcodegen generate --quiet
+  xcodebuild -scheme GuitarPractice -destination 'platform=macOS' -quiet build
+  echo "✓ app build"
+fi
