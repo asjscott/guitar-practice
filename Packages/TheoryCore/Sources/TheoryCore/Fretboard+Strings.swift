@@ -8,6 +8,13 @@ extension Fretboard {
         return frets.clamped(to: playableFrets).map { FretboardLocation(string: string, fret: $0) }
     }
 
+    /// The playable locations on one string within a fret range whose pitch is within a range of intervals above the
+    /// sounding open string, by fret.
+    public func locations(onString string: Int, frets: ClosedRange<Int>, aboveOpen intervals: ClosedRange<Interval>) -> [FretboardLocation] {
+        locations(onString: string, frets: frets)
+            .filter { intervals.contains(pitch(at: $0) - soundingOpenPitch(ofString: string)) }
+    }
+
     /// The playable locations of a pitch class on one string within a fret range, by fret.
     public func locations(of pitchClass: PitchClass, onString string: Int, frets: ClosedRange<Int>) -> [FretboardLocation] {
         locations(onString: string, frets: frets).filter { pitch(at: $0).pitchClass == pitchClass }

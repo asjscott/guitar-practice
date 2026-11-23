@@ -11,6 +11,7 @@ struct DrillView: View {
     @State private var model: DrillViewModel
     @State private var showSummary = false
     @Environment(AudioInputService.self) private var audioInput
+    @Environment(AppSoundOutput.self) private var soundOutput
     @Environment(AttemptLog.self) private var log
 
     init(model: DrillViewModel = DrillViewModel()) {
@@ -32,12 +33,17 @@ struct DrillView: View {
                 DrillOptionsBar(model: model).disabled(model.isRunning)
             }
             ToolbarItemGroup(placement: .primaryAction) {
-                DrillRunButtons(model: model, canStart: audioInput.canListen)
+                DrillRunButtons(model: model, canStart: audioInput.canListen && (!model.kind.needsSound || soundOutput.hasDevice),
+                                soundProblem: model.kind.needsSound ? soundOutput.problem : nil)
             }
         }
         .typesNoteNames(isActive: model.takesNoteNames) { model.press($0) }
         .listensToAudioInput(model.audioConsumer)
-        .onAppear { model.log = log }
+        .onAppear {
+            model.log = log
+            model.soundOutput = soundOutput
+        }
+        .onChange(of: soundOutput.problem) { model.soundProblemChanged() }
         .onDisappear { model.leave() }
         .followsInstrumentSettings { tuning, capo in
             model.tuning = tuning
@@ -66,7 +72,7 @@ struct DrillView: View {
             if let display = model.snapshot.display {
                 DrillTarget(display: display, countdown: model.countdown, typed: model.nameEntry.text)
             } else {
-                DrillRestingCard(model: model)
+                DrillRestingCard(model: model, soundProblem: model.kind.needsSound ? soundOutput.problem : nil)
             }
             DrillAttemptStrip(model: model).padding(.top, 10)
             Spacer(minLength: 12)
@@ -167,10 +173,12 @@ private struct DrillOptionsBar: View {
 }
 
 /// Start (↩) when idle; Pause/Resume (P), Skip (S), Repeat (R) and Stop (Esc) during a run. Start (and ↩) is
-/// disabled while microphone access is denied, there's no input device, or nothing can be prompted.
+/// disabled while microphone access is denied, there's no input device (or no output, for a drill that needs sound), or
+/// nothing can be prompted.
 private struct DrillRunButtons: View {
     let model: DrillViewModel
     let canStart: Bool
+    let soundProblem: String?
 
     var body: some View {
         if model.isRunning {
@@ -191,7 +199,7 @@ private struct DrillRunButtons: View {
                 .keyboardShortcut(.return, modifiers: [])
                 .buttonStyle(.borderedProminent)
                 .disabled(!canStart || model.nothingToPromptReason != nil)
-                .help(model.nothingToPromptReason ?? "Start")
+                .help(model.nothingToPromptReason ?? soundProblem ?? "Start")
         }
     }
 }
@@ -201,6 +209,7 @@ private struct DrillRunButtons: View {
 /// In place of a prompt: the drill and how to start (or why it can't), or Paused.
 private struct DrillRestingCard: View {
     let model: DrillViewModel
+    let soundProblem: String?
 
     var body: some View {
         // The same layout as DrillTarget, so nothing jumps.
@@ -216,10 +225,14 @@ private struct DrillRestingCard: View {
     @ViewBuilder private var content: some View {
         if model.isPaused {
             Label("Paused", systemImage: "pause.circle").font(.title.weight(.semibold))
-            Text(model.resumesSamePrompt ? "Resume (P) to carry on" : "Resume (P) for a new prompt").font(.title3).foregroundStyle(.secondary)
+            if let soundProblem {
+                Text(soundProblem).font(.title3).foregroundStyle(.orange)
+            } else {
+                Text(model.resumesSamePrompt ? "Resume (P) to carry on" : "Resume (P) for a new prompt").font(.title3).foregroundStyle(.secondary)
+            }
         } else {
             Text(model.kind.title).font(.title.weight(.semibold))
-            if let reason = model.nothingToPromptReason {
+            if let reason = model.nothingToPromptReason ?? soundProblem {
                 Text(reason).font(.title3).foregroundStyle(.orange)
             } else {
                 Text("Press Start (↩)").font(.title3).foregroundStyle(.secondary)
@@ -237,16 +250,19 @@ private struct DrillAttemptStrip: View {
             ForEach(model.recentAttempts, id: \.id) { item in
                 let attempt = item.attempt
                 VStack(spacing: 0) {
-                    Text(attempt.prompt.noteName).font(.caption.weight(.semibold))
+                    Text(hidesNote(attempt) ? "–" : attempt.prompt.noteName).font(.caption.weight(.semibold))
                     Text(attempt.shortTimeText).font(.caption2.monospacedDigit())
                 }
                 .frame(width: 38, height: 34)
                 .background(RoundedRectangle(cornerRadius: 6).fill(color(attempt).opacity(0.2)))
-                .help(attempt.summaryLine(in: model.tuning))
+                .help(hidesNote(attempt) ? "Skipped" : attempt.summaryLine(in: model.tuning))
             }
         }
         .frame(height: 34)
     }
+
+    /// A skip reveals nothing.
+    private func hidesNote(_ attempt: Attempt) -> Bool { attempt.skipped && model.kind.hidesNote }
 
     private func color(_ attempt: Attempt) -> Color {
         switch attempt.outcome {
@@ -330,6 +346,7 @@ private extension String {
 #Preview {
     DrillView()
         .environment(AudioInputService())
+        .environment(AppSoundOutput(isInert: true))
         .environment(AttemptLog.inMemory())
         .frame(width: 1100, height: 600)
 }

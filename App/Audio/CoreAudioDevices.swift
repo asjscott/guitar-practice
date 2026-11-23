@@ -1,7 +1,7 @@
 import CoreAudio
 import Foundation
 
-/// Thin Core Audio queries: input devices, the system default input, UID → device ID, and change notices.
+/// Thin Core Audio queries: input devices, the system default input and output, UID → device ID, and change notices.
 /// Hardware code, kept small and not unit-tested (spec #11, Testing Decisions).
 enum CoreAudioDevices {
     /// Every device with at least one input channel, sorted by name. Output-only devices and the engine's
@@ -19,12 +19,18 @@ enum CoreAudioDevices {
 
     /// The UID of the system default input device, if there is one.
     static func defaultInputUID() -> String? {
-        var address = globalAddress(kAudioHardwarePropertyDefaultInputDevice)
+        defaultID(kAudioHardwarePropertyDefaultInputDevice).flatMap { string(kAudioDevicePropertyDeviceUID, of: $0) }
+    }
+
+    /// The system default output device, if there is one.
+    static func defaultOutputID() -> AudioDeviceID? { defaultID(kAudioHardwarePropertyDefaultOutputDevice) }
+
+    private static func defaultID(_ selector: AudioObjectPropertySelector) -> AudioDeviceID? {
+        var address = globalAddress(selector)
         var id = AudioDeviceID(kAudioObjectUnknown)
         var size = UInt32(MemoryLayout<AudioDeviceID>.size)
         let status = AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &id)
-        guard status == noErr, id != kAudioObjectUnknown else { return nil }
-        return string(kAudioDevicePropertyDeviceUID, of: id)
+        return status == noErr && id != kAudioObjectUnknown ? id : nil
     }
 
     /// The current device ID for a UID (IDs change across reconnects; UIDs don't).
@@ -46,6 +52,11 @@ enum CoreAudioDevices {
             globalAddress(kAudioDevicePropertyDeviceHasChanged),
             globalAddress(kAudioDevicePropertyStreamConfiguration, scope: kAudioObjectPropertyScopeInput),
         ])
+    }
+
+    /// Calls `onChange` on the main queue whenever the default output changes.
+    static func observeDefaultOutput(_ onChange: @escaping @MainActor () -> Void) -> ChangeObserver {
+        ChangeObserver(onChange, addresses: [globalAddress(kAudioHardwarePropertyDefaultOutputDevice)])
     }
 
     /// Asks for an IO buffer of `frames`, kept within what the device allows. Applies to this app only.
