@@ -37,6 +37,7 @@ struct DrillView: View {
                                 soundProblem: model.kind.needsSound ? soundOutput.problem : nil)
             }
         }
+        .typesNoteNames(isActive: model.takesNoteNames) { model.press($0) }
         .listensToAudioInput(model.audioConsumer)
         .onAppear {
             model.log = log
@@ -69,7 +70,7 @@ struct DrillView: View {
 
             Spacer(minLength: 12)
             if let display = model.snapshot.display {
-                DrillTarget(display: display, countdown: model.countdown)
+                DrillTarget(display: display, countdown: model.countdown, typed: model.nameEntry.text)
             } else {
                 DrillRestingCard(model: model, soundProblem: model.kind.needsSound ? soundOutput.problem : nil)
             }
@@ -227,7 +228,7 @@ private struct DrillRestingCard: View {
             if let soundProblem {
                 Text(soundProblem).font(.title3).foregroundStyle(.orange)
             } else {
-                Text("Resume (P) for a new prompt").font(.title3).foregroundStyle(.secondary)
+                Text(model.resumesSamePrompt ? "Resume (P) to carry on" : "Resume (P) for a new prompt").font(.title3).foregroundStyle(.secondary)
             }
         } else {
             Text(model.kind.title).font(.title.weight(.semibold))
@@ -295,6 +296,7 @@ private struct DrillRunSummary: View {
                 list("Slowest onsets", stats.slowest(5).filter { $0.outcome == .answered })
             } else {
                 list("Slowest", stats.slowest(3))
+                if !model.sweeps.isEmpty { lines("Sweeps", model.sweeps.suffix(6).map(\.summaryLine)) }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -317,6 +319,14 @@ private struct DrillRunSummary: View {
             ForEach(Array(attempts.enumerated()), id: \.offset) { _, attempt in
                 Text(line(attempt)).font(.callout).foregroundStyle(.secondary)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func lines(_ title: String, _ lines: [String]) -> some View {
+        Text(title).font(.subheadline.weight(.semibold)).padding(.top, 4)
+        ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+            Text(line).font(.callout).foregroundStyle(.secondary)
         }
     }
 

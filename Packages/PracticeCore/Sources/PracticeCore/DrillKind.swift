@@ -6,7 +6,9 @@ public struct DrillKind: Identifiable, Sendable {
     /// Every drill, in the picker's order.
     public static let all: [DrillKind] = [
         .notePlayIt,
+        .allInstances,
         .hearFindIt,
+        .fretNameIt,
     ]
 
     /// Saved in the attempt log: never change it.

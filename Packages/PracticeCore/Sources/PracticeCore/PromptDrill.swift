@@ -55,6 +55,11 @@ public struct PromptDrill<Rules: DrillRules>: Drill {
     public var prompt: NotePrompt? { phase == .paused ? nil : current }
     public var promptStart: Duration? { phase == .paused ? nil : timerStart }
 
+    public var resumesSamePrompt: Bool {
+        guard phase == .paused, wasAnswerableBeforePause, case .samePrompt = rules.resumeRule else { return false }
+        return true
+    }
+
     /// The location to light on a right answer.
     public var litLocation: FretboardLocation? {
         if case .correct(let location) = phase { location } else { nil }

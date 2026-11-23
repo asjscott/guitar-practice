@@ -53,19 +53,44 @@ struct DrillCountdown: Equatable {
 struct DrillTarget: View {
     let display: DrillDisplay
     let countdown: DrillCountdown?
+    /// The note name typed so far (`NoteNameEntry.text`).
+    var typed = ""
 
     var body: some View {
         VStack(spacing: 10) {
             HStack(spacing: 24) {
                 DrillTargetCard(tint: display.result.tint) {
-                    Text(display.headline).font(.system(size: 76, weight: .bold, design: .rounded))
+                    Text(display.acceptsTypedName && !typed.isEmpty ? typed : display.headline).font(.system(size: 76, weight: .bold, design: .rounded))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
                     Text(display.subline).font(.title2).foregroundStyle(.secondary)
                 }
                 DrillCountdownRing(countdown: countdown).frame(width: 64, height: 64)
             }
-            Label(display.feedback, systemImage: display.result.symbol)
+            Label(display.feedback, systemImage: display.symbol)
                 .foregroundStyle(display.result.color)
                 .font(.title2.weight(.medium))
+            if !display.chips.isEmpty { DrillChips(chips: display.chips) }
+        }
+    }
+}
+
+/// A chip per part of the prompt: string number over fret in a sweep.
+private struct DrillChips: View {
+    let chips: [DrillDisplay.Chip]
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ForEach(Array(chips.enumerated()), id: \.offset) { _, chip in
+                VStack(spacing: 0) {
+                    Text(chip.title).font(.caption.weight(.semibold))
+                    Text(chip.text).font(.caption2)
+                }
+                .frame(width: 52, height: 34)
+                .background(RoundedRectangle(cornerRadius: 6).fill(chip.state.fill))
+                .accessibilityElement()
+                .accessibilityLabel("String \(chip.title): \(chip.state.spoken(chip.text))")
+            }
         }
     }
 }
@@ -105,6 +130,32 @@ struct DrillCountdownRing: View {
         .accessibilityLabel("Time left")
         .accessibilityValue(countdown.map { Text("\(Int($0.remaining.rounded(.up))) seconds") } ?? Text("Not running"))
     }
+}
+
+private extension DrillDisplay.Chip.State {
+    var fill: Color {
+        switch self {
+        case .waiting: .secondary.opacity(0.08)
+        case .current: .accentColor.opacity(0.25)
+        case .found: .green.opacity(0.2)
+        case .timedOut: .orange.opacity(0.2)
+        case .skipped: .gray.opacity(0.2)
+        }
+    }
+
+    func spoken(_ text: String) -> String {
+        switch self {
+        case .waiting: "not found yet"
+        case .current: "next"
+        case .found: "found, \(text)"
+        case .timedOut: "revealed, \(text)"
+        case .skipped: "skipped"
+        }
+    }
+}
+
+private extension DrillDisplay {
+    var symbol: String { result == .waiting && acceptsTypedName ? "keyboard" : result.symbol }
 }
 
 private extension DrillDisplay.Result {
