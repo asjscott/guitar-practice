@@ -226,6 +226,131 @@ struct SessionDrillTests {
     }
 }
 
+@Suite("Session player: pause")
+struct SessionPauseTests {
+    @Test func pausingHidesThePromptAndStopsTheClock() {
+        var player = playing()
+        player.handle(.typed(.g, at: s(110)))       // wrong
+        player.handle(.pause(at: s(112)))
+        #expect(player.stage == .paused)
+        #expect(player.drill?.prompt == nil)
+        #expect(player.drill?.display == nil)
+        for time in [113.0, 200, 300] { player.handle(.tick(at: s(time))) }
+        player.handle(.resume(at: s(302)))
+        #expect(player.stage == .playing)
+        #expect(player.spent(inBlock: 0) == s(10))
+        #expect(player.timeLeft(inBlock: 0) == s(170))
+        #expect(player.elapsed == s(12))
+        player.handle(.tick(at: s(303)))
+        #expect(player.spent(inBlock: 0) == s(11))
+        #expect(player.elapsed == s(13))
+    }
+
+    @Test func resumingGivesANewPromptAndDropsTheOldOneUnlogged() {
+        var player = playing()
+        _ = player.takeSounds()
+        player.handle(.pause(at: s(112)))
+        #expect(player.takeSounds().isEmpty)
+        player.handle(.resume(at: s(200)))
+        #expect(player.drill?.prompt?.noteName == "F")
+        #expect(player.drill?.promptStart == s(200.6))
+        #expect(player.takeSounds().map(\.at) == [s(200)])
+        #expect(player.attempts(inBlock: 0).isEmpty)
+    }
+
+    @Test func aTimeoutDueWhenPausingIsKept() {
+        var player = playing()
+        player.handle(.pause(at: s(125)))
+        #expect(player.attempts(inBlock: 0).map(\.outcome) == [.timedOut])
+    }
+
+    @Test func aSweepResumesAtItsLocationWithTheTimerRestarted() {
+        var player = SessionPlayer(blocks: [SessionBlock(kind: .allInstances, length: s(180))],
+                                   setup: DrillSetup(fretboard: Fretboard(tuning: .standard), seed: 1))
+        player.handle(.start(at: s(0)))
+        player.handle(.next(at: s(1)))
+        player.handle(.skip(at: s(2)))
+        let prompt = player.drill?.prompt
+        player.handle(.pause(at: s(5)))
+        player.handle(.resume(at: s(50)))
+        #expect(player.drill?.prompt == prompt)
+        #expect(player.drill?.promptStart == s(50))
+        #expect(player.attempts(inBlock: 0).count == 1)
+    }
+
+    @Test func nothingReachesTheDrillWhilePaused() {
+        var player = playing()
+        player.handle(.pause(at: s(105)))
+        player.handle(.played(Pitch(40), onset: s(104.9), at: s(105.1)))
+        player.handle(.typed(.e, at: s(106)))
+        player.handle(.skip(at: s(107)))
+        player.handle(.repeat(at: s(108)))
+        player.handle(.tick(at: s(130)))
+        player.handle(.next(at: s(131)))
+        player.handle(.start(at: s(132)))
+        player.handle(.pause(at: s(133)))
+        #expect(player.stage == .paused)
+        #expect(player.blockIndex == 0)
+        #expect(player.attempts(inBlock: 0).isEmpty)
+        #expect(player.takeSounds().isEmpty)
+        player.handle(.resume(at: s(140)))
+        // Sounding before the resume, detected after.
+        player.handle(.played(Pitch(41), onset: s(139.9), at: s(140.1)))
+        #expect(player.drill?.phase == .waiting)
+    }
+
+    @Test func aReadyCardStartsItsCountdownAgainOnResume() {
+        var player = player()
+        player.handle(.pause(at: s(104)))
+        #expect(player.stage == .paused)
+        player.handle(.tick(at: s(120)))
+        #expect(player.stage == .paused)
+        #expect(player.drill == nil)
+        player.handle(.resume(at: s(130)))
+        #expect(player.stage == .ready)
+        #expect(player.readyRemaining == s(5))
+        player.handle(.tick(at: s(135)))
+        #expect(player.stage == .playing)
+        #expect(player.elapsed == s(9))
+        #expect(player.spent(inBlock: 0) == .zero)
+    }
+
+    @Test func pausingWorksInOvertime() {
+        var player = playing()
+        player.handle(.tick(at: s(290)))
+        player.handle(.pause(at: s(292)))
+        player.handle(.tick(at: s(400)))
+        #expect(player.timeLeft(inBlock: 0) == s(-10))
+    }
+
+    @Test func endingWhilePausedSummarisesWhatWasDone() {
+        var player = playing()
+        player.handle(.skip(at: s(103)))
+        player.handle(.pause(at: s(112)))
+        player.handle(.end(at: s(500)))
+        #expect(player.stage == .finished)
+        #expect(player.endedEarly)
+        #expect(player.drill?.isRunning == false)
+        #expect(player.summary.totalTime == s(12))
+        #expect(player.summary.blocks.map(\.stats.skips) == [1])
+        player.handle(.resume(at: s(501)))
+        #expect(player.stage == .finished)
+    }
+
+    @Test func thereIsNothingToPauseOrResumeBeforeStartOrAfterTheEnd() {
+        var idle = player(started: false)
+        idle.handle(.pause(at: s(1)))
+        idle.handle(.resume(at: s(2)))
+        #expect(idle.stage == .idle)
+        var ended = playing()
+        ended.handle(.resume(at: s(103)))
+        #expect(ended.stage == .playing)
+        ended.handle(.end(at: s(110)))
+        ended.handle(.pause(at: s(111)))
+        #expect(ended.stage == .finished)
+    }
+}
+
 @Suite("Session summary")
 struct SessionSummaryTests {
     @Test func figuresPerBlockAndTheSlowestOverall() {
