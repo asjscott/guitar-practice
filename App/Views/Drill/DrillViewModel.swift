@@ -40,6 +40,9 @@ final class DrillViewModel {
 
     private(set) var snapshot = Snapshot()
 
+    /// The note name being typed, in a drill answered by typing.
+    private(set) var nameEntry = NoteNameEntry()
+
     /// Now on the drill clock, in host seconds; moves with each tick while running (drives the countdown ring).
     private(set) var now: Double = 0
 
@@ -135,6 +138,21 @@ final class DrillViewModel {
         runLog?.update(from: drill)
         let new = Snapshot(phase: drill.phase, display: drill.display, attempts: drill.attempts)
         if new != snapshot { snapshot = new }
+        var entry = nameEntry
+        entry.follow(drill)
+        if entry != nameEntry { nameEntry = entry }
+    }
+
+    // MARK: - Typing
+
+    /// Whether typed note names go to the drill now.
+    var takesNoteNames: Bool { isRunning && kind.usesKeyboard }
+
+    /// A key for `.typesNoteNames`: true when it was the drill's.
+    func press(_ key: NoteNameKey) -> Bool {
+        guard case .taken(let event) = nameEntry.press(key, for: drill, at: clockNow()) else { return false }
+        if let event { send(event) }
+        return true
     }
 
     // MARK: - Listening
@@ -160,6 +178,11 @@ final class DrillViewModel {
         let pitch = fretboard.pitch(at: location)
         let now = clockNow()
         send(.played(right ? pitch : pitch + Interval(1), onset: now, at: now))
+    }
+
+    /// Names the current prompt, as if typed and submitted now.
+    func answerForSnapshot() {
+        if let prompt = drill.prompt { send(.typed(prompt.name, at: clockNow())) }
     }
     #endif
 

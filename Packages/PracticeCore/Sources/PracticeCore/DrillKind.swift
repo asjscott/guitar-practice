@@ -7,6 +7,7 @@ public struct DrillKind: Identifiable, Sendable {
     public static let all: [DrillKind] = [
         .notePlayIt,
         .allInstances,
+        .fretNameIt,
     ]
 
     /// Saved in the attempt log: never change it.
