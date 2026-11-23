@@ -85,7 +85,7 @@ struct CAGEDStandardTuningTests {
 
     @Test func bluesAddsItsBlueNoteInsideTheWindow() throws {
         // E blues uses G major's E-shape window, 2–5. Its B♭ (♭5) falls inside it only on
-        // string 3 (G string, fret 3); elsewhere it is at frets 1, 6, 8 or 11.
+        // string 3 (G), fret 3; elsewhere it is at frets 1, 6, 8 or 11.
         let e = try #require(position(.e, of: Scale(.blues, tonic: .e)))
         let blueNotes = e.locations.filter { fretboard.pitch(at: $0).pitchClass == PitchClass(10) }
         #expect(blueNotes == [FretboardLocation(string: 3, fret: 3)])

@@ -83,7 +83,7 @@ One kind of task the player repeats, such as Note → play it. Drills belong to 
 _Avoid_: Exercise (for a single drill), game, quiz
 
 **Prompt**:
-One task inside a drill, such as "F♯ on the G string". A prompt is answered by played notes.
+One task inside a drill, such as "F♯ on string 3 (G)". A prompt is answered by played notes.
 _Avoid_: Question, item, challenge
 
 **Attempt**:

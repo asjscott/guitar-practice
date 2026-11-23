@@ -13,7 +13,7 @@ struct CAGEDDropDTests {
             .first { $0.cagedShape == .e && $0.octave == 0 })
         let frets = (0..<6).map { string in e.locations.filter { $0.string == string }.map(\.fret) }
         // String 6 (D): F♯ G A. Strings 5–1 as in standard tuning's G major E shape (frets 2–5),
-        // with no F♯ at fret 7 on the B string.
+        // with no F♯ at fret 7 on string 2 (B).
         #expect(frets == [[4, 5, 7], [2, 3, 5], [2, 4, 5], [2, 4, 5], [3, 5], [2, 3, 5]])
         #expect(e.frets == 2...7)
     }
