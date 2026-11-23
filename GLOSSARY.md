@@ -83,13 +83,45 @@ One kind of task the player repeats, such as Note → play it. Drills belong to 
 _Avoid_: Exercise (for a single drill), game, quiz
 
 **Prompt**:
-One task inside a drill, such as "F♯ on string 3 (G)". A prompt is answered by played notes.
+One task inside a drill, such as "F♯ on string 3 (G)". A prompt is answered by played notes or, in Fret → name it, by a typed note name.
 _Avoid_: Question, item, challenge
 
 **Attempt**:
-The record of one prompt: whether the first played note was right, the response time, and any wrong notes played before the right one.
+The record of one prompt's outcome (answered, timed out or skipped), its response time and any wrong answers given before the right one. A sweep is recorded as one attempt per fretboard location.
 _Avoid_: Answer, try, trial
 
 **Response time**:
-The time from a prompt appearing to the onset of the played note that answered it correctly.
+The time from a prompt appearing (in Hear → find it, from the target pitch starting) to the right answer: the onset of the played note, or the note name being submitted. Within a sweep it runs from the previous location being dealt with.
 _Avoid_: Latency (that means audio delay), reaction time
+
+**Sweep**:
+The single prompt of the All instances drill: every fretboard location of one pitch class in a fret range, found string by string from string 6, lowest fret first.
+_Avoid_: Round, lap, pass
+
+## Sessions
+
+**Session**:
+One planned run of practice: a time budget split into blocks and tied together by a theme.
+_Avoid_: Workout, lesson, run (a run is one go at a drill in free practice)
+
+**Block**:
+A timed part of a session, spent on one drill. It ends only when the player moves on; time past its planned end is overtime.
+_Avoid_: Section, stage, segment
+
+**Theme**:
+What a day's sessions are built around: a key and a position, later also a string set and a progression. Every session on one calendar day shares it.
+_Avoid_: Seed (the number it is picked with), topic
+
+**Overtime**:
+Time spent in a block after its planned end. It lengthens the session; later blocks keep their length.
+
+**Extend**:
+To move the end of the current block two minutes later.
+
+**Free practice**:
+Doing one drill on its own, outside a session, with no block and no theme.
+_Avoid_: Drill mode, solo practice
+
+**Check run**:
+An "In order (check)" run of Note → play it, which tests what the app hears rather than the player. It is never logged.
+_Avoid_: Test, calibration
