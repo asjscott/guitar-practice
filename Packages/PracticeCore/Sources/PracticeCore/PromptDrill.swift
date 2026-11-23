@@ -30,6 +30,8 @@ public struct PromptDrill<Rules: DrillRules>: Drill {
     private var current: NotePrompt?
     private var timerStart: Duration?
     private var wrongSoFar: [WrongAnswer] = []
+    /// The same answers as they were given.
+    private var rawWrongSoFar: [DrillAnswer] = []
     /// After a prompt is dealt with: when the next appears, and when its timer starts if not then.
     private var next: (at: Duration, timerStart: Duration?)?
     private var wasAnswerableBeforePause = false
@@ -137,8 +139,10 @@ public struct PromptDrill<Rules: DrillRules>: Drill {
             return showNextPrompt(at: now)
         }
         let kept = keepsWrong ? wrongSoFar : []
+        let keptRaw = keepsWrong ? rawWrongSoFar : []
         show(current, at: now)
         wrongSoFar = kept
+        rawWrongSoFar = keptRaw
         if let last = kept.last { phase = .wrong(last.pitchClass) }
     }
 
@@ -148,6 +152,7 @@ public struct PromptDrill<Rules: DrillRules>: Drill {
         timerStart = nil
         next = nil
         wrongSoFar = []
+        rawWrongSoFar = []
         pendingSounds = []
     }
 
@@ -155,7 +160,8 @@ public struct PromptDrill<Rules: DrillRules>: Drill {
         advance(to: now)
         guard isRunning, phase != .paused, let current else { return }
         if isAnswerable {
-            attempts.append(Attempt(prompt: current, outcome: .skipped, wrongAnswers: wrongSoFar))
+            attempts.append(Attempt(prompt: current, outcome: .skipped, wrongAnswers: wrongSoFar,
+                                    rawWrongAnswers: rawWrongSoFar))
         }
         showNextPrompt(at: now)
     }
@@ -182,13 +188,14 @@ public struct PromptDrill<Rules: DrillRules>: Drill {
         switch rules.judge(answer, for: current) {
         case .right(let location):
             let attempt = Attempt(prompt: current, outcome: .answered, responseTime: madeAt - timerStart,
-                                  wrongAnswers: wrongSoFar, location: location)
+                                  wrongAnswers: wrongSoFar, rawWrongAnswers: rawWrongSoFar, location: location)
             attempts.append(attempt)
             phase = .correct(location)
             let transition = rules.transition(after: attempt)
             next = (now + transition.pause, transition.timesFromLastPrompt ? madeAt : nil)
         case .wrong(let wrong):
             wrongSoFar.append(wrong)
+            rawWrongSoFar.append(answer)
             phase = .wrong(wrong.pitchClass)
         case .ignored:
             break
@@ -198,7 +205,8 @@ public struct PromptDrill<Rules: DrillRules>: Drill {
     /// Moves the clock to `now`: a due timeout (once `grace` past the timeout), then a due next prompt.
     private mutating func advance(to now: Duration, grace: Duration = DrillTiming.detectionGrace) {
         if isAnswerable, let current, let timerStart, now - timerStart >= timeLimit + grace {
-            let attempt = Attempt(prompt: current, outcome: .timedOut, wrongAnswers: wrongSoFar)
+            let attempt = Attempt(prompt: current, outcome: .timedOut, wrongAnswers: wrongSoFar,
+                                  rawWrongAnswers: rawWrongSoFar)
             attempts.append(attempt)
             phase = .timedOut
             let transition = rules.transition(after: attempt)
@@ -221,6 +229,7 @@ public struct PromptDrill<Rules: DrillRules>: Drill {
         self.timerStart = timerStart ?? now + rules.timerDelay(for: prompt)
         next = nil
         wrongSoFar = []
+        rawWrongSoFar = []
         phase = .waiting
         pendingSounds = []
         requestSounds(for: prompt, at: now)
