@@ -72,7 +72,7 @@ enum LogCheck {
         let theme = SavedTheme(key: .major(.bFlat), position: Position.ID(system: .caged, number: 3))
         let session = newSession()
         session.theme = theme
-        session.state = .endedEarly
+        // Still in progress when this process dies, so ended early when the log is next opened.
         var sessionDrill = newDrill()
         let run = log.run(session: session, blockIndex: 1)
         sessionDrill.handle(.start(at: .zero))
@@ -112,7 +112,7 @@ enum LogCheck {
         session.log = log
         session.start()
         session.next()
-        session.leave()
+        session.end()
         session.done()
         session.start()
         session.next()
@@ -123,7 +123,14 @@ enum LogCheck {
         session.start()
         session.next()
         session.skip()
+        session.pause()
+        guard session.stage == .paused else { throw LogCheckError.sessions(["not paused"]) }
+        session.skip()      // nothing happens while paused
+        session.resume()
         session.leave()
+        guard session.stage == .paused else { throw LogCheckError.sessions(["leaving didn't pause"]) }
+        session.askToEnd()
+        session.end()
 
         let saved = try log.context.fetch(FetchDescriptor<PracticeSession>(sortBy: [SortDescriptor(\.startedAt)]))
         let attempts = try log.context.fetch(FetchDescriptor<LoggedAttempt>())

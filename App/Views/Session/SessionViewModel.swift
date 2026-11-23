@@ -52,6 +52,12 @@ final class SessionViewModel {
     /// The neck the session was started on.
     private(set) var fretboard = Fretboard(tuning: .standard)
 
+    /// Why the session paused by itself, for the Paused screen.
+    private(set) var pauseNotice: String?
+
+    /// Whether the Paused screen asks if the session should end.
+    private(set) var asksToEnd = false
+
     /// Now on the session's clock, in host seconds; moves with each tick (drives the countdown ring).
     private(set) var now: Double = 0
 
@@ -66,7 +72,7 @@ final class SessionViewModel {
     var stage: SessionStage { snapshot.stage }
 
     /// From Start until it is finished.
-    var isActive: Bool { stage == .ready || stage == .playing }
+    var isActive: Bool { stage == .ready || stage == .playing || stage == .paused }
 
     /// The current block's drill; nil before Start.
     var blockKind: DrillKind? { snapshot.blocks.indices.contains(snapshot.blockIndex) ? snapshot.blocks[snapshot.blockIndex].kind : nil }
@@ -122,9 +128,42 @@ final class SessionViewModel {
     /// R: what it does is up to the drill.
     func repeatPrompt() { send(.repeat(at: clockNow())) }
 
-    /// The screen is closing: a session that is going ends early.
-    func leave() {
+    /// P. Also by itself, with a notice saying why; that is dropped if it was already paused.
+    func pause(notice: String? = nil) {
+        guard isActive, stage != .paused else { return }
+        pauseNotice = notice
+        send(.pause(at: clockNow()))
+    }
+
+    /// P while paused.
+    func resume() {
+        guard stage == .paused else { return }
+        pauseNotice = nil
+        asksToEnd = false
+        // Ready before the clock is read, so that the first sound and its timer aren't late.
+        if blockKind?.needsSound == true { soundOutput?.prepare() }
+        send(.resume(at: clockNow()))
+    }
+
+    /// Esc: pauses, and asks before ending.
+    func askToEnd() {
+        pause()
+        asksToEnd = stage == .paused
+    }
+
+    /// Esc again: stays paused.
+    func cancelEnd() { asksToEnd = false }
+
+    /// Ends the session early.
+    func end() {
+        asksToEnd = false
         send(.end(at: clockNow()))
+    }
+
+    /// The screen is closing: a session that is going pauses, and what was being heard is forgotten.
+    func leave() {
+        pause()
+        asksToEnd = false
         feed.reset()
     }
 
@@ -170,11 +209,13 @@ final class SessionViewModel {
             prepareSound(for: player)
             updateRecord(from: player)
         }
-        if player.stage == .finished {
+        if player.stage == .paused || player.stage == .finished {
             ticker?.cancel()
             ticker = nil
-            summary = player.summary
+        } else if before.stage == .paused {
+            startTicking()
         }
+        if player.stage == .finished { summary = player.summary }
         let new = Snapshot(of: player)
         if new != snapshot { snapshot = new }
         if let drill = player.drill { followTyping(drill) } else { nameEntry = NoteNameEntry() }
@@ -204,8 +245,9 @@ final class SessionViewModel {
     }
 
     /// The output starts on the Ready card of a block that needs it, so that its first sound and timer aren't late.
+    /// It stops while paused: `resume` starts it again.
     private func prepareSound(for player: SessionPlayer) {
-        if player.stage != .finished, player.blocks[player.blockIndex].kind.needsSound {
+        if player.stage != .finished, player.stage != .paused, player.blocks[player.blockIndex].kind.needsSound {
             soundOutput?.prepare()
         } else {
             soundOutput?.release()
@@ -230,8 +272,8 @@ final class SessionViewModel {
 
     // MARK: - Typing
 
-    /// Whether typed note names go to the drill now.
-    var takesNoteNames: Bool { stage == .playing && blockKind?.usesKeyboard == true }
+    /// Whether typed note names are the drill's now: while paused too, so that a late one doesn't do something else.
+    var takesNoteNames: Bool { (stage == .playing || stage == .paused) && blockKind?.usesKeyboard == true }
 
     /// A key for `.typesNoteNames`: true when it was the drill's.
     func press(_ key: NoteNameKey) -> Bool {

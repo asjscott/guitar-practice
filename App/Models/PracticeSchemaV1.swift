@@ -180,7 +180,7 @@ struct WrongAnswerRecord: Codable, Hashable, Sendable {
 
 /// Saved raw values: never change them.
 enum SessionState: String, Sendable {
-    /// Going, or cut off by a quit or crash.
+    /// Going, or cut off by a quit or crash and not seen since: opening the log makes it `endedEarly`.
     case inProgress
     case completed
     case endedEarly
