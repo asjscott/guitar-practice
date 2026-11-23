@@ -16,6 +16,14 @@ The look and behaviour settled in Phase 0. Keep to these when changing a screen.
 - Key, scale, position and triad (string set, inversion) pickers in the native window toolbar. Not persisted; defaults are C major, CAGED E shape.
 - A header naming key, scale and position, with the notes as chips (root highlighted); the fretboard in a rounded card; a status bar with the legend (root / scale or chord tone).
 
+## Drill
+
+- A drill picker at the left of the toolbar, from `DrillKind.all`. Options are shared by every drill and not persisted; Order shows only for drills that offer it.
+- The neck and target card (`App/Views/Drill/DrillTarget.swift`) draw a `DrillDisplay`, for any drill, on both the Drill and session screens.
+- Pause hides the prompt; Resume gives a new one and drops the old. An "In order (check)" run asks for the same location again, as a new prompt, so that none is missed.
+- S skips with no reveal: grey in the attempt strip, and in neither accuracy nor median.
+- Start is disabled, with the reason on the card, when nothing can be prompted.
+
 ## Settings
 
 - Persisted with `@AppStorage`, not SwiftData.

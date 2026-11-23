@@ -58,6 +58,19 @@ enum Snapshots {
             drill.playForSnapshot(right: true)
         }
 
+        try await save("drill-skipped", DrillView(model: drill)) {
+            drill.start(seed: 1)
+            drill.skip()
+        }
+        try await save("drill-paused", DrillView(model: drill)) {
+            drill.start(seed: 1)
+            drill.togglePause()
+        }
+        try await save("drill-nothing-to-prompt", DrillView(model: drill)) {
+            drill.tuning = TuningPreset.eFlatStandard.tuning
+            drill.capo = 12
+        }
+
         try await save("settings-instrument", InstrumentSettingsView(), size: CGSize(width: 520, height: 640))
         try await save("settings-audio", AudioSettingsView(), size: CGSize(width: 520, height: 480))
     }
