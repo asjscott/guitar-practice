@@ -5,17 +5,21 @@ import TheoryCore
 extension Attempt {
     /// One summary row: "F on string 3 (G) — 2.31 s · played E, G first", or "… — timed out".
     public func summaryLine(in tuning: Tuning) -> String {
-        let time = responseTime.map { "\(secondsText($0, decimals: 2)) s" } ?? "timed out"
-        let wrong = wrongNotes.isEmpty ? "" : " · played \(wrongNotes.map(\.sharpName).joined(separator: ", ")) first"
+        let time = responseTime.map { "\(secondsText($0, decimals: 2)) s" } ?? (skipped ? "skipped" : "timed out")
+        let wrong = wrongAnswers.isEmpty ? "" : " · \(wrongVerb) \(wrongAnswers.map(\.text).joined(separator: ", ")) first"
         return "\(prompt.text(in: tuning)) — \(time)\(wrong)"
     }
 
-    /// The response time for the attempt strip, one decimal: "2.3"; "—" for a timeout.
-    public var shortTimeText: String {
-        responseTime.map { secondsText($0, decimals: 1) } ?? "—"
+    private var wrongVerb: String {
+        if case .name = wrongAnswers.first { "typed" } else { "played" }
     }
 
-    /// The feedback after a right answer: "Fret 7 · 0.82 s"; nil for a timeout.
+    /// The response time for the attempt strip, one decimal: "2.3"; "—" for a timeout, "skip" for a skip.
+    public var shortTimeText: String {
+        responseTime.map { secondsText($0, decimals: 1) } ?? (skipped ? "skip" : "—")
+    }
+
+    /// The feedback after a right answer: "Fret 7 · 0.82 s"; nil for a timeout or a skip.
     public var rightAnswerText: String? {
         guard let location, let responseTime else { return nil }
         return "Fret \(location.fret) · \(secondsText(responseTime, decimals: 2)) s"
@@ -33,9 +37,9 @@ extension RunStats {
         medianResponseTime.map { "\(secondsText($0, decimals: 2)) s" } ?? "–"
     }
 
-    /// Attempts not right first time (a wrong note first, or a timeout), in the order they happened.
+    /// Attempts not right first time (a wrong note first, or a timeout; not a skip), in the order they happened.
     /// The "In order (check)" summary lists them.
-    public var misses: [Attempt] { attempts.filter { !$0.firstRight } }
+    public var misses: [Attempt] { attempts.filter { !$0.firstRight && !$0.skipped } }
 }
 
 /// A duration in seconds with a fixed number of decimals: "2.31".
