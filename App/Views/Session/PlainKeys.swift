@@ -3,7 +3,7 @@ import SwiftUI
 
 /// A key the app acts on wherever the focus is.
 enum PlainKey: Hashable {
-    case space, `return`
+    case space, `return`, escape
     /// In lower case.
     case character(String)
 
@@ -12,6 +12,7 @@ enum PlainKey: Hashable {
         switch event.charactersIgnoringModifiers {
         case " ": self = .space
         case "\r", "\u{3}": self = .return
+        case "\u{1b}": self = .escape
         case let text?: self = .character(text.lowercased())
         case nil: return nil
         }

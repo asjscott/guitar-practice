@@ -28,8 +28,6 @@ struct SessionSetupView: View {
     let problem: SessionProblem?
     let start: () -> Void
 
-    @Environment(AudioInputService.self) private var audioInput
-
     /// What is stored could be anything.
     private var shownMinutes: Int { SessionSetup(minutes: minutes).minutes }
 
@@ -74,7 +72,7 @@ struct SessionSetupView: View {
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
             .disabled(problem != nil)
-            if let problem { notice(problem) }
+            if let problem { SessionProblemNotice(problem: problem) }
             HStack(spacing: 12) {
                 ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
                     VStack(spacing: 4) {
@@ -111,8 +109,14 @@ struct SessionSetupView: View {
         .disabled(new == shownMinutes)
         .accessibilityLabel(label)
     }
+}
 
-    private func notice(_ problem: SessionProblem) -> some View {
+struct SessionProblemNotice: View {
+    let problem: SessionProblem
+
+    @Environment(AudioInputService.self) private var audioInput
+
+    var body: some View {
         HStack {
             Label(problem.text, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
             if problem == .noAccess {

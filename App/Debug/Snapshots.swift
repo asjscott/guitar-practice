@@ -138,6 +138,10 @@ enum Snapshots {
         try await saveSession()
 
         try await save("settings-instrument", InstrumentSettingsView(), size: CGSize(width: 520, height: 640))
+        let activeSessions = ActiveSessions()
+        activeSessions.set(UUID(), isActive: true)
+        try await save("settings-instrument-locked", InstrumentSettingsView().environment(activeSessions),
+                       size: CGSize(width: 520, height: 700))
         try await save("settings-audio", AudioSettingsView(), size: CGSize(width: 520, height: 480))
     }
 
@@ -169,7 +173,7 @@ enum Snapshots {
         /// A new session, playing the block of a drill.
         func play(_ kind: DrillKind) {
             session.done()
-            session.leave()
+            session.end()
             session.done()
             session.start(seed: 1)
             session.next()
@@ -201,9 +205,38 @@ enum Snapshots {
             type("f#\r")
         }
         try await save("session-hear", SessionView(model: session)) { play(.hearFindIt) }
+        try await save("session-paused", SessionView(model: session)) {
+            play(.notePlayIt)
+            session.pause()
+        }
+        try await save("session-paused-notice", SessionView(model: session)) {
+            play(.notePlayIt)
+            session.pause(notice: "Scarlett 2i2 was disconnected.")
+        }
+        try await save("session-paused-no-input", SessionPlayingView(model: session, inputProblem: .noInput, resume: {}))
+        // By itself, since the window's sidebar isn't drawn.
+        try await save("sidebar-session-paused", Sidebar(selection: .constant(.explorer), sessionIsPaused: true),
+                       size: CGSize(width: 200, height: 240))
+        // Esc in the drill answered by typing, then keys in the whole window.
+        try await save("session-ending", SessionView(model: session)) {
+            play(.fretNameIt)
+            type("g\u{1b}")
+        }
+        try await save("session-paused-by-keys", ContentView(), settle: .milliseconds(1600)) {
+            focusSidebar()
+            type("\r p")
+        }
+        try await save("session-resumed-by-keys", ContentView(), settle: .milliseconds(1600)) {
+            focusSidebar()
+            type("\r \u{1b}\u{1b}p")
+        }
+        try await save("session-ended-by-keys", ContentView(), settle: .milliseconds(1600)) {
+            focusSidebar()
+            type("\r s\u{1b}\r")
+        }
         try await save("session-summary", SessionView(model: session)) {
             play(.notePlayIt)
-            session.leave()
+            session.end()
             session.done()
             session.start(seed: 1)
             while session.isActive {
@@ -216,7 +249,7 @@ enum Snapshots {
         }
         try await save("session-summary-nothing-done", SessionView(model: session)) {
             play(.notePlayIt)
-            session.leave()
+            session.end()
         }
     }
 

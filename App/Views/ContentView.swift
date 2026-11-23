@@ -9,19 +9,15 @@ import TheoryCore
 struct ContentView: View {
     @SceneStorage("main.screen") private var screen: Screen = .session
     @State private var session = SessionViewModel()
+    @State private var sessionID = UUID()
+    @Environment(ActiveSessions.self) private var activeSessions: ActiveSessions?
     @State private var explorer = ExplorerViewModel()
     @AppStorage(InstrumentSettings.Key.positionSystem) private var positionSystem = InstrumentSettings.defaultPositionSystem
 
     var body: some View {
         NavigationSplitView {
-            List(selection: selection) {
-                Section("Practice") {
-                    ForEach(Screen.allCases) { screen in
-                        Label(screen.title, systemImage: screen.icon).tag(screen)
-                    }
-                }
-            }
-            .navigationSplitViewColumnWidth(min: 160, ideal: 180)
+            Sidebar(selection: selection, sessionIsPaused: session.stage == .paused)
+                .navigationSplitViewColumnWidth(min: 160, ideal: 180)
         } detail: {
             detail
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -29,6 +25,12 @@ struct ContentView: View {
         .followsInstrumentSettings { tuning, capo in
             explorer.tuning = tuning
             explorer.capo = capo
+        }
+        .onChange(of: session.isActive) { activeSessions?.set(sessionID, isActive: session.isActive) }
+        .onDisappear {
+            // The window closed, so there is no way back to a paused session.
+            session.end()
+            activeSessions?.set(sessionID, isActive: false)
         }
         .onChange(of: positionSystem, initial: true) {
             explorer.positionSystem = positionSystem
@@ -46,6 +48,24 @@ struct ContentView: View {
         case .explorer: ExplorerView(model: explorer)
         case .tuner: TunerView()
         case .drill: DrillView()
+        }
+    }
+}
+
+/// The sidebar's list of screens. A paused session says so.
+struct Sidebar: View {
+    let selection: Binding<Screen?>
+    let sessionIsPaused: Bool
+
+    var body: some View {
+        List(selection: selection) {
+            Section("Practice") {
+                ForEach(Screen.allCases) { screen in
+                    Label(screen.title, systemImage: screen.icon)
+                        .badge(screen == .session && sessionIsPaused ? Text("Paused") : nil)
+                        .tag(screen)
+                }
+            }
         }
     }
 }

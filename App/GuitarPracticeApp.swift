@@ -22,6 +22,9 @@ struct GuitarPracticeApp: App {
     /// The app's one attempt log.
     @State private var log = AttemptLog.live()
 
+    /// The sessions going, in any window.
+    @State private var activeSessions = ActiveSessions()
+
     var body: some Scene {
         WindowGroup {
             ContentView()
@@ -29,6 +32,7 @@ struct GuitarPracticeApp: App {
                 .environment(audioInput)
                 .environment(soundOutput)
                 .environment(log)
+                .environment(activeSessions)
         }
         .commands {
             // Replace the system "Settings…" item with one that explicitly activates
@@ -41,6 +45,7 @@ struct GuitarPracticeApp: App {
         Settings {
             SettingsView()
                 .environment(audioInput)
+                .environment(activeSessions)
         }
     }
 }

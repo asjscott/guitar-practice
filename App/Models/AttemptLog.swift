@@ -23,6 +23,7 @@ final class AttemptLog {
         self.container = container
         openProblem = problem
         container.mainContext.autosaveEnabled = false
+        endCutOffSessions()
     }
 
     /// The player's own log, in a file of this app's. If it can't be opened it is left alone, and this run's
@@ -57,6 +58,19 @@ final class AttemptLog {
         let configuration = url.map { ModelConfiguration(schema: schema, url: $0, cloudKitDatabase: .none) }
             ?? ModelConfiguration(schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, migrationPlan: PracticeMigrationPlan.self, configurations: configuration)
+    }
+
+    /// A session still in progress when the log is opened was cut off by a quit or crash. Nothing is resumed.
+    private func endCutOffSessions() {
+        let inProgress = SessionState.inProgress.rawValue
+        do {
+            let cutOff = try context.fetch(FetchDescriptor<PracticeSession>(predicate: #Predicate { $0.stateRaw == inProgress }))
+            guard !cutOff.isEmpty else { return }
+            for session in cutOff { session.state = .endedEarly }
+            save()
+        } catch {
+            saveProblem = error.localizedDescription
+        }
     }
 
     /// Saves everything inserted or changed. What can't be saved is kept and tried again next time.

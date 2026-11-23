@@ -33,7 +33,10 @@ The look and behaviour settled in Phase 0. Keep to these when changing a screen.
 - Setup: the theme (key large, position under it) with Reroll until the day's first session has started; minutes with − and +, Start (↩), the planned blocks, then Naturals / All notes and First 12 frets / Whole neck. Start is disabled, with the reason under it, when nothing can be heard or prompted.
 - The drills bar stays on top through Ready cards and drills: time left per block, or time spent once it is over.
 - Keys go through `onPlainKey`, which sees them before any focused control: Space, Return, S and R work whatever has focus, and held-down repeats do nothing.
-- A session keeps the tuning, capo and theme it started with. The theme is in the status bar while it goes.
+- A session keeps the tuning, capo and theme it started with; Settings locks the tuning, capo and position system until it ends. The theme is in the status bar while it goes.
+- P pauses, on a Ready card too, which then counts down afresh. Leaving the screen, sleep and losing the input pause, with the reason for the last two on the Paused screen; the sidebar shows a "Paused" badge. Without an input, Resume is disabled.
+- Esc pauses and asks "End session?" on the Paused screen: Return ends, Esc stays paused, P resumes. Its End session button doesn't ask.
+- Closing the window ends the session early.
 - The summary shows a card per block that started; one where nothing was answered shows no speed.
 
 ## Settings

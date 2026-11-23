@@ -8,6 +8,8 @@ public enum SessionStage: Hashable, Sendable {
     case ready
     /// The current block's drill is running.
     case playing
+    /// Paused on a Ready card or in a drill: no time passes, and any prompt is hidden.
+    case paused
     /// After the last block, or ended early.
     case finished
 }
@@ -17,6 +19,9 @@ public enum SessionEvent: Hashable, Sendable {
     case start(at: Duration)
     /// Space: starts the block from its Ready card; while playing, ends the block.
     case next(at: Duration)
+    case pause(at: Duration)
+    /// Back to what was paused: a Ready card counts down afresh; a drill follows its own resume rule.
+    case resume(at: Duration)
     /// Ends the session before its last block is over.
     case end(at: Duration)
     /// The clock moved on.
@@ -49,10 +54,10 @@ public struct SessionPlayer: Sendable {
     /// The current block's drill: nil on its Ready card. Kept, stopped, once the session is finished.
     public private(set) var drill: (any Drill)?
 
-    /// From Start, Ready cards and overtime included, up to the last event.
+    /// From Start, Ready cards and overtime included but not time paused, up to the last event.
     public private(set) var elapsed: Duration = .zero
 
-    /// What is left of the Ready card; nil unless one is up.
+    /// What is left of the Ready card; nil unless one is up and counting.
     public private(set) var readyRemaining: Duration?
 
     /// Ended before its last block was over.
@@ -113,10 +118,25 @@ public struct SessionPlayer: Sendable {
             switch stage {
             case .ready: startBlock(at: now)
             case .playing: endBlock(at: now)
-            case .idle, .finished: break
+            case .idle, .paused, .finished: break
+            }
+        case .pause(let now):
+            guard stage == .ready || stage == .playing else { return }
+            passTime(to: now)
+            send(.pause(at: now))
+            stage = .paused
+            readyRemaining = nil
+        case .resume(let now):
+            guard stage == .paused else { return }
+            passTime(to: now)
+            if drill == nil {
+                showReady(blockIndex)
+            } else {
+                stage = .playing
+                send(.resume(at: now))
             }
         case .end(let now):
-            guard stage == .ready || stage == .playing else { return }
+            guard stage == .ready || stage == .playing || stage == .paused else { return }
             passTime(to: now)
             drill?.handle(.stop(at: now))
             endedEarly = true
@@ -148,7 +168,7 @@ public struct SessionPlayer: Sendable {
         let passed = max(.zero, now - lastEvent)
         lastEvent = max(lastEvent, now)
         switch stage {
-        case .idle, .finished:
+        case .idle, .paused, .finished:
             return
         case .ready:
             readyRemaining = readyRemaining.map { max(.zero, $0 - passed) }

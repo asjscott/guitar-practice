@@ -2,9 +2,13 @@ import PracticeCore
 import SwiftUI
 import TheoryCore
 
-/// A session that is going: the drills bar stays on top through Ready cards and drills, so nothing jumps.
+/// A session that is going: the drills bar stays on top through Ready cards, drills and pauses, so nothing
+/// jumps.
 struct SessionPlayingView: View {
     let model: SessionViewModel
+    /// Why it can't resume; nil when it can.
+    let inputProblem: SessionProblem?
+    let resume: () -> Void
 
     var body: some View {
         let snapshot = model.snapshot
@@ -16,6 +20,10 @@ struct SessionPlayingView: View {
                 Spacer(minLength: 8)
                 SessionReadyCard(kind: block.kind, length: block.timeText, seconds: snapshot.readySeconds)
                 Spacer(minLength: 8)
+            } else if snapshot.stage == .paused {
+                Spacer(minLength: 8)
+                SessionPausedCard(model: model, inputProblem: inputProblem, resume: resume)
+                Spacer(minLength: 8)
             } else {
                 DrillNeck(display: snapshot.display, fretboard: model.fretboard, height: 190)
                     .padding(.horizontal, 24)
@@ -26,10 +34,18 @@ struct SessionPlayingView: View {
             }
             Divider()
             HStack(spacing: 14) {
-                SessionKey(key: "Space", action: spaceAction)
+                if snapshot.stage != .paused { SessionKey(key: "Space", action: spaceAction) }
                 if snapshot.stage == .playing {
                     SessionKey(key: "S", action: "skip")
                     if let repeatTitle = block.kind.repeatTitle { SessionKey(key: "R", action: repeatTitle.lowercased()) }
+                }
+                if snapshot.stage == .paused {
+                    if inputProblem == nil { SessionKey(key: "P", action: "resume") }
+                    if model.asksToEnd { SessionKey(key: "↩", action: "end session") }
+                    SessionKey(key: "Esc", action: model.asksToEnd ? "stay paused" : "end")
+                } else {
+                    SessionKey(key: "P", action: "pause")
+                    SessionKey(key: "Esc", action: "end")
                 }
                 Spacer()
                 if let theme = model.theme { Text(theme.text) }
@@ -116,6 +132,33 @@ private struct SessionReadyCard: View {
             Text(kind.instructions).font(.title2).foregroundStyle(.secondary)
             Text("\(seconds)").font(.system(size: 72, weight: .heavy, design: .rounded)).monospacedDigit()
             Text("\(length) · Space to start now").foregroundStyle(.secondary)
+        }
+        .multilineTextAlignment(.center)
+        .padding(.horizontal, 24)
+    }
+}
+
+/// Paused, and after Esc the question whether to end.
+private struct SessionPausedCard: View {
+    let model: SessionViewModel
+    let inputProblem: SessionProblem?
+    let resume: () -> Void
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text(model.asksToEnd ? "End session?" : "Paused").font(.system(size: 72, weight: .bold, design: .rounded))
+            if let notice = model.pauseNotice { Text(notice).font(.title2).foregroundStyle(.secondary) }
+            HStack {
+                if model.asksToEnd {
+                    Button("End session ↩", action: model.end)
+                    Button("Stay paused (Esc)", action: model.cancelEnd)
+                } else {
+                    Button("Resume (P)", action: resume).disabled(inputProblem != nil)
+                    Button("End session", action: model.end)
+                }
+            }
+            .controlSize(.large)
+            if let inputProblem { SessionProblemNotice(problem: inputProblem) }
         }
         .multilineTextAlignment(.center)
         .padding(.horizontal, 24)
