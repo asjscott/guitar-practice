@@ -26,9 +26,9 @@ public enum WrongAnswer: Hashable, Sendable {
         }
     }
 
-    /// "G♯"; a typed name as it was typed.
-    public var text: String {
-        if case .name(let name) = self { name.description } else { pitchClass.sharpName }
+    /// "G♯", spelled in a key (nil = sharps); a typed name as it was typed.
+    public func text(in key: Key? = nil) -> String {
+        if case .name(let name) = self { name.description } else { Key.spell(pitchClass, in: key).description }
     }
 }
 

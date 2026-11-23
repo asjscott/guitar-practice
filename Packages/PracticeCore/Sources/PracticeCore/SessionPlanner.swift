@@ -55,10 +55,7 @@ public enum SessionPlanner {
     /// most once.
     private static func shuffled(_ blocks: [SessionBlock], day: Int) -> [SessionBlock] {
         var random = SplitMix64(seed: UInt64(bitPattern: Int64(day)))
-        var blocks = blocks
-        for last in blocks.indices.dropFirst().reversed() {
-            blocks.swapAt(last, Int(random.next() % UInt64(last + 1)))
-        }
+        let blocks = random.shuffled(blocks)
         let keyboard = blocks.filter(\.kind.usesKeyboard)
         let guitar = blocks.filter { !$0.kind.usesKeyboard }
         return random.next().isMultiple(of: 2) ? keyboard + guitar : guitar + keyboard

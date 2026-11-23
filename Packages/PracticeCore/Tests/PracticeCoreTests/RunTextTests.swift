@@ -2,6 +2,17 @@ import Testing
 import TheoryCore
 import PracticeCore
 
+@Suite("Themed run text")
+struct ThemedRunTextTests {
+    @Test func wrongNotesAreSpelledInTheKey() {
+        let attempt = Attempt(prompt: NotePrompt(name: .eFlat, string: 3), outcome: .answered, responseTime: s(2),
+                              wrongAnswers: [.pitch(Pitch(58)), .name(.aSharp)], location: FretboardLocation(string: 3, fret: 8))
+        // A typed name stays as it was typed.
+        #expect(attempt.summaryLine(in: .standard, key: .major(.bFlat)) == "E♭ on string 3 (G) — 2.00 s · played B♭, A♯ first")
+        #expect(attempt.summaryLine(in: .standard) == "E♭ on string 3 (G) — 2.00 s · played A♯, A♯ first")
+    }
+}
+
 @Suite("Run text")
 struct RunTextTests {
     let f3 = NotePrompt(pitchClass: PitchClass(5), string: 3)

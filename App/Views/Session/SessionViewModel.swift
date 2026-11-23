@@ -3,6 +3,23 @@ import Observation
 import PracticeCore
 import TheoryCore
 
+/// A theme, as shown.
+struct SessionTheme: Equatable {
+    let theme: Theme
+    /// "CAGED A shape"; nil when no position fits the neck.
+    let positionName: String?
+
+    var key: Key { theme.key }
+
+    /// "B♭ major · CAGED A shape".
+    var text: String { [key.description, positionName].compactMap { $0 }.joined(separator: " · ") }
+
+    init(_ theme: Theme, on fretboard: Fretboard) {
+        self.theme = theme
+        positionName = theme.position(on: fretboard).map { "\($0.system.settingsName) \($0.name)" }
+    }
+}
+
 /// The Session screen's state. Connects audio input, keys and the attempt log to the PracticeCore session player, and
 /// turns the player's state into what the screen shows. It knows nothing of any particular drill.
 ///
@@ -32,6 +49,8 @@ final class SessionViewModel {
     var tuning: Tuning = .standard
     var capo = 0
 
+    var positionSystem = InstrumentSettings.defaultPositionSystem
+
     /// The setup choices; the view keeps them.
     var setup = SessionSetup()
 
@@ -48,6 +67,12 @@ final class SessionViewModel {
 
     /// The finished session's, until Done.
     private(set) var summary: SessionSummary?
+
+    /// The day's theme while setting up; from Start until Done, the session's, even past midnight.
+    private(set) var theme: SessionTheme?
+
+    /// Whether the theme can still be rerolled: no session has been started that day.
+    private(set) var canReroll = false
 
     /// The neck the session was started on.
     private(set) var fretboard = Fretboard(tuning: .standard)
@@ -75,7 +100,9 @@ final class SessionViewModel {
 
     private func drillSetup(seed: UInt64) -> DrillSetup {
         let fretboard = Fretboard(tuning: tuning, capo: capo)
-        return DrillSetup(fretboard: fretboard, options: setup.drillOptions(on: fretboard), seed: seed)
+        var drillSetup = DrillSetup(fretboard: fretboard, options: setup.drillOptions(on: fretboard), seed: seed)
+        if let theme { drillSetup.follow(theme.theme) }
+        return drillSetup
     }
 
     private var usableDrills: [DrillKind] {
@@ -97,10 +124,40 @@ final class SessionViewModel {
         return reasons.contains(nil) ? nil : reasons.compactMap { $0 }.first
     }
 
+    // MARK: - Theme
+
+    /// When it changes, the theme to show may have changed too.
+    struct ThemeNeck: Hashable {
+        var tuning: Tuning
+        var capo: Int
+        var positionSystem: Position.System
+        var isSettingUp: Bool
+    }
+
+    var themeNeck: ThemeNeck {
+        ThemeNeck(tuning: tuning, capo: capo, positionSystem: positionSystem, isSettingUp: stage == .idle)
+    }
+
+    /// Shows the day's theme, picking and saving it if need be. A session that has started keeps its own.
+    func showTheme(on date: Date = .now) {
+        guard stage == .idle, let log else { return }
+        let fretboard = Fretboard(tuning: tuning, capo: capo)
+        let shown = SessionTheme(log.theme(on: date, fretboard: fretboard, system: positionSystem), on: fretboard)
+        if theme != shown { theme = shown }
+        canReroll = !log.hasStartedSession(on: date)
+    }
+
+    func reroll(on date: Date = .now) {
+        guard stage == .idle else { return }
+        log?.rerollTheme(on: date, fretboard: Fretboard(tuning: tuning, capo: capo), system: positionSystem)
+        showTheme(on: date)
+    }
+
     // MARK: - Control
 
     func start(on date: Date = .now, seed: UInt64 = .random(in: .min ... .max)) {
         guard stage == .idle, nothingToPromptReason == nil else { return }
+        showTheme(on: date)
         let blocks = plan(on: date)
         let drillSetup = drillSetup(seed: seed)
         fretboard = drillSetup.fretboard
@@ -109,6 +166,7 @@ final class SessionViewModel {
             day: Calendar.practiceDay(of: date), startedAt: date, budgetMinutes: setup.minutes,
             naturalsOnly: setup.notes == .naturals, wholeNeck: setup.range == .wholeNeck,
             blocks: blocks.map { SessionBlockRecord(drill: $0.kind.id, plannedSeconds: $0.length / .seconds(1)) })
+        record?.theme = theme?.theme
         send(.start(at: clockNow()))
         startTicking()
     }

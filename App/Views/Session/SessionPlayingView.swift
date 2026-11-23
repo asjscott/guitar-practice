@@ -32,6 +32,7 @@ struct SessionPlayingView: View {
                     if let repeatTitle = block.kind.repeatTitle { SessionKey(key: "R", action: repeatTitle.lowercased()) }
                 }
                 Spacer()
+                if let theme = model.theme { Text(theme.text) }
                 AttemptLogNotice()
                 AudioInputFallbackNotice()
                 AudioInputLine()

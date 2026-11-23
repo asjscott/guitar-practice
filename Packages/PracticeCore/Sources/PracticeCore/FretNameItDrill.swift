@@ -46,7 +46,7 @@ public struct FretNameItRules: DrillRules {
             display.headline = "?"
             display.acceptsTypedName = true
             display.markers = [.init(location: target, label: "?", isAnswer: false)]
-            display.feedback = moment.wrongAnswers.last.map { "Not \($0.text)" } ?? "Type its name, then Return"
+            display.feedback = moment.wrongAnswers.last.map { "Not \($0.text())" } ?? "Type its name, then Return"
         }
         return display
     }
