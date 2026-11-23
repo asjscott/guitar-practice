@@ -34,13 +34,23 @@ final class SessionViewModel {
         /// Whole seconds left of the Ready card.
         var readySeconds = 0
         var display: DrillDisplay?
+        /// When it will end if it goes on now.
+        var finish = Finish()
+    }
+
+    /// When a session will end: the time of day, or while paused, how long after resuming.
+    struct Finish: Equatable {
+        var timeText = ""
+        var afterResuming: Duration?
     }
 
     /// A block in the drills bar.
     struct BlockProgress: Equatable {
         var kind: DrillKind
-        /// What is left, or for a block that is over, what was spent.
+        /// What is left, "+0:12" in overtime, or for a block that is over, what was spent.
         var timeText: String
+        /// Goes on past its planned end.
+        var isOvertime: Bool
         /// Of the planned length, 0–1.
         var fraction: Double
     }
@@ -79,6 +89,11 @@ final class SessionViewModel {
 
     /// Why the session paused by itself, for the Paused screen.
     private(set) var pauseNotice: String?
+    @ObservationIgnored private var isPausedForSound = false
+
+    /// A chime that couldn't be heard, while it flashes.
+    private(set) var flash: AppSound?
+    @ObservationIgnored private var flashEnd: Task<Void, Never>?
 
     /// Whether the Paused screen asks if the session should end.
     private(set) var asksToEnd = false
@@ -111,22 +126,22 @@ final class SessionViewModel {
         return drillSetup
     }
 
-    private var usableDrills: [DrillKind] {
-        let canPlay = soundOutput.map { $0.problem == nil } ?? false
-        return DrillKind.all.filter { canPlay || !$0.needsSound }
-    }
+    /// Whether sound can be heard, as far as is known.
+    private var hasSound: Bool { soundOutput.map { $0.problem == nil } ?? false }
+
+    /// What a session without sound does differently; nil with sound.
+    var noSoundNotice: String? { hasSound ? nil : SessionPlanner.noSoundNotice(from: DrillKind.all) }
 
     /// The blocks a session would have: every drill that has something to prompt, and can be heard if it needs to be.
     func plan(on date: Date = .now) -> [SessionBlock] {
-        let drillSetup = drillSetup(seed: 0)
-        let drills = usableDrills.filter { $0.makeDrill(drillSetup).nothingToPromptReason == nil }
+        let drills = SessionPlanner.drills(from: DrillKind.all, for: drillSetup(seed: 0), hasSound: hasSound)
         return SessionPlanner.plan(drills.map { WeightedDrill($0) }, budget: setup.budget, day: Calendar.dayNumber(of: date))
     }
 
     /// Why no drill can prompt anything; nil when one can.
     var nothingToPromptReason: String? {
         let drillSetup = drillSetup(seed: 0)
-        let reasons = usableDrills.map { $0.makeDrill(drillSetup).nothingToPromptReason }
+        let reasons = DrillKind.all.filter { hasSound || !$0.needsSound }.map { $0.makeDrill(drillSetup).nothingToPromptReason }
         return reasons.contains(nil) ? nil : reasons.compactMap { $0 }.first
     }
 
@@ -164,10 +179,12 @@ final class SessionViewModel {
     func start(on date: Date = .now, seed: UInt64 = .random(in: .min ... .max)) {
         guard stage == .idle, nothingToPromptReason == nil else { return }
         showTheme(on: date)
+        // Tried before planning, so that a session without sound is planned as one.
+        soundOutput?.prepare()
         let blocks = plan(on: date)
         let drillSetup = drillSetup(seed: seed)
         fretboard = drillSetup.fretboard
-        player = SessionPlayer(blocks: blocks, setup: drillSetup)
+        player = SessionPlayer(blocks: blocks, setup: drillSetup, hasSound: hasSound)
         record = PracticeSession(
             day: Calendar.practiceDay(of: date), startedAt: date, budgetMinutes: setup.minutes,
             naturalsOnly: setup.notes == .naturals, wholeNeck: setup.range == .wholeNeck,
@@ -180,6 +197,9 @@ final class SessionViewModel {
     /// Space.
     func next() { send(.next(at: clockNow())) }
 
+    /// +: 2 minutes more for the block.
+    func extend() { send(.extend(at: clockNow())) }
+
     /// S.
     func skip() { send(.skip(at: clockNow())) }
 
@@ -190,17 +210,34 @@ final class SessionViewModel {
     func pause(notice: String? = nil) {
         guard isActive, stage != .paused else { return }
         pauseNotice = notice
+        isPausedForSound = false
         send(.pause(at: clockNow()))
     }
 
     /// P while paused.
     func resume() {
         guard stage == .paused else { return }
+        // Ready before the clock is read, so that the first sound and its timer aren't late.
+        soundOutput?.prepare()
+        soundChanged()
         pauseNotice = nil
         asksToEnd = false
-        // Ready before the clock is read, so that the first sound and its timer aren't late.
-        if blockKind?.needsSound == true { soundOutput?.prepare() }
         send(.resume(at: clockNow()))
+    }
+
+    /// The sound output failed or came back. Failing mid-block pauses, with a notice.
+    func soundChanged() {
+        guard let player, isActive, player.hasSound != hasSound else { return }
+        let wasPaused = stage == .paused
+        send(.output(works: hasSound, at: clockNow()))
+        if hasSound, isPausedForSound {
+            pauseNotice = nil
+            isPausedForSound = false
+        } else if !hasSound, !wasPaused, stage == .paused {
+            let resuming = blockKind?.needsSound == true ? "Resuming goes on without this drill." : "Chimes will flash."
+            pauseNotice = [soundOutput?.problem, resuming].compactMap { $0 }.joined(separator: " ")
+            isPausedForSound = true
+        }
     }
 
     /// Esc: pauses, and asks before ending.
@@ -247,10 +284,17 @@ final class SessionViewModel {
     }
 
     private func clockNow() -> Duration {
-        let seconds = AudioInputService.hostTimeNow()
+        let seconds = hostTimeNow()
         now = seconds
         return .seconds(seconds)
     }
+
+    #if DEBUG
+    @ObservationIgnored private var skippedTime = 0.0
+    private func hostTimeNow() -> Double { AudioInputService.hostTimeNow() + skippedTime }
+    #else
+    private func hostTimeNow() -> Double { AudioInputService.hostTimeNow() }
+    #endif
 
     // MARK: - The player
 
@@ -259,9 +303,11 @@ final class SessionViewModel {
         let before = (stage: player.stage, promptStart: player.drill?.promptStart)
         player.handle(event)
         let sounds = player.takeSounds()
+        let chime = player.takeChime()
         self.player = player
 
         playSounds(sounds, isNewPrompt: player.drill?.promptStart != before.promptStart)
+        if let chime { play(chime) }
         logAttempts(of: player)
         if player.stage != before.stage {
             prepareSound(for: player)
@@ -289,23 +335,33 @@ final class SessionViewModel {
 
     /// Plays what the drill asks for. A new prompt, or none, cuts off what is playing.
     private func playSounds(_ requests: [DrillSoundRequest], isNewPrompt: Bool) {
-        guard let soundOutput, player?.blocks.contains(where: \.kind.needsSound) == true else { return }
+        guard let soundOutput else { return }
         if isNewPrompt {
             soundOutput.stopTones()
-            player?.handle(.tonesStopped(at: .seconds(AudioInputService.hostTimeNow())))
+            player?.handle(.tonesStopped(at: .seconds(hostTimeNow())))
         }
-        for request in requests {
-            let sound = AppSound.tones(request.tones)
-            let start = AudioInputService.hostTimeNow()
-            guard let latency = soundOutput.play(sound) else { return }
+        for request in requests { play(.tones(request.tones)) }
+    }
+
+    /// Plays a sound. A chime that can't be heard flashes; a drill's failing is the output's problem, which pauses.
+    private func play(_ sound: AppSound) {
+        let start = hostTimeNow()
+        if let latency = soundOutput?.play(sound) {
             player?.handle(.soundStarted(sound, at: .seconds(start), latency: latency))
+        } else if sound == .chime || sound == .softChime {
+            flash = sound
+            flashEnd?.cancel()
+            flashEnd = Task { [weak self] in
+                try? await Task.sleep(for: sound.duration)
+                if !Task.isCancelled { self?.flash = nil }
+            }
         }
     }
 
-    /// The output starts on the Ready card of a block that needs it, so that its first sound and timer aren't late.
-    /// It stops while paused: `resume` starts it again.
+    /// The output runs all through a session, so that its sounds and their timers aren't late. It stops while paused:
+    /// `resume` starts it again.
     private func prepareSound(for player: SessionPlayer) {
-        if player.stage != .finished, player.stage != .paused, player.blocks[player.blockIndex].kind.needsSound {
+        if player.stage != .finished, player.stage != .paused {
             soundOutput?.prepare()
         } else {
             soundOutput?.release()
@@ -369,6 +425,12 @@ final class SessionViewModel {
     }
 
     #if DEBUG
+    /// Moves the session's clock on.
+    func passTimeForSnapshot(_ seconds: Double) {
+        skippedTime += seconds
+        send(.tick(at: clockNow()))
+    }
+
     /// Answers the current prompt, as if played or typed now (see `Snapshots`).
     func answerForSnapshot(right: Bool) {
         guard let drill = player?.drill, let prompt = drill.prompt else { return }
@@ -389,18 +451,31 @@ extension SessionViewModel.Snapshot {
         stage = player.stage
         blockIndex = player.blockIndex
         readySeconds = player.readyRemaining.map { Int(($0 / .seconds(1)).rounded(.up)) } ?? 0
-        display = player.drill?.display
+        display = player.display
+        finish = player.stage == .paused ? .init(afterResuming: player.timeToFinish)
+            : .init(timeText: sessionFinishText(player.timeToFinish, after: .now))
         blocks = player.blocks.indices.map { index in
-            let block = player.blocks[index]
             let spent = player.spent(inBlock: index)
             let isOver = spent != nil && index < player.blockIndex
+            let left = player.timeLeft(inBlock: index)
+            let isOvertime = !isOver && left < .zero
+            let timeText = if player.isLeftOut(block: index) { "no sound" }
+                else if isOver { clockText(spent ?? .zero) }
+                else if isOvertime { "+" + clockText(.zero - left) }
+                else { clockText(left, rounding: .up) }
             return .init(
-                kind: block.kind,
-                timeText: isOver ? clockText(spent ?? .zero) : clockText(player.timeLeft(inBlock: index), rounding: .up),
+                kind: player.blocks[index].kind,
+                timeText: timeText,
+                isOvertime: isOvertime,
                 // In 200ths, so that the bar moves smoothly without a redraw on every tick.
-                fraction: isOver ? 1 : min(1, ((spent ?? .zero) / block.length * 200).rounded(.down) / 200))
+                fraction: isOver ? 1 : min(1, ((spent ?? .zero) / player.length(ofBlock: index) * 200).rounded(.down) / 200))
         }
     }
+}
+
+/// "Ends 18:42".
+func sessionFinishText(_ timeLeft: Duration, after date: Date) -> String {
+    "Ends " + (date + timeLeft / .seconds(1)).formatted(date: .omitted, time: .shortened)
 }
 
 extension Calendar {

@@ -51,6 +51,11 @@ public struct AppSoundFilter: Sendable {
         }
     }
 
+    /// Whether a chime, or the tail after it, would hide the player's notes now.
+    func isChiming(at time: Duration) -> Bool {
+        windows.contains { !$0.isTones && $0.start <= time && time <= $0.end + Self.tail }
+    }
+
     /// Whether a played note with this onset may be the app's own sound.
     public func ignores(onset: Duration) -> Bool {
         windows.contains { $0.start <= onset && onset <= $0.end + Self.tail }

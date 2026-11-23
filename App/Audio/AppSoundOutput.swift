@@ -18,6 +18,9 @@ final class AppSoundOutput {
     private(set) var hasDevice = true
 
     @ObservationIgnored private var engine: Engine?
+    /// When the last chime has been heard.
+    @ObservationIgnored private var chimeEnd: ContinuousClock.Instant = .now
+    @ObservationIgnored private var lateRelease: Task<Void, Never>?
     @ObservationIgnored private var outputObserver: CoreAudioDevices.ChangeObserver?
     @ObservationIgnored private let isInert: Bool
 
@@ -35,6 +38,7 @@ final class AppSoundOutput {
     @discardableResult
     func prepare() -> Bool {
         if isInert { return problem == nil }
+        lateRelease?.cancel()
         if let engine, engine.isRunning { return true }
         engine = nil
         checkForOutput()
@@ -55,14 +59,24 @@ final class AppSoundOutput {
         if isInert { return .zero }
         guard let engine else { return nil }
         engine.play(sound)
-        return .seconds(engine.latency)
+        let latency = Duration.seconds(engine.latency)
+        if case .tones = sound {} else { chimeEnd = .now + latency + sound.duration }
+        return latency
     }
 
     /// Cuts off any tones; a chime plays on.
     func stopTones() { engine?.stopTones() }
 
-    /// Nothing more to play for now: stops the engine.
-    func release() { engine = nil }
+    /// Nothing more to play for now: cuts off any tones, and stops the engine once a chime has ended.
+    func release() {
+        lateRelease?.cancel()
+        guard let engine, chimeEnd > .now else { return self.engine = nil }
+        engine.stopTones()
+        lateRelease = Task { [weak self, chimeEnd] in
+            try? await Task.sleep(until: chimeEnd)
+            if !Task.isCancelled { self?.engine = nil }
+        }
+    }
 
     private func checkForOutput() {
         hasDevice = CoreAudioDevices.defaultOutputID() != nil
