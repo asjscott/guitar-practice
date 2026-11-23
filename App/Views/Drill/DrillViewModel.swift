@@ -122,7 +122,7 @@ final class DrillViewModel {
 
     // MARK: - Listening
 
-    /// The consumer for `.listensToAudioInput(_:)`: runs the listener on the tap thread and hands played
+    /// The consumer for `.listensToAudioInput(_:)`: runs the listener on the audio input thread and hands played
     /// notes, on the drill clock, to the engine on the main actor.
     var audioConsumer: AudioInputConsumer {
         let listener = self.listener

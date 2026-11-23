@@ -18,7 +18,7 @@ Phase order: 0 Foundations → 1 Hear the guitar → 2 Session MVP → 3 Scales 
 
 - Swift 6 (strict concurrency), SwiftUI, macOS 14+, Apple silicon
 - SwiftData for persistence (app target only)
-- AVAudioEngine for audio input (Phase 1), with our own pitch detector in ListenCore (ADR 0002); AudioKit for backing from Phase 4
+- An input-only Core Audio unit for audio input (ADR 0004), with our own pitch detector in ListenCore (ADR 0002); AudioKit for backing from Phase 4
 - XcodeGen: `project.yml` is the source of truth for the Xcode project
 - Personal use, run from Xcode; public GitHub repo (MIT licence)
 
@@ -37,7 +37,7 @@ To see a UI change, run `scripts/snapshot` and read the PNGs (screen recording i
 
 ## Architecture rules
 
-- **ListenCore and PracticeCore are pure too** (`scripts/check` enforces each package's imports). ListenCore: samples in, tuner readings and played notes out; the engine tap and Core Audio device code live in the app. PracticeCore: drill engines driven by played notes (a `Pitch` and an onset time) and a clock. The app connects them.
+- **ListenCore and PracticeCore are pure too** (`scripts/check` enforces each package's imports). ListenCore: samples in, tuner readings and played notes out; the input unit and Core Audio device code live in the app. PracticeCore: drill engines driven by played notes (a `Pitch` and an onset time) and a clock. The app connects them.
 - **TheoryCore is pure.** Value types, no side effects. Every public function has tests. Exercises ask TheoryCore what is correct; they never do note or fret maths themselves.
 - **Layers:** Views → Session engine / Exercise modules / Progress engine → TheoryCore + Audio engine → SwiftData. Lower layers never import higher ones.
 - Before changing the fretboard, explorer or Settings, read `docs/ui.md`.

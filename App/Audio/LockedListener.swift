@@ -1,7 +1,7 @@
 import ListenCore
 import os
 
-/// A ListenCore listener behind a lock, so a screen can run it on the audio tap's thread and reset it from the
+/// A ListenCore listener behind a lock, so a screen can run it on the audio input thread and reset it from the
 /// main actor. A block that starts a new stream (after a device or format change) resets it first.
 final class LockedListener: Sendable {
     private let listener = OSAllocatedUnfairLock(initialState: Listener())

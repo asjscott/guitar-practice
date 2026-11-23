@@ -38,30 +38,66 @@ enum CoreAudioDevices {
         ChangeObserver(onChange)
     }
 
+    /// Calls `onChange` on the main queue whenever a device's sample rate, streams or other set-up may have changed.
+    /// Notices can repeat, or be caused by the app itself: check what really changed (`InputSetup`).
+    static func observeChanges(of id: AudioDeviceID, _ onChange: @escaping @MainActor () -> Void) -> ChangeObserver {
+        ChangeObserver(onChange, object: id, addresses: [
+            globalAddress(kAudioDevicePropertyNominalSampleRate),
+            globalAddress(kAudioDevicePropertyDeviceHasChanged),
+            globalAddress(kAudioDevicePropertyStreamConfiguration, scope: kAudioObjectPropertyScopeInput),
+        ])
+    }
+
+    /// Asks for an IO buffer of `frames`, kept within what the device allows. Applies to this app only.
+    static func setBufferFrames(_ frames: UInt32, of id: AudioDeviceID) {
+        var address = globalAddress(kAudioDevicePropertyBufferFrameSizeRange)
+        var range = AudioValueRange()
+        var size = UInt32(MemoryLayout<AudioValueRange>.size)
+        guard AudioObjectGetPropertyData(id, &address, 0, nil, &size, &range) == noErr else { return }
+        var wanted = max(min(frames, UInt32(range.mMaximum)), UInt32(range.mMinimum))
+        address.mSelector = kAudioDevicePropertyBufferFrameSize
+        AudioObjectSetPropertyData(id, &address, 0, nil, UInt32(MemoryLayout<UInt32>.size), &wanted)
+    }
+
+    /// The device's sample rate in Hz; 0 if it has none.
+    static func sampleRate(of id: AudioDeviceID) -> Double {
+        var address = globalAddress(kAudioDevicePropertyNominalSampleRate)
+        var rate = 0.0
+        var size = UInt32(MemoryLayout<Double>.size)
+        guard AudioObjectGetPropertyData(id, &address, 0, nil, &size, &rate) == noErr else { return 0 }
+        return rate
+    }
+
     final class ChangeObserver {
         private let listener: AudioObjectPropertyListenerBlock
-        private static let selectors = [kAudioHardwarePropertyDevices, kAudioHardwarePropertyDefaultInputDevice]
+        private let object: AudioObjectID
+        private let addresses: [AudioObjectPropertyAddress]
 
-        fileprivate init(_ onChange: @escaping @MainActor () -> Void) {
+        fileprivate init(_ onChange: @escaping @MainActor () -> Void,
+                         object: AudioObjectID = AudioObjectID(kAudioObjectSystemObject),
+                         addresses: [AudioObjectPropertyAddress] = [
+                            globalAddress(kAudioHardwarePropertyDevices),
+                            globalAddress(kAudioHardwarePropertyDefaultInputDevice),
+                         ]) {
             // Delivered on the main queue (below), so assuming main-actor isolation is sound.
             listener = { _, _ in MainActor.assumeIsolated { onChange() } }
-            for selector in Self.selectors {
-                var address = globalAddress(selector)
-                AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &address, .main, listener)
+            self.object = object
+            self.addresses = addresses
+            for var address in addresses {
+                AudioObjectAddPropertyListenerBlock(object, &address, .main, listener)
             }
         }
 
         deinit {
-            for selector in Self.selectors {
-                var address = globalAddress(selector)
-                AudioObjectRemovePropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &address, .main, listener)
+            for var address in addresses {
+                AudioObjectRemovePropertyListenerBlock(object, &address, .main, listener)
             }
         }
     }
 
     // MARK: - Property helpers
 
-    private static func globalAddress(_ selector: AudioObjectPropertySelector,
+    fileprivate static func globalAddress(_ selector: AudioObjectPropertySelector,
                                       scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal) -> AudioObjectPropertyAddress {
         AudioObjectPropertyAddress(mSelector: selector, mScope: scope, mElement: kAudioObjectPropertyElementMain)
     }
@@ -77,7 +113,7 @@ enum CoreAudioDevices {
     }
 
     /// Total channels across the device's input streams.
-    private static func inputChannelCount(of id: AudioDeviceID) -> Int {
+    static func inputChannelCount(of id: AudioDeviceID) -> Int {
         var address = globalAddress(kAudioDevicePropertyStreamConfiguration, scope: kAudioObjectPropertyScopeInput)
         var size: UInt32 = 0
         guard AudioObjectGetPropertyDataSize(id, &address, 0, nil, &size) == noErr, size > 0 else { return 0 }

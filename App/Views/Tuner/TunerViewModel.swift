@@ -6,7 +6,7 @@ import TheoryCore
 /// The Tuner screen's state. Adapts the ListenCore listener (fed by the audio input service) to what the
 /// T1 "Needle" layout shows: the note, the needle's cents, the "+18 cents · 83.3 Hz" line and the string chips.
 ///
-/// The listener runs on the audio tap's thread inside a lock; a block's tuner reading hops to the main actor
+/// The listener runs on the audio input thread inside a lock; a block's tuner reading hops to the main actor
 /// when it changed. With no signal the last reading is kept, marked as not sounding, so the view can grey it out.
 @MainActor @Observable
 final class TunerViewModel {
@@ -48,7 +48,7 @@ final class TunerViewModel {
     private(set) var isSounding = false
 
     @ObservationIgnored private let listener = LockedListener()
-    /// The reading last sent to the main actor, on the tap thread.
+    /// The reading last sent to the main actor, on the audio input thread.
     @ObservationIgnored private let lastPosted = OSAllocatedUnfairLock<TunerReading?>(initialState: nil)
 
     // MARK: - Display
@@ -107,7 +107,7 @@ final class TunerViewModel {
 
     // MARK: - Listening
 
-    /// The consumer for `.listensToAudioInput(_:)`: runs the listener on the tap thread, shows results here.
+    /// The consumer for `.listensToAudioInput(_:)`: runs the listener on the audio input thread, shows results here.
     var audioConsumer: AudioInputConsumer {
         let listener = self.listener
         let lastPosted = self.lastPosted

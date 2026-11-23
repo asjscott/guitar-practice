@@ -3,11 +3,11 @@ import AVFoundation
 import Observation
 
 /// The app's audio input: lists input devices, remembers the chosen device and channel, and while at least one
-/// listening screen is open runs an AVAudioEngine input tap that delivers the chosen channel's mono samples to
+/// listening screen is open runs an input unit (ADR 0004) that delivers the chosen channel's mono samples to
 /// the attached consumers and drives the input meter.
 ///
 /// One instance for the app, in the environment. Screens don't start and stop it directly; they use
-/// `.listensToAudioInput(…)`, which counts them in on appear and out on disappear. The engine runs only while
+/// `.listensToAudioInput(…)`, which counts them in on appear and out on disappear. The unit runs only while
 /// that count is above zero (and microphone access is granted), so the mic-in-use indicator is off otherwise.
 @MainActor @Observable
 final class AudioInputService {
@@ -20,11 +20,11 @@ final class AudioInputService {
     /// The device and channel being listened to; nil when there are no input devices.
     private(set) var choice: AudioInputChoice?
     private(set) var permission: Permission
-    /// True while the engine runs (the mic-in-use indicator is on).
+    /// True while the input unit runs (the mic-in-use indicator is on).
     private(set) var isRunning = false
     /// Input meter, 0–1 (−60…0 dBFS peak), with a short release. 0 when not running.
     private(set) var level = 0.0
-    /// Why the engine couldn't start, if it couldn't.
+    /// Why the input unit couldn't start, if it couldn't.
     private(set) var failure: String?
 
     /// False while microphone access is denied or there's no input device: nothing can be heard, so a
@@ -45,21 +45,21 @@ final class AudioInputService {
 
     @ObservationIgnored private var listeners = Set<UUID>()
     @ObservationIgnored private let consumers = AudioInputConsumers()
-    @ObservationIgnored private var engine: AVAudioEngine?
+    @ObservationIgnored private var unit: AudioInputUnit?
     @ObservationIgnored private var startedSetup: InputSetup?
-    @ObservationIgnored private var tap: AudioInputTap?
+    @ObservationIgnored private var stream: AudioInputStream?
     @ObservationIgnored private var levelTask: Task<Void, Never>?
-    @ObservationIgnored private var configurationObserver: NSObjectProtocol?
+    @ObservationIgnored private var setupObserver: CoreAudioDevices.ChangeObserver?
     @ObservationIgnored private var deviceObserver: CoreAudioDevices.ChangeObserver?
     @ObservationIgnored private var activationObserver: NSObjectProtocol?
     @ObservationIgnored private var isRequestingPermission = false
 
-    /// Requested tap size: 1024 frames ≈ 21 ms at 48 kHz, small enough for the detection latency budget.
-    private static let bufferSize: AVAudioFrameCount = 1024
-    /// Meter release per block (≈ 1.4 full scale per second at 48 kHz / 1024).
-    private static let meterRelease = 0.03
+    /// Requested block size: 512 frames ≈ 11 ms at 48 kHz, within the detection latency budget (ADR 0004).
+    private static let bufferFrames: UInt32 = 512
+    /// Meter release, in full scale per second.
+    private static let meterRelease = 1.4
 
-    /// True in `Snapshots`: lists devices and counts as granted, but never asks for access or starts the engine.
+    /// True in `Snapshots`: lists devices and counts as granted, but never asks for access or starts the input unit.
     @ObservationIgnored private let isInert: Bool
 
     init(defaults: UserDefaults = .standard, isInert: Bool = false) {
@@ -90,7 +90,7 @@ final class AudioInputService {
 
     // MARK: - Listening screens and consumers
 
-    /// Counts a listening screen in, attaching its consumer (if any), and starts the engine if needed.
+    /// Counts a listening screen in, attaching its consumer (if any), and starts the input unit if needed.
     /// Prefer `.listensToAudioInput(…)`, which calls this and `stopListening` for you.
     func startListening(_ listener: UUID, consumer: AudioInputConsumer? = nil) {
         guard !isInert else { return }
@@ -101,7 +101,7 @@ final class AudioInputService {
         reconcile()
     }
 
-    /// Counts a listening screen out and detaches its consumer; stops the engine when none is left.
+    /// Counts a listening screen out and detaches its consumer; stops the input unit when none is left.
     func stopListening(_ listener: UUID) {
         listeners.remove(listener)
         consumers.set(nil, for: listener)
@@ -138,14 +138,14 @@ final class AudioInputService {
         AVAudioTime.seconds(forHostTime: mach_absolute_time())
     }
 
-    // MARK: - Engine lifecycle
+    // MARK: - Input unit lifecycle
 
     private func refreshDevices() {
         let listed = CoreAudioDevices.inputDevices()
         if listed != devices { devices = listed }
     }
 
-    /// Brings the engine in line with what is wanted: running on the current choice while any listening screen
+    /// Brings the input unit in line with what is wanted: running on the current choice while any listening screen
     /// is open and access is granted, stopped otherwise.
     private func reconcile() {
         let resolved = AudioInputChoice.resolve(savedUID: savedDeviceUID, savedChannel: savedChannel,
@@ -158,9 +158,9 @@ final class AudioInputService {
         }
         let wanted = !listeners.isEmpty && permission == .granted && choice != nil
         if wanted, !isRunning || choiceChanged {
-            restartEngine()
-        } else if !wanted, engine != nil {
-            stopEngine()
+            restartUnit()
+        } else if !wanted, startedSetup != nil {
+            stopUnit()
         }
     }
 
@@ -183,69 +183,52 @@ final class AudioInputService {
         }
     }
 
-    private func restartEngine() {
-        stopEngine()
+    private func restartUnit() {
+        stopUnit()
         guard let choice else { return }
         do {
-            try startEngine(on: choice)
+            try startUnit(on: choice)
             failure = nil
         } catch {
-            stopEngine()
+            isRunning = false
             failure = error.localizedDescription
         }
     }
 
-    /// A fresh engine per run: set the device on the input node, tap the device's own format, start.
-    private func startEngine(on choice: AudioInputChoice) throws(AudioInputError) {
+    /// A fresh input unit per run, on the device's own sample rate.
+    private func startUnit(on choice: AudioInputChoice) throws(AudioInputError) {
         guard let deviceID = CoreAudioDevices.deviceID(forUID: choice.device.uid) else {
             throw .deviceUnavailable(choice.device.name)
         }
-        let engine = AVAudioEngine()
-        let input = engine.inputNode
-        guard let unit = input.audioUnit else { throw .noInputUnit }
-        var id = deviceID
-        let status = AudioUnitSetProperty(unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0,
-                                          &id, UInt32(MemoryLayout<AudioDeviceID>.size))
-        guard status == noErr else { throw .couldNotSelectDevice(choice.device.name, status) }
+        // Watched even if starting fails, so a device that is still changing over is tried again when it settles.
+        let setup = InputSetup(deviceID: deviceID)
+        startedSetup = setup
+        setupObserver = CoreAudioDevices.observeChanges(of: deviceID) { [weak self] in self?.setupMayHaveChanged() }
+        guard setup.channelCount > 0, setup.sampleRate > 0 else { throw .noInputChannels(choice.device.name) }
 
-        // Not outputFormat: that still describes the default device, and a tap with the wrong rate hears nothing.
-        let format = input.inputFormat(forBus: 0)
-        guard format.channelCount > 0, format.sampleRate > 0 else { throw .noInputChannels(choice.device.name) }
-
-        let tap = AudioInputTap(channelIndex: choice.channel - 1, consumers: consumers)
-        tap.install(on: input, format: format, bufferSize: Self.bufferSize)
-        self.engine = engine
-        self.tap = tap
-        startedSetup = InputSetup(of: engine)
-        engine.prepare()
-        do {
-            try engine.start()
-        } catch {
-            throw .couldNotStart((error as NSError).code)
-        }
+        let stream = AudioInputStream(consumers: consumers)
+        let unit = try AudioInputUnit(setup: setup, deviceName: choice.device.name, channelIndex: choice.channel - 1,
+                                      bufferFrames: Self.bufferFrames, onBlock: stream.process)
+        self.stream = stream
+        self.unit = unit
         isRunning = true
 
         levelTask = Task { [weak self] in
-            for await fraction in tap.levels {
+            var last = 0.0
+            for await new in stream.levels {
                 guard let self else { return }
-                level = max(fraction, level - Self.meterRelease)
+                level = max(new.fraction, level - Self.meterRelease * (new.time - last))
+                last = new.time
             }
-        }
-        // The engine stops itself when the device's format or routing changes; see engineConfigurationChanged.
-        configurationObserver = NotificationCenter.default.addObserver(
-            forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.engineConfigurationChanged() }
         }
     }
 
-    /// Starts again on the new setup, unless the engine is still running on the device and format it was started
-    /// with. Selecting a device on the input node also posts this notice; restarting then selects the device again,
-    /// posts again, and loops before any audio is delivered (#20).
-    private func engineConfigurationChanged() {
-        guard let engine else { return }
+    /// Starts again if the device's set-up is no longer the one tried last. Comparing keeps a notice caused by
+    /// starting from restarting forever (#20).
+    private func setupMayHaveChanged() {
+        guard let startedSetup else { return }
         refreshDevices()
-        if engine.isRunning, InputSetup(of: engine) == startedSetup { return }
+        guard InputSetup(deviceID: startedSetup.deviceID) != startedSetup else { return }
         isRunning = false
         reconcile()
     }
@@ -255,30 +238,17 @@ final class AudioInputService {
         reconcile()
     }
 
-    private func stopEngine() {
-        if let configurationObserver { NotificationCenter.default.removeObserver(configurationObserver) }
-        configurationObserver = nil
-        engine?.inputNode.removeTap(onBus: 0)
-        engine?.stop()
-        engine = nil
+    private func stopUnit() {
+        setupObserver = nil
         startedSetup = nil
-        tap?.finish()
-        tap = nil
+        unit?.stop()
+        unit = nil
+        stream?.finish()
+        stream = nil
         levelTask?.cancel()
         levelTask = nil
         isRunning = false
         level = 0
-    }
-}
-
-/// What an engine's input node listens to: compared to tell a real configuration change from a repeat notice.
-private struct InputSetup: Equatable {
-    var deviceID: AudioDeviceID
-    var format: AVAudioFormat
-
-    init(of engine: AVAudioEngine) {
-        deviceID = engine.inputNode.auAudioUnit.deviceID
-        format = engine.inputNode.inputFormat(forBus: 0)
     }
 }
 
@@ -292,7 +262,7 @@ enum AudioInputError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .deviceUnavailable(let name): "\(name) isn't available."
-        case .noInputUnit: "The audio engine has no input."
+        case .noInputUnit: "macOS has no audio input unit."
         case .couldNotSelectDevice(let name, let status): "Couldn't listen to \(name) (error \(status))."
         case .noInputChannels(let name): "\(name) reports no input channels."
         case .couldNotStart(let code): "Couldn't start audio input (error \(code))."
