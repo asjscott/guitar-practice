@@ -29,6 +29,7 @@ git config core.hooksPath .githooks   # once per clone: the pre-commit hook runs
 scripts/check                         # repo rules + all package tests, ~10 s
 scripts/check --build                 # the same, then generates the project and builds the app
 scripts/snapshot                      # renders each screen to build/snapshots/*.png
+scripts/log-check                     # logs practice, relaunches and compares, in a throwaway store
 ```
 
 Run `scripts/check` after package changes and `scripts/check --build` after app changes. Fix failures before moving on.
@@ -42,7 +43,7 @@ To see a UI change, run `scripts/snapshot` and read the PNGs (screen recording i
 - **Layers:** Views → Session engine / Exercise modules / Progress engine → TheoryCore + Audio engine → SwiftData. Lower layers never import higher ones.
 - Before changing the fretboard, explorer or Settings, read `docs/ui.md`.
 - Use `@Observable` for view state; keep views thin.
-- SwiftData models live in `App/Models` only.
+- SwiftData models live in `App/Models` only. Run `scripts/log-check` after changing them. The player's store is opened only by `AttemptLog.live()`; snapshots and previews use `.inMemory()`.
 - No new dependencies without asking first.
 
 ## Music conventions (TheoryCore)

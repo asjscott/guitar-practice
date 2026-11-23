@@ -1,0 +1,24 @@
+#!/bin/bash
+# Checks that logged practice survives a relaunch, in a throwaway store: one process logs and quits without warning,
+# another reads it back and the result is compared with what it should be. ~15 s plus the build.
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+xcodegen generate --quiet
+derived="$PWD/build/DerivedData"
+xcodebuild -scheme GuitarPractice -configuration Debug -destination 'platform=macOS' -derivedDataPath "$derived" -quiet build
+app="$derived/Build/Products/Debug/GuitarPractice.app/Contents/MacOS/GuitarPractice"
+
+folder="$(mktemp -d)"
+trap 'rm -rf "$folder"' EXIT
+export GP_LOG_CHECK="$folder/Check.store"
+GP_LOG_CHECK_STEP=write "$app"
+found="$(GP_LOG_CHECK_STEP=read "$app")"
+expected='attempt notePlayIt freePractice answered tuning [38, 45, 50, 55, 59, 64] capo 2 target E string 3 fret 9 pitch 64 sweep false first false wrong [65] timed session none
+attempt notePlayIt freePractice skipped tuning [38, 45, 50, 55, 59, 64] capo 2 target C string 2 fret -1 pitch -1 sweep false first false wrong [] no time session none
+attempt notePlayIt freePractice timedOut tuning [38, 45, 50, 55, 59, 64] capo 2 target D string 4 fret -1 pitch -1 sweep false first false wrong [] no time session none
+attempt notePlayIt session skipped tuning [40, 45, 50, 55, 59, 64] capo 0 target B string 3 fret -1 pitch -1 sweep false first false wrong [] no time session 2026-07-25 block 1
+attempt notePlayIt freePractice answered tuning [40, 45, 50, 55, 59, 64] capo 0 target F string 2 fret 3 pitch 53 sweep true first false wrong [B♭] timed session none
+session 2026-07-25 endedEarly theme B♭ major blocks [450.0, 450.0] attempts 1
+theme 2026-07-25 B♭ major position caged 3 rerolls 2'
+diff <(printf '%s\n' "$expected") <(printf '%s\n' "$found") || { echo "✗ log check" >&2; exit 1; }
+echo "✓ log check"
