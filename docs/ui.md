@@ -1,0 +1,22 @@
+# UI decisions
+
+The look and behaviour settled in Phase 0. Keep to these when changing a screen. The prototype is on `prototype/fretboard-explorer` (variant A2), which is never merged. The Tuner and Drill screens' decisions are in the spec doc's "Phase 1 decisions"; their prototype is `prototype/phase1-screens` (T1 and D4).
+
+## Fretboard
+
+- High E at the top, nut on the left, frets 0–22 with real-neck spacing; inlays at 3 5 7 9 12 15 17 19 21.
+- Wood board, bone nut, wound bass strings thinning to string 1, pearl inlays, string names on the left, fret-number ruler.
+- Orange root and blue tone dots with a white ring.
+- Capo bar, with the frets below it dimmed.
+- Note labels shown / faded / hidden. The font shrinks on high frets; text that can't fit is hidden.
+- Per-location heatmap tint hook (0–1), with a debug fill.
+
+## Explorer
+
+- Key, scale, position and triad (string set, inversion) pickers in the native window toolbar. Not persisted; defaults are C major, CAGED E shape.
+- A header naming key, scale and position, with the notes as chips (root highlighted); the fretboard in a rounded card; a status bar with the legend (root / scale or chord tone).
+
+## Settings
+
+- Persisted with `@AppStorage`, not SwiftData.
+- Tuning picker with presets + Custom (per-string semitone stepper), capo 0–12, position system (CAGED/3NPS).

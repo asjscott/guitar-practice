@@ -18,17 +18,18 @@ xcodegen generate                       # creates GuitarPractice.xcodeproj from 
 open GuitarPractice.xcodeproj           # then Run (⌘R)
 ```
 
-Theory tests:
+Checks (repo rules and package tests), also run by the pre-commit hook and CI:
 
 ```bash
-cd Packages/TheoryCore && swift test
+git config core.hooksPath .githooks     # once per clone: turns the pre-commit hook on
+scripts/check                           # add --build to build the app too
 ```
 
 ## Layout
 
 - `App/` — SwiftUI app target (views, SwiftData models, resources)
-- `Packages/TheoryCore/` — pure Swift music-theory package, fully unit-tested
-- `scripts/` — helper scripts (sound fetching arrives in Phase 4)
+- `Packages/` — pure, unit-tested Swift packages: TheoryCore (music theory), ListenCore (pitch detection), PracticeCore (drill engines)
+- `scripts/` — `check`, `snapshot` (screens to PNGs); sound fetching arrives in Phase 4
 - `Sounds/` — git-ignored; filled by script
 
 ## Licence

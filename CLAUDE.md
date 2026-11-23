@@ -2,14 +2,15 @@
 
 Native macOS app for a daily, varied guitar practice routine: fretboard notes, scales in position, triads, triads over progressions, and building licks into solos. The guitar comes in through an audio interface; the app listens with pitch detection, plays backing, and adapts to weak spots.
 
-Full spec and roadmap: https://claude.ai/artifact/Qt4EnpkCLa34Z3Fa5icthA
-Read the relevant spec section before starting any phase.
+Full spec and roadmap: Claude Docs `c1631de5-f295-4bd8-a9fe-f1c1948a980d`. Before starting a phase, read that phase's section with the docs connector (not the Artifact tool); edit it with full node ids (`ms84a902bdp.13168`, not `.13168`). The link for people: https://claude.ai/artifact/Qt4EnpkCLa34Z3Fa5icthA
 
 ## Current phase
 
 **Phase 2 · Session MVP.** Scope: All instances, Hear → find it and Fret → name it drills; time budget input, daily theme seed, block planner, block player; auto-advance, keyboard shortcuts, end-of-block chime; SwiftData attempt log and session summary. Done when: a timed notes session runs start to finish.
 
-Phase 0 · Foundations (spec #1) and Phase 1 · Hear the guitar (spec #11) are complete; the Phase 0 scope and decisions below stay as reference, and the Phase 1 decisions are in the spec doc.
+Also in Phase 2: the input-device bug, #20.
+
+Phases 0 (spec #1) and 1 (spec #11) are complete.
 
 Phase order: 0 Foundations → 1 Hear the guitar → 2 Session MVP → 3 Scales and triads → 4 Backing and progressions → 5 Lick → solo → 6 Adaptive and polish. Don't start work from a later phase unless asked.
 
@@ -21,47 +22,25 @@ Phase order: 0 Foundations → 1 Hear the guitar → 2 Session MVP → 3 Scales 
 - XcodeGen: `project.yml` is the source of truth for the Xcode project
 - Personal use, run from Xcode; public GitHub repo (MIT licence)
 
-## Layout
-
-```
-GuitarPractice/
-├── CLAUDE.md
-├── project.yml                 # XcodeGen spec — edit this, never the .xcodeproj
-├── App/                        # SwiftUI app target
-│   ├── GuitarPracticeApp.swift
-│   ├── Views/                  # Fretboard, Settings, (later) Session, Exercises, Dashboard
-│   ├── Models/                 # SwiftData models
-│   └── Resources/
-├── Packages/
-│   ├── TheoryCore/             # Pure Swift package: no UI, no audio, no SwiftData
-│   │   ├── Sources/TheoryCore/
-│   │   └── Tests/TheoryCoreTests/
-│   ├── ListenCore/             # Pure: audio samples in → tuner readings + played notes out (Phase 1)
-│   │   └── Tests/ListenCoreTests/Fixtures/   # small self-recorded clips allowed (see Repo rules)
-│   └── PracticeCore/           # Pure: drill engines; depends on TheoryCore only (Phase 1)
-├── Sounds/                     # git-ignored; filled by scripts/fetch-sounds
-├── sounds.json                 # (Phase 4) sound pack manifest: url, licence, credit
-├── scripts/
-└── CREDITS.md
-```
-
 ## Commands
 
 ```bash
-xcodegen generate                                    # after any change to project.yml
-cd Packages/TheoryCore && swift test                 # theory tests (run often)
-cd Packages/ListenCore && swift test                 # detection tests
-cd Packages/PracticeCore && swift test               # drill engine tests
-xcodebuild -scheme GuitarPractice -destination 'platform=macOS' build
+git config core.hooksPath .githooks   # once per clone: the pre-commit hook runs scripts/check
+scripts/check                         # repo rules + all package tests, ~10 s
+scripts/check --build                 # the same, then generates the project and builds the app
+scripts/snapshot                      # renders each screen to build/snapshots/*.png
 ```
 
-Run `swift test` after every change to a package and `xcodebuild … build` after app changes. Fix failures before moving on.
+Run `scripts/check` after package changes and `scripts/check --build` after app changes. Fix failures before moving on.
+
+To see a UI change, run `scripts/snapshot` and read the PNGs (screen recording is not permitted). Add a `save` in `App/Debug/Snapshots.swift` for each new screen or state.
 
 ## Architecture rules
 
-- **ListenCore and PracticeCore are pure too.** ListenCore: samples in, tuner readings and played notes out; no AVFoundation (the engine tap and Core Audio device code live in the app). PracticeCore: drill engines driven by played notes (a `Pitch` and an onset time) and a clock; depends on TheoryCore only, never on ListenCore. The app connects them.
-- **TheoryCore is pure.** Value types, no side effects, no imports beyond Foundation. Every public function has tests. Exercises ask TheoryCore what is correct; they never do note or fret maths themselves.
+- **ListenCore and PracticeCore are pure too** (`scripts/check` enforces each package's imports). ListenCore: samples in, tuner readings and played notes out; the engine tap and Core Audio device code live in the app. PracticeCore: drill engines driven by played notes (a `Pitch` and an onset time) and a clock. The app connects them.
+- **TheoryCore is pure.** Value types, no side effects. Every public function has tests. Exercises ask TheoryCore what is correct; they never do note or fret maths themselves.
 - **Layers:** Views → Session engine / Exercise modules / Progress engine → TheoryCore + Audio engine → SwiftData. Lower layers never import higher ones.
+- Before changing the fretboard, explorer or Settings, read `docs/ui.md`.
 - Use `@Observable` for view state; keep views thin.
 - SwiftData models live in `App/Models` only.
 - No new dependencies without asking first.
@@ -82,19 +61,9 @@ Use the terms in `GLOSSARY.md`. Phase 0 decisions are recorded there and in `doc
 - Triads: major, minor (later diminished, augmented); root, 1st, 2nd inversion; string sets of three adjacent strings; a triad voicing spans at most 4 frets.
 - Everything must work in any tuning. Tests: exact expected answers in standard tuning; invariants (notes in scale, notes per string, span ≤ 4, within capo–22) in Drop D, DADGAD, Open G and with a capo.
 
-## Phase 0 scope
-
-1. XcodeGen `project.yml` with the app target and the local TheoryCore package
-2. TheoryCore: notes, intervals, key-aware spelling, scales, triads + inversions, tuning/capo → fretboard map, CAGED + 3NPS shape generation
-3. Tests for all of the above, including Drop D and DADGAD
-4. Fretboard view: high E at top, nut on the left, frets 0–22 with real-neck spacing and inlays (3 5 7 9 12 15 17 19 21), capo bar with dimmed frets below; highlight locations; note labels shown / faded / hidden (font shrinks on high frets, text hidden if it can't fit); per-location heatmap tint hook (0–1) with a debug fill
-5. Main window = fretboard explorer: key, scale, position, triad (string set, inversion) pickers; not persisted, defaults C major, CAGED E shape. Layout (chosen by prototype, see branch `prototype/fretboard-explorer`, variant A2): pickers in the native window toolbar; a header naming key/scale/position with the notes as chips (root highlighted); the fretboard in a rounded card; a status bar with the legend (root / scale or chord tone). Fretboard look: wood board, bone nut, wound bass strings thinning to string 1, pearl inlays, string names on the left, fret-number ruler, orange root and blue tone dots with a white ring
-6. Settings (persisted with `@AppStorage`, not SwiftData): tuning picker with presets + Custom (per-string semitone stepper), capo 0–12, position system (CAGED/3NPS)
-
 ## Repo rules
 
 - Never commit sound files (`Sounds/`, `*.sf2`, `*.sfz`, audio samples). They are git-ignored and fetched by script. One exception: small self-recorded guitar clips (< 1 MB each) used as ListenCore test fixtures, under `Packages/ListenCore/Tests/ListenCoreTests/Fixtures/` (ADR 0002).
-- Small, focused commits with clear messages.
 - Keep `CREDITS.md` up to date when any third-party asset is added.
 
 ## How to work
