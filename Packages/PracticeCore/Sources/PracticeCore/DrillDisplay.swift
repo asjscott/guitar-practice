@@ -36,6 +36,23 @@ public struct DrillDisplay: Hashable, Sendable {
         }
     }
 
+    /// One part of a prompt with several, such as a location of a sweep: "6" over "fret 8".
+    public struct Chip: Hashable, Sendable {
+        public enum State: Hashable, Sendable {
+            case waiting, current, found, timedOut, skipped
+        }
+
+        public var title: String
+        public var text: String
+        public var state: State
+
+        public init(title: String, text: String, state: State) {
+            self.title = title
+            self.text = text
+            self.state = state
+        }
+    }
+
     /// The card's big line: "F♯".
     public var headline: String
 
@@ -52,6 +69,9 @@ public struct DrillDisplay: Hashable, Sendable {
     public var highlightedString: Int?
 
     public var markers: [Marker]
+
+    /// A row under the feedback; empty in most drills.
+    public var chips: [Chip] = []
 
     /// The display most drills start from, and change what differs.
     public init(standard moment: DrillMoment, in setup: DrillSetup) {

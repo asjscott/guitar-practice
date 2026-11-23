@@ -80,6 +80,9 @@ public protocol Drill: Sendable {
     /// Time left before the current prompt times out, while it is waiting for an answer.
     func timeRemaining(at now: Duration) -> Duration?
 
+    /// While paused: whether resuming continues the same prompt rather than giving a new one.
+    var resumesSamePrompt: Bool { get }
+
     /// What to show for the current prompt; nil when idle or paused.
     var display: DrillDisplay? { get }
 

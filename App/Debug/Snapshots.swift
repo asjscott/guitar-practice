@@ -71,6 +71,26 @@ enum Snapshots {
             drill.capo = 12
         }
 
+        let sweep = DrillViewModel()
+        sweep.kind = .allInstances
+        try await save("drill-sweep", DrillView(model: sweep)) {
+            sweep.start(seed: 1)
+            sweep.playForSnapshot(right: true)
+            sweep.playForSnapshot(right: true)
+            sweep.skip()
+            sweep.playForSnapshot(right: true)
+        }
+        try await save("drill-sweep-wrong", DrillView(model: sweep)) {
+            sweep.stop()
+            sweep.start(seed: 1)
+            sweep.playForSnapshot(right: true)
+            sweep.playForSnapshot(right: false)
+        }
+        try await save("drill-sweep-paused", DrillView(model: sweep)) {
+            sweep.start(seed: 1)
+            sweep.togglePause()
+        }
+
         try await save("drill-not-saving", DrillView(), log: .inMemory(problem: "The file couldn’t be opened."))
 
         try await save("settings-instrument", InstrumentSettingsView(), size: CGSize(width: 520, height: 640))
