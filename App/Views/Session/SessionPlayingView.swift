@@ -14,7 +14,7 @@ struct SessionPlayingView: View {
         let snapshot = model.snapshot
         let block = snapshot.blocks[snapshot.blockIndex]
         VStack(spacing: 0) {
-            SessionDrillsBar(blocks: snapshot.blocks, current: snapshot.blockIndex)
+            SessionDrillsBar(blocks: snapshot.blocks, current: snapshot.blockIndex, finish: snapshot.finish)
             Divider()
             if snapshot.stage == .ready {
                 Spacer(minLength: 8)
@@ -37,6 +37,7 @@ struct SessionPlayingView: View {
                 if snapshot.stage != .paused { SessionKey(key: "Space", action: spaceAction) }
                 if snapshot.stage == .playing {
                     SessionKey(key: "S", action: "skip")
+                    SessionKey(key: "+", action: "2 min")
                     if let repeatTitle = block.kind.repeatTitle { SessionKey(key: "R", action: repeatTitle.lowercased()) }
                 }
                 if snapshot.stage == .paused {
@@ -49,17 +50,35 @@ struct SessionPlayingView: View {
                 }
                 Spacer()
                 if let theme = model.theme { Text(theme.text) }
+                if model.noSoundNotice != nil {
+                    Label("No sound", systemImage: "speaker.slash.fill").foregroundStyle(.orange)
+                        .help("Chimes flash.")
+                }
                 AttemptLogNotice()
                 AudioInputFallbackNotice()
                 AudioInputLine()
             }
             .sessionStatusBar()
         }
+        .overlay { SessionFlash(chime: model.flash) }
     }
 
     private var spaceAction: String {
         if model.stage == .ready { return "start" }
         return model.snapshot.blockIndex + 1 < model.snapshot.blocks.count ? "next block" : "finish"
+    }
+}
+
+/// A chime to see: the whole screen lights up and fades, less for the softer one.
+private struct SessionFlash: View {
+    let chime: AppSound?
+
+    var body: some View {
+        Color.orange
+            .opacity(chime == nil ? 0 : chime == .softChime ? 0.2 : 0.4)
+            .animation(.easeOut(duration: 0.3), value: chime)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
     }
 }
 
@@ -87,10 +106,12 @@ private struct SessionKey: View {
     }
 }
 
-/// One column per block: its drill, its time left (or spent, once over) and how far through it is.
+/// One column per block: its drill, its time left (or over, or spent) and how far through it is. Then when
+/// the session will end.
 private struct SessionDrillsBar: View {
     let blocks: [SessionViewModel.BlockProgress]
     let current: Int
+    let finish: SessionViewModel.Finish
 
     var body: some View {
         HStack(spacing: 12) {
@@ -100,12 +121,13 @@ private struct SessionDrillsBar: View {
                         Label(block.kind.title, systemImage: block.kind.symbol).lineLimit(1)
                         Spacer(minLength: 4)
                         Text(block.timeText).monospacedDigit()
+                            .foregroundStyle(block.isOvertime ? .orange : .primary)
                     }
                     .font(.caption.weight(index == current ? .semibold : .regular))
                     GeometryReader { geo in
                         Capsule().fill(.secondary.opacity(0.2))
                             .overlay(alignment: .leading) {
-                                Capsule().fill(Color.accentColor).frame(width: geo.size.width * block.fraction)
+                                Capsule().fill(block.isOvertime ? Color.orange : .accentColor).frame(width: geo.size.width * block.fraction)
                             }
                     }
                     .frame(height: 6)
@@ -114,9 +136,19 @@ private struct SessionDrillsBar: View {
                 .accessibilityElement(children: .combine)
                 .accessibilityAddTraits(index == current ? .isSelected : [])
             }
+            finishText.font(.caption).foregroundStyle(.secondary).monospacedDigit().padding(.leading, 8)
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 10)
+    }
+
+    /// Later and later while paused.
+    @ViewBuilder private var finishText: some View {
+        if let afterResuming = finish.afterResuming {
+            TimelineView(.periodic(from: .now, by: 1)) { Text(sessionFinishText(afterResuming, after: $0.date)) }
+        } else {
+            Text(finish.timeText)
+        }
     }
 }
 

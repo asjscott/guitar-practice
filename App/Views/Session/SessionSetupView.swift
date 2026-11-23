@@ -26,6 +26,8 @@ struct SessionSetupView: View {
     let reroll: (() -> Void)?
     let blocks: [SessionBlock]
     let problem: SessionProblem?
+    /// Nil with sound.
+    var noSoundNotice: String?
     let start: () -> Void
 
     /// What is stored could be anything.
@@ -73,6 +75,9 @@ struct SessionSetupView: View {
             .controlSize(.large)
             .disabled(problem != nil)
             if let problem { SessionProblemNotice(problem: problem) }
+            if let noSoundNotice {
+                Label(noSoundNotice, systemImage: "speaker.slash.fill").foregroundStyle(.orange)
+            }
             HStack(spacing: 12) {
                 ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
                     VStack(spacing: 4) {

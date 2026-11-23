@@ -160,6 +160,9 @@ enum Snapshots {
         let session = SessionViewModel()
         try await save("session-setup", SessionView(model: session))
 
+        let silent = AppSoundOutput(isInert: true, problem: "There’s no sound output device.")
+        try await save("session-setup-no-sound", SessionView(model: SessionViewModel()), sound: silent)
+
         // The whole window, with its sidebar focused: Return and Space must get through by themselves.
         try await save("session-ready-by-keys", ContentView(), settle: .milliseconds(1600)) {
             focusSidebar()
@@ -205,6 +208,41 @@ enum Snapshots {
             type("f#\r")
         }
         try await save("session-hear", SessionView(model: session)) { play(.hearFindIt) }
+        try await save("session-overtime", SessionView(model: session), settle: .milliseconds(1700)) {
+            play(.notePlayIt)
+            session.passTimeForSnapshot(225 + 12)
+            session.skip()
+        }
+        // + and = in the drill answered by typing.
+        try await save("session-extended", SessionView(model: session), settle: .milliseconds(1700)) {
+            play(.fretNameIt)
+            session.passTimeForSnapshot(225 + 12)
+            type("+=")
+        }
+        try await save("session-ready-after-overtime", SessionView(model: session)) {
+            play(.notePlayIt)
+            session.end()
+            session.done()
+            session.start(seed: 1)
+            session.next()
+            session.passTimeForSnapshot(225 + 72)
+            session.next()
+        }
+        let unheard = SessionViewModel()
+        try await save("session-flash", SessionView(model: unheard), sound: silent, settle: .milliseconds(500)) {
+            unheard.start(seed: 1)
+            unheard.next()
+            unheard.passTimeForSnapshot(271)
+            unheard.skip()
+        }
+        // The output failing: with the block that needs sound to come, and in it.
+        for (name, kind) in [("coming", DrillKind.notePlayIt), ("mid-block", .hearFindIt)] {
+            try await save("session-sound-failed-\(name)", SessionView(model: session)) {
+                play(kind)
+                session.soundOutput = silent
+                session.soundChanged()
+            }
+        }
         try await save("session-paused", SessionView(model: session)) {
             play(.notePlayIt)
             session.pause()

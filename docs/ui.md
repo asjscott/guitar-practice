@@ -31,7 +31,9 @@ The look and behaviour settled in Phase 0. Keep to these when changing a screen.
 
 - First in the sidebar, and the first-launch default. S4 on branch `prototype/phase2-screens`.
 - Setup: the theme (key large, position under it) with Reroll until the day's first session has started; minutes with − and +, Start (↩), the planned blocks, then Naturals / All notes and First 12 frets / Whole neck. Start is disabled, with the reason under it, when nothing can be heard or prompted.
-- The drills bar stays on top through Ready cards and drills: time left per block, or time spent once it is over.
+- The drills bar stays on top through Ready cards and drills: time left per block (orange and counting up in overtime), or time spent once it is over, then "Ends 18:42".
+- + (or =) extends the block while it plays. Chimes sound only in a gap, and the next prompt waits for them to end; in a sweep the next location stays up, without its ring.
+- With no output, Setup says so and the plan leaves out drills that need sound; chimes flash the screen orange. Losing it mid-block pauses; Resume then goes on without a drill that needs sound.
 - Keys go through `onPlainKey`, which sees them before any focused control: Space, Return, S and R work whatever has focus, and held-down repeats do nothing.
 - A session keeps the tuning, capo and theme it started with; Settings locks the tuning, capo and position system until it ends. The theme is in the status bar while it goes.
 - P pauses, on a Ready card too, which then counts down afresh. Leaving the screen, sleep and losing the input pause, with the reason for the last two on the Paused screen; the sidebar shows a "Paused" badge. Without an input, Resume is disabled.

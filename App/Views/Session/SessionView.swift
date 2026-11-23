@@ -3,7 +3,7 @@ import SwiftUI
 import TheoryCore
 
 /// The Session screen, S4: setup, then for each block a Ready card and the drill under a bar of the session's drills,
-/// then a summary. Return starts and leaves the summary; Space goes on; S skips; R is up to the drill; P pauses and
+/// then a summary. Return starts and leaves the summary; Space goes on; S skips; + extends; R is up to the drill; P pauses and
 /// resumes; Esc pauses and asks before ending. A listening screen; leaving it pauses the session, as do sleep and losing
 /// the input. Follows the tuning, capo and position system in Settings.
 struct SessionView: View {
@@ -34,6 +34,7 @@ struct SessionView: View {
                 model.capo = capo
             }
             .onChange(of: positionSystem, initial: true) { model.positionSystem = positionSystem }
+            .onChange(of: soundOutput.problem) { model.soundChanged() }
             .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.willSleepNotification)) { _ in
                 model.pause(notice: "The Mac went to sleep.")
             }
@@ -53,6 +54,7 @@ struct SessionView: View {
         case .idle:
             SessionSetupView(minutes: $minutes, naturalsOnly: $naturalsOnly, range: $range, theme: model.theme,
                              reroll: model.canReroll ? { model.reroll() } : nil, blocks: model.plan(), problem: problem,
+                             noSoundNotice: model.noSoundNotice,
                              start: start)
         case .ready, .playing, .paused:
             SessionPlayingView(model: model, inputProblem: inputProblem, resume: resume)
@@ -94,6 +96,8 @@ struct SessionView: View {
         case (.space, .ready), (.space, .playing): model.next()
         case (.character("s"), .playing): model.skip()
         case (.character("r"), .playing): model.repeatPrompt()
+        // = is + without Shift.
+        case (.character("+"), .playing), (.character("="), .playing): model.extend()
         case (.character("p"), .ready), (.character("p"), .playing): model.pause()
         case (.character("p"), .paused): resume()
         case (.escape, .ready), (.escape, .playing): model.askToEnd()
