@@ -1,3 +1,4 @@
+// VERDICT (23 Nov 2026): P4. P1's setup plus the theme's scale on a neck; P2's playing screen with P3's zoom; P1's metronome panel and summary.
 // PROTOTYPE, throwaway. Three variants of the Phase 3 screens (P1, P2, P3) on one Prototype screen.
 // ← → variant · 1–7 scene · F fade stage · Space plays or stops the fake pass · M metronome scene. No audio, nothing saved.
 import Observation
