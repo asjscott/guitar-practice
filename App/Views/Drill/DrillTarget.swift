@@ -15,7 +15,7 @@ extension FretboardDiagram {
         markers = (display?.markers ?? []).map {
             Marker(location: $0.location, label: $0.label, role: $0.isAnswer ? .root : .tone)
         }
-        highlightedString = display?.highlightedString
+        highlightedStrings = Set([display?.highlightedString].compactMap { $0 })
     }
 }
 

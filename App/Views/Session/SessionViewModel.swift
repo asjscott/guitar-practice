@@ -9,6 +9,8 @@ struct SessionTheme: Equatable {
     let theme: Theme
     /// "CAGED A shape"; nil when no position fits the neck.
     let positionName: String?
+    /// The position on a whole neck; nil when no position fits it.
+    let neck: FretboardDiagram?
 
     var key: Key { theme.key }
 
@@ -17,7 +19,9 @@ struct SessionTheme: Equatable {
 
     init(_ theme: Theme, on fretboard: Fretboard) {
         self.theme = theme
-        positionName = theme.position(on: fretboard).map { "\($0.system.settingsName) \($0.name)" }
+        let position = theme.position(on: fretboard)
+        positionName = position.map { "\($0.system.settingsName) \($0.name)" }
+        neck = position.map { FretboardDiagram($0, in: theme.key, on: fretboard) }
     }
 }
 
