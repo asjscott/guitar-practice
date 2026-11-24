@@ -58,10 +58,16 @@ public struct Attempt: Hashable, Sendable {
     /// Where the right answer is on the prompted string; nil unless answered.
     public let location: FretboardLocation?
 
-    /// `rawWrongAnswers` is worked out from `wrongAnswers` unless given. `responseTime` and `location` are both given when answered, and neither otherwise.
+    /// Nil when the attempt stands alone.
+    public let group: AttemptGroup?
+
+    /// Nil in the Fretboard notes drills.
+    public let facts: AttemptFacts?
+
+    /// `rawWrongAnswers` is worked out from `wrongAnswers`, and `group` from the prompt's sweep, unless given. `responseTime` and `location` are both given when answered, and neither otherwise.
     public init(prompt: NotePrompt, outcome: Outcome, responseTime: Duration? = nil,
                 wrongAnswers: [WrongAnswer] = [], rawWrongAnswers: [DrillAnswer]? = nil,
-                location: FretboardLocation? = nil) {
+                location: FretboardLocation? = nil, group: AttemptGroup? = nil, facts: AttemptFacts? = nil) {
         self.prompt = prompt
         self.outcome = outcome
         self.firstRight = outcome == .answered && wrongAnswers.isEmpty
@@ -69,6 +75,8 @@ public struct Attempt: Hashable, Sendable {
         self.wrongAnswers = wrongAnswers
         self.rawWrongAnswers = rawWrongAnswers ?? wrongAnswers.compactMap(\.raw)
         self.location = location
+        self.group = group ?? prompt.sweep.map { AttemptGroup(number: $0) }
+        self.facts = facts
     }
 
     /// An answered or timed-out (no response time) attempt with played wrong notes.
@@ -90,7 +98,8 @@ public struct Attempt: Hashable, Sendable {
 
     /// Everything but `rawWrongAnswers` (`firstRight` follows from the rest).
     private var compared: Compared {
-        Compared(prompt: prompt, outcome: outcome, responseTime: responseTime, wrongAnswers: wrongAnswers, location: location)
+        Compared(prompt: prompt, outcome: outcome, responseTime: responseTime, wrongAnswers: wrongAnswers, location: location,
+                 group: group, facts: facts)
     }
 
     private struct Compared: Hashable {
@@ -99,5 +108,7 @@ public struct Attempt: Hashable, Sendable {
         let responseTime: Duration?
         let wrongAnswers: [WrongAnswer]
         let location: FretboardLocation?
+        let group: AttemptGroup?
+        let facts: AttemptFacts?
     }
 }
