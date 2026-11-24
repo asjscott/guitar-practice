@@ -6,7 +6,7 @@ Full spec and roadmap: Claude Docs `c1631de5-f295-4bd8-a9fe-f1c1948a980d`. Befor
 
 ## Current phase
 
-**Phase 3 · Scales and triads.** Scope: scale drills in position with metronome, memory-mode fade; triad drills by string set and inversion (arpeggiated); the theme applies across notes, scales and triads blocks. The spec and tickets aren't written yet.
+**Phase 3 · Scales and triads.** Scope: scale drills in position with metronome, memory-mode fade; triad drills by string set and inversion (arpeggiated); the theme applies across notes, scales and triads blocks. Spec: #33; screens: `docs/ui.md` (P4). The tickets aren't written yet.
 
 Phases 0 (spec #1), 1 (spec #11) and 2 (spec #21) are complete.
 

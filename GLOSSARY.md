@@ -91,12 +91,44 @@ The record of one prompt's outcome (answered, timed out or skipped), its respons
 _Avoid_: Answer, try, trial
 
 **Response time**:
-The time from a prompt appearing (in Hear → find it, from the target pitch starting) to the right answer: the onset of the played note, or the note name being submitted. Within a sweep it runs from the previous location being dealt with.
+The time from a prompt appearing (in Hear → find it, from the target pitch starting) to the right answer: the onset of the played note, or the note name being submitted. Within a sweep or a pass it runs from the previous location being dealt with.
 _Avoid_: Latency (that means audio delay), reaction time
 
 **Sweep**:
 The single prompt of the All instances drill: every fretboard location of one pitch class in a fret range, found string by string from string 6, lowest fret first.
 _Avoid_: Round, lap, pass
+
+**Pass**:
+One scale played once through a position in a set order, such as up and down from its lowest root. (All instances has sweeps instead.)
+_Avoid_: Run, sweep, lap
+
+**Clean**:
+Said of a pass whose every expected note was played with no wrong note, timeout, skip or hint. Timing does not affect it.
+_Avoid_: Perfect, correct (for a whole pass)
+
+**Count-in**:
+The whole bars of clicks, at least four clicks, that come before a pass and set its tempo. The first note may come up to half a beat early; anything before that is ignored.
+_Avoid_: Lead-in, pre-roll
+
+**Click**:
+One beat of the metronome, heard and shown. Tempo (BPM) counts clicks, whatever note the time signature makes a beat.
+_Avoid_: Tick, pulse (that is only the part shown)
+
+**Emphasis**:
+Which beats of the bar have a stronger click. Any beats can be chosen, or none.
+_Avoid_: Accent, downbeat (beat 1 need not be emphasised)
+
+**Tempo ladder**:
+The rule that raises a scale drill's tempo after clean passes that kept up with the clicks, and lowers it after passes that weren't clean.
+_Avoid_: Speed trainer, auto-tempo
+
+**Fade stage**:
+How much of a position is shown during a pass: Shown (dots and names), Faded (faint dots, no names) or Hidden (only the root marked). It belongs to one scale kind in one position, whatever the key.
+_Avoid_: Memory level, difficulty
+
+**Hint**:
+Showing the position during a pass, on request. The pass is then not clean.
+_Avoid_: Reveal (that follows a timeout)
 
 ## Sessions
 
@@ -109,8 +141,12 @@ A timed part of a session, spent on one drill. It ends only when the player move
 _Avoid_: Section, stage, segment
 
 **Theme**:
-What a day's sessions are built around: a key and a position, later also a string set and a progression. Every session on one calendar day shares it.
+What a day's sessions are built around: a key, a position and a string set, later also a progression. Every session on one calendar day shares it.
 _Avoid_: Seed (the number it is picked with), topic
+
+**Module**:
+A group of drills that train one skill: Fretboard notes, Scales in position, Triads. A session shares its time out by module, in that order.
+_Avoid_: Category, area
 
 **Overtime**:
 Time spent in a block after its planned end. It lengthens the session; later blocks keep their length.

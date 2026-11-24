@@ -45,6 +45,20 @@ The look and behaviour settled in Phase 0. Keep to these when changing a screen.
 - Closing the window ends the session early.
 - The summary shows a card per block that started; one where nothing was answered shows no speed.
 
+## Scales and triads (Phase 3, not built yet)
+
+P4 on branch `prototype/phase3-screens`.
+
+- Setup: as Session, with the theme's position on a whole neck under the theme, the string set beside the position, and the blocks grouped by module.
+- Playing: no target card. A header line (what to play, feedback, beats and BPM), a tall zoomed neck, then the pass as a line that rises and falls with pitch and fills in as it is played. The drills bar moves below that. The count-in is a big number over the neck.
+- The zoomed neck keeps the wood, inlays, string names and fret numbers, stays still during a pass, and has a thin bar showing which part of the neck it is. Scales: the position and two frets either side. Triads: the whole practised range, since a tighter zoom would give the voicing away (so none with Whole neck).
+- Only the last note played is lit, ringed in yellow; never the next, and not the earlier ones, which would give the shape away.
+- Fade stages: Shown has dots and names, Faded faint dots without names, Hidden faint roots only.
+- Triads: the set's strings lit, and a circle per string with its note once played.
+- Beats: every beat of the bar shown, emphasised ones larger and blue, the current one orange.
+- Metronome panel: over the status-bar button ("♩ = 72 · 4/4") or on M: BPM, Hold tempo, time signature, a circle per beat to emphasise, volume, sound.
+- Summary: a card per block that started, as now, with the scale and triad figures.
+
 ## Settings
 
 - Persisted with `@AppStorage`, not SwiftData.
