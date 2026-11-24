@@ -306,7 +306,7 @@ struct SweepDisplayTests {
         #expect(display.headline == "Every C")
         #expect(display.subline == "next: string 6 (E) · 1 of 6")
         #expect(display.feedback == "Listening…")
-        #expect(display.highlightedString == 0)
+        #expect(display.highlightedStrings == [0])
         #expect(display.markers.isEmpty)
         #expect(display.chips.map(\.title) == ["6", "5", "4", "3", "2", "1"])
         #expect(display.chips.map(\.text) == ["–", "–", "–", "–", "–", "–"])
@@ -318,7 +318,7 @@ struct SweepDisplayTests {
         #expect(display.subline == "next: string 4 (D) · 3 of 6")
         #expect(display.feedback == "Fret 3 · 1.50 s")
         #expect(display.result == .waiting)
-        #expect(display.highlightedString == 2)
+        #expect(display.highlightedStrings == [2])
         #expect(display.markers == [.init(location: at(0, 8), label: "C", isAnswer: true),
                                     .init(location: at(1, 3), label: "C", isAnswer: true)])
         #expect(display.chips.map(\.state) == [.found, .found, .current, .waiting, .waiting, .waiting])
@@ -331,7 +331,7 @@ struct SweepDisplayTests {
         let display = try #require(drill.display)
         #expect(display.markers.map(\.location) == everyC)
         #expect(display.subline == "6 of 6")
-        #expect(display.highlightedString == nil)
+        #expect(display.highlightedStrings == [])
         #expect(display.chips.map(\.state) == Array(repeating: .found, count: 6))
     }
 }

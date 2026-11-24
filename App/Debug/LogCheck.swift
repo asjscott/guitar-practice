@@ -110,7 +110,7 @@ enum LogCheck {
             sweepRun.update(from: sweeps)
         }
 
-        // What no drill fills yet: passes and triads.
+        // Passes and triads.
         let pass = PassFacts(scale: Scale(.blues, tonic: .a), position: Position.ID(system: .caged, number: 4, octave: 1),
                              startDegree: Scale.Degree(5, -1), tempo: 72, beatsPerBar: 7, beatUnit: 8, fadeStage: .faded,
                              hinted: true, clickOffset: .milliseconds(-125))

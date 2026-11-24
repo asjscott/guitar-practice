@@ -231,11 +231,15 @@ final class DrillViewModel {
     /// Answers the current prompt, as if a right or wrong note had been played now (see `Snapshots` and `LogCheck`).
     func playForSnapshot(right: Bool) {
         guard let prompt = drill.prompt,
-              let location = prompt.target ?? fretboard.locations(of: prompt.pitchClass, onString: prompt.string,
+              let location = prompt.target ?? triadLocation(for: prompt) ?? fretboard.locations(of: prompt.pitchClass, onString: prompt.string,
                                                                   frets: options.frets).first else { return }
         let pitch = fretboard.pitch(at: location)
         let now = max(clockNow(), drill.promptStart ?? .zero)
         send(.played(right ? pitch : pitch + Interval(1), onset: now, at: now))
+    }
+
+    private func triadLocation(for prompt: NotePrompt) -> FretboardLocation? {
+        (drill as? PromptDrill<TriadPlayItRules>)?.correctLocations.first { $0.string == prompt.string }
     }
 
     /// Lets the current prompt's time run out now.
@@ -261,6 +265,9 @@ final class DrillViewModel {
     var countdown: DrillCountdown? { DrillCountdown(drill: drill, at: .seconds(now)) }
 
     var stats: RunStats { RunStats(attempts: snapshot.attempts) }
+
+    /// The run's key, for spelling; nil = sharps.
+    var key: Key? { drill.setup.key }
 
     /// The run's sweeps, in All instances.
     var sweeps: [SweepResult] { drill.sweeps }

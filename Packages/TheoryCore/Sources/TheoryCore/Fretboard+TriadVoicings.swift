@@ -58,4 +58,10 @@ extension Fretboard {
             ($0.frets.lowerBound, $0.locations[0].fret) < ($1.frets.lowerBound, $1.locations[0].fret)
         }
     }
+
+    /// The voicings wholly within a fret range, ordered up the neck.
+    public func voicings(of triad: Triad, inversion: Triad.Inversion, on stringSet: StringSet,
+                         frets: ClosedRange<Int>) -> [TriadVoicing] {
+        voicings(of: triad, inversion: inversion, on: stringSet).filter { $0.locations.allSatisfy { frets.contains($0.fret) } }
+    }
 }

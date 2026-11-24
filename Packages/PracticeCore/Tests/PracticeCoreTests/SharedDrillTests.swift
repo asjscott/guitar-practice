@@ -227,7 +227,7 @@ struct DrillDisplayTests {
         #expect(display.subline == "on string 6 (E) · fret 0")
         #expect(display.feedback == "Listening…")
         #expect(display.result == .waiting)
-        #expect(display.highlightedString == 0)
+        #expect(display.highlightedStrings == [0])
         #expect(display.markers.isEmpty)
 
         drill.handle(.played(Pitch(43), onset: s(1), at: s(1.1)))

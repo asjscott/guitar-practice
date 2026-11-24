@@ -9,6 +9,7 @@ public struct DrillKind: Identifiable, Sendable {
         .allInstances,
         .hearFindIt,
         .fretNameIt,
+        .triadPlayIt,
     ]
 
     /// Saved in the attempt log: never change it.

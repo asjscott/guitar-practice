@@ -151,7 +151,7 @@ struct SessionPlannerDrillsTests {
     }
 
     @Test func withSoundEveryDrillIsIn() {
-        #expect(SessionPlanner.drills(from: DrillKind.all, for: setup, hasSound: true) == DrillKind.all)
+        #expect(SessionPlanner.drills(from: DrillKind.all, for: setup, hasSound: true) == DrillKind.all.filter(\.isInSessions))
     }
 
     @Test func aDrillWithNothingToPromptIsLeftOut() {

@@ -72,4 +72,13 @@ extension Triad: CustomStringConvertible {
 extension Key {
     /// The key's tonic triad: major in a major key, minor in a minor key.
     public var triad: Triad { Triad(mode == .major ? .major : .minor, root: tonic) }
+
+    /// The key's major and minor triads, in its spelling, by degree from the tonic. The diminished one is left out.
+    public var chords: [Triad] {
+        let notes = notes
+        return notes.indices.compactMap { degree in
+            let tones = [0, 2, 4].map { notes[(degree + $0) % notes.count] }
+            return Triad.Quality.allCases.map { Triad($0, root: tones[0]) }.first { $0.notes == tones }
+        }
+    }
 }

@@ -152,7 +152,7 @@ struct HearFindItTests {
         var drill = lowF()
         #expect(drill.display?.headline == "♪")
         #expect(drill.display?.subline == "on string 6 (E)")
-        #expect(drill.display?.highlightedString == 0)
+        #expect(drill.display?.highlightedStrings == [0])
         #expect(drill.display?.markers == [])
         #expect(drill.display?.feedback == "Listening…")
 
