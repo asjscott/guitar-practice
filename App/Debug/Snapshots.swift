@@ -18,6 +18,12 @@ enum Snapshots {
     /// Nothing saved: default settings, and the audio line shows the system default rather than a fallback warning.
     private static let emptyDefaults = UserDefaults(suiteName: "GuitarPractice.snapshots") ?? .standard
 
+    /// Only screens whose names start with one of these are rendered; none means every screen.
+    private static let onlyPrefixes = (environment["GP_SNAPSHOT_ONLY"] ?? "").split(separator: ",").map(String.init)
+    private static let wantsSheet = environment["GP_SNAPSHOT_SHEET"] == "1"
+    private static var sheet = ContactSheet()
+    private static var savedCount = 0
+
     static var isRequested: Bool { environment["GP_SNAPSHOT"] != nil }
 
     static func run() -> Never {
@@ -27,6 +33,8 @@ enum Snapshots {
         Task {
             do {
                 try await saveAll()
+                guard savedCount > 0 else { throw SnapshotError.noScreenMatches(onlyPrefixes) }
+                try saveSheet()
                 exit(EXIT_SUCCESS)
             } catch {
                 FileHandle.standardError.write(Data("Snapshot failed: \(error)\n".utf8))
@@ -73,7 +81,7 @@ enum Snapshots {
             drill.togglePause()
         }
         drill.stop()
-        try await save("drill-paused-no-input", DrillView(model: drill)) {
+        try await save("drill-paused-no-input", DrillView(model: drill), neededBy: "drill-back-while-paused") {
             drill.start(seed: 1)
             drill.inputChanged(AudioInputState(permission: .granted, device: nil, devices: [], isRunning: false))
         }
@@ -345,10 +353,29 @@ enum Snapshots {
         }
     }
 
+    private static func isWanted(_ name: String) -> Bool {
+        onlyPrefixes.isEmpty || onlyPrefixes.contains { name.hasPrefix($0) }
+    }
+
+    private static func saveSheet() throws {
+        guard wantsSheet else { return }
+        for (index, page) in sheet.pages().enumerated() { try write(page, as: "sheet-\(index + 1)") }
+    }
+
+    private static func write(_ png: Data, as name: String) throws {
+        let url = URL(fileURLWithPath: environment["GP_SNAPSHOT"] ?? ".").appendingPathComponent("\(name).png")
+        try png.write(to: url)
+        print(url.path)
+    }
+
     /// Hosts `view` in an offscreen window, lets it lay out, applies `prepare`, and writes `<name>.png`.
+    /// Skipped if `--only` leaves it out, so a screen must not rely on an earlier one's `prepare`; if it has to, the
+    /// earlier one names it in `neededBy`.
     private static func save(_ name: String, _ view: some View, size: CGSize = screenSize, log: AttemptLog = .inMemory(),
                              sound: AppSoundOutput = AppSoundOutput(isInert: true),
-                             settle: Duration = .milliseconds(400), prepare: () -> Void = {}) async throws {
+                             settle: Duration = .milliseconds(400), neededBy follower: String? = nil,
+                             prepare: () -> Void = {}) async throws {
+        guard isWanted(name) || follower.map(isWanted) == true else { return }
         let host = NSHostingController(rootView: view.frame(width: size.width, height: size.height).environment(audioInput)
             .environment(sound).environment(log).defaultAppStorage(emptyDefaults))
         host.sceneBridgingOptions = [.title, .toolbars]
@@ -382,9 +409,9 @@ enum Snapshots {
         guard let png = bitmap.representation(using: .png, properties: [:]) else {
             throw SnapshotError.couldNotRender(name)
         }
-        let url = URL(fileURLWithPath: environment["GP_SNAPSHOT"] ?? ".").appendingPathComponent("\(name).png")
-        try png.write(to: url)
-        print(url.path)
+        try write(png, as: name)
+        if wantsSheet { sheet.add(name, bitmap) }
+        savedCount += 1
         window.close()
         window.contentViewController = nil
         try await Task.sleep(for: .milliseconds(50))
@@ -392,6 +419,7 @@ enum Snapshots {
 
     private enum SnapshotError: Error {
         case couldNotRender(String)
+        case noScreenMatches([String])
     }
 }
 #endif

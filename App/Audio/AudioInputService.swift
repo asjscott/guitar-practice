@@ -1,5 +1,6 @@
 import AppKit
 import AVFoundation
+import ListenCore
 import Observation
 
 /// The app's audio input: lists input devices, remembers the chosen device and channel, and while at least one
@@ -11,15 +12,11 @@ import Observation
 /// that count is above zero (and microphone access is granted), so the mic-in-use indicator is off otherwise.
 @MainActor @Observable
 final class AudioInputService {
-    enum Permission: Equatable {
-        case undetermined, granted, denied
-    }
-
     /// Input devices only (output-only devices are left out), sorted by name.
     private(set) var devices: [AudioInputDevice] = []
     /// The device and channel being listened to; nil when there are no input devices.
     private(set) var choice: AudioInputChoice?
-    private(set) var permission: Permission
+    private(set) var permission: AudioInputPermission
     /// True while the input unit runs (the mic-in-use indicator is on).
     private(set) var isRunning = false
     /// Input meter, 0–1 (−60…0 dBFS peak), with a short release. 0 when not running.
@@ -153,14 +150,13 @@ final class AudioInputService {
         let choiceChanged = resolved != choice
         if choiceChanged { choice = resolved }
 
-        if !listeners.isEmpty, permission == .undetermined {
-            requestPermission()
-        }
-        let wanted = !listeners.isEmpty && permission == .granted && choice != nil
-        if wanted, !isRunning || choiceChanged {
-            restartUnit()
-        } else if !wanted, startedSetup != nil {
-            stopUnit()
+        let plan = AudioInputPlan(hasListeners: !listeners.isEmpty, permission: permission, hasChoice: choice != nil,
+                                  choiceChanged: choiceChanged, isRunning: isRunning, hasTriedToStart: startedSetup != nil)
+        if plan.asksForPermission { requestPermission() }
+        switch plan.unit {
+        case .leave: break
+        case .restart: restartUnit()
+        case .stop: stopUnit()
         }
     }
 
@@ -175,7 +171,7 @@ final class AudioInputService {
         }
     }
 
-    private static func currentPermission() -> Permission {
+    private static func currentPermission() -> AudioInputPermission {
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .authorized: .granted
         case .notDetermined: .undetermined
@@ -204,7 +200,7 @@ final class AudioInputService {
         let setup = InputSetup(deviceID: deviceID)
         startedSetup = setup
         setupObserver = CoreAudioDevices.observeChanges(of: deviceID) { [weak self] in self?.setupMayHaveChanged() }
-        guard setup.channelCount > 0, setup.sampleRate > 0 else { throw .noInputChannels(choice.device.name) }
+        guard setup.canStart else { throw .noInputChannels(choice.device.name) }
 
         let stream = AudioInputStream(consumers: consumers)
         let unit = try AudioInputUnit(setup: setup, deviceName: choice.device.name, channelIndex: choice.channel - 1,
@@ -223,12 +219,11 @@ final class AudioInputService {
         }
     }
 
-    /// Starts again if the device's set-up is no longer the one tried last. Comparing keeps a notice caused by
-    /// starting from restarting forever (#20).
+    /// Starts again if the device's set-up is no longer the one tried last.
     private func setupMayHaveChanged() {
         guard let startedSetup else { return }
         refreshDevices()
-        guard InputSetup(deviceID: startedSetup.deviceID) != startedSetup else { return }
+        guard InputSetup.needsRestart(tried: startedSetup, now: InputSetup(deviceID: startedSetup.deviceID)) else { return }
         isRunning = false
         reconcile()
     }

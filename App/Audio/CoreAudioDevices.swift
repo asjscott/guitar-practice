@@ -1,5 +1,6 @@
 import CoreAudio
 import Foundation
+import ListenCore
 
 /// Thin Core Audio queries: input devices, the system default input and output, UID → device ID, and change notices.
 /// Hardware code, kept small and not unit-tested (spec #11, Testing Decisions).
