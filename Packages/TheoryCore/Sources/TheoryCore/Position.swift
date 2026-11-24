@@ -59,4 +59,9 @@ public struct Position: Hashable, Sendable, Identifiable {
 
     /// The fret window: lowest to highest fret used.
     public var frets: ClosedRange<Int> { locations.fretSpan }
+
+    /// The frets to show around the position: two either side, as far as the neck goes. It may go below the capo.
+    public var fretWindow: ClosedRange<Int> {
+        (frets.lowerBound - 2...frets.upperBound + 2).clamped(to: Fretboard.frets)
+    }
 }

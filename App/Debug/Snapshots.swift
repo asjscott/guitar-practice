@@ -171,6 +171,11 @@ enum Snapshots {
 
         try await save("drill-not-saving", DrillView(model: DrillViewModel()), log: .inMemory(problem: "The file couldn’t be opened."))
 
+        // A menu can't be drawn offscreen, so its items are laid out inline.
+        try await save("drill-picker", DrillPicker(kind: .constant(.notePlayIt), kinds: drillsOfEveryModule)
+            .pickerStyle(.inline).padding(), size: CGSize(width: 320, height: 360))
+
+        try await saveNecks()
         try await saveSession()
 
         try await save("settings-instrument", InstrumentSettingsView(), size: CGSize(width: 520, height: 640))
@@ -179,6 +184,47 @@ enum Snapshots {
         try await save("settings-instrument-locked", InstrumentSettingsView().environment(activeSessions),
                        size: CGSize(width: 520, height: 700))
         try await save("settings-audio", AudioSettingsView(), size: CGSize(width: 520, height: 480))
+    }
+
+    /// The neck by itself: zoomed, and at each fade stage.
+    private static func saveNecks() async throws {
+        let names = Fretboard(tuning: .standard).stringNames(in: nil).map(\.description)
+        func save(_ name: String, _ diagram: FretboardDiagram) async throws {
+            try await Self.save("neck-\(name)", FretboardView(diagram: diagram).padding(24), size: CGSize(width: 1100, height: 400))
+        }
+        func zoomed(_ tonic: NoteName, _ shape: CAGEDShape, octave: Int = 0, capo: Int = 0) -> FretboardDiagram {
+            let fretboard = Fretboard(tuning: .standard, capo: capo), key = Key.major(tonic)
+            let id = Position.ID(system: .caged, number: shape.number, octave: octave)
+            guard let position = Theme(key: key, position: id).position(on: fretboard) else {
+                preconditionFailure("No such position")
+            }
+            var diagram = FretboardDiagram(position, in: key, on: fretboard)
+            diagram.fretWindow = position.fretWindow
+            return diagram
+        }
+        func stage(isFaint: Bool, rootsOnly: Bool = false) -> FretboardDiagram {
+            var diagram = zoomed(.a, .d)
+            var lastPlayed = diagram.markers.remove(at: 7)
+            lastPlayed.isLastPlayed = true
+            if rootsOnly { diagram.markers.removeAll { $0.role != .root } }
+            for index in diagram.markers.indices { diagram.markers[index].isFaint = isFaint }
+            diagram.markers.append(lastPlayed)
+            return diagram
+        }
+        try await save("whole", FretboardDiagram(stringNames: names, highlightedStrings: [3]))
+        try await save("nut", zoomed(.c, .c))
+        // The nut shows, without the open strings.
+        try await save("first-fret", FretboardDiagram(stringNames: names, fretWindow: 1...8))
+        try await save("last-fret", zoomed(.c, .e, octave: 1))
+        try await save("capo", zoomed(.d, .c, capo: 2))
+        try await save("capo-inside", zoomed(.c, .e, capo: 6))
+        try await save("shown", stage(isFaint: false))
+        try await save("faded", stage(isFaint: true))
+        try await save("hidden", stage(isFaint: true, rootsOnly: true))
+        try await save("string-set", FretboardDiagram(
+            stringNames: names, fretWindow: 0...12,
+            markers: [.init(location: FretboardLocation(string: 2, fret: 4), label: "F♯", role: .tone, isLastPlayed: true)],
+            highlightedStrings: Set(StringSet.dGB.strings)))
     }
 
     private static func saveSession() async throws {
@@ -193,8 +239,24 @@ enum Snapshots {
                                     on: Fretboard(tuning: .standard)),
                 reroll: nil, blocks: SessionViewModel().plan(), problem: problem, start: {}))
         }
+        // A neck that the theme has no position on.
+        try await save("session-setup-no-position", SessionSetupView(
+            minutes: .constant(10), naturalsOnly: .constant(false), range: .constant(.wholeNeck),
+            theme: SessionTheme(Theme(key: .major(.c), position: Position.ID(system: .caged, number: CAGEDShape.d.number)),
+                                on: Fretboard(tuning: .standard, capo: 12)),
+            reroll: {}, blocks: SessionViewModel().plan(), problem: nil, start: {}))
         let session = SessionViewModel()
         try await save("session-setup", SessionView(model: session))
+        try await save("session-setup-short", SessionView(model: session), size: CGSize(width: 1100, height: 480))
+
+        for minutes in [10, 60] {
+            try await save("session-setup-modules-\(minutes)", SessionSetupView(
+                minutes: .constant(minutes), naturalsOnly: .constant(true), range: .constant(.first12),
+                theme: SessionTheme(Theme(key: .major(.bFlat), position: Position.ID(system: .caged, number: 3)),
+                                    on: Fretboard(tuning: .standard)),
+                reroll: {}, blocks: SessionPlanner.plan(drillsOfEveryModule, budget: .seconds(minutes * 60), day: 1),
+                problem: nil, start: {}), size: CGSize(width: 920, height: 620))
+        }
 
         let silent = AppSoundOutput(isInert: true, problem: "There’s no sound output device.")
         try await save("session-setup-no-sound", SessionView(model: SessionViewModel()), sound: silent)
@@ -329,6 +391,16 @@ enum Snapshots {
             play(.notePlayIt)
             session.end()
         }
+    }
+
+    /// Today's drills, with made-up ones in the other modules.
+    private static var drillsOfEveryModule: [DrillKind] {
+        func madeUp(_ title: String, _ module: DrillModule) -> DrillKind {
+            DrillKind(id: title, module: module, title: title, instructions: "", symbol: "star", rules: NotePlayItRules.self)
+        }
+        return DrillKind.all.filter { $0.module == .notes }
+            + [madeUp("Up and down", .scales), madeUp("From a degree", .scales),
+               madeUp("Triad → play it", .triads), madeUp("Inversions", .triads)]
     }
 
     private static var newestWindow: NSWindow? { NSApp.windows.last { $0.isVisible } }

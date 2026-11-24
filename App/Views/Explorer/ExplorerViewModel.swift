@@ -129,10 +129,7 @@ final class ExplorerViewModel {
             detail: scaleDetail,
             chips: scale.notes.map { Chip(name: $0.description, isRoot: $0 == scale.tonic) },
             toneLabel: "Scale tone",
-            markers: scaleLocations.map { location in
-                let name = fretboard.name(at: location, in: scale)
-                return .init(location: location, label: name.description, role: name == scale.tonic ? .root : .tone)
-            })
+            markers: scaleLocations.map { .init($0, of: scale, on: fretboard) })
     }
 
     /// The neck with the given markers, string names spelled in the scale's key, and the

@@ -9,6 +9,8 @@ The look and behaviour settled in Phase 0. Keep to these when changing a screen.
 - Orange root and blue tone dots with a white ring.
 - Capo bar, with the frets below it dimmed.
 - Note labels shown / faded / hidden. The font shrinks on high frets; text that can't fit is hidden.
+- Zoomed (`fretWindow`): only those frets, real-neck spacing kept, larger dots, labels and numbers, and a thin bar under the fret numbers for the part of the neck. The nut shows from fret 1 down, the open strings from fret 0.
+- Faint markers (no name), a yellow ring on the last note played, any number of lit strings.
 - Per-location heatmap tint hook (0–1), with a debug fill.
 
 ## Explorer
@@ -18,7 +20,7 @@ The look and behaviour settled in Phase 0. Keep to these when changing a screen.
 
 ## Drill
 
-- A drill picker at the left of the toolbar, from `DrillKind.all`. Options are shared by every drill and not persisted; Order shows only for drills that offer it.
+- A drill picker at the left of the toolbar, from `DrillKind.all`, grouped by module. Options are shared by every drill and not persisted; Order shows only for drills that offer it.
 - The neck and target card (`App/Views/Drill/DrillTarget.swift`) draw a `DrillDisplay`, for any drill, on both the Drill and session screens.
 - Pause hides the prompt; Resume gives a new one and drops the old. An "In order (check)" run asks for the same location again, as a new prompt, so that none is missed.
 - In a drill answered by typing, `.typesNoteNames` (`App/Views/Drill/NoteNameKeys.swift`) takes A–G, # and b, Backspace and Return before focused controls, the sidebar or shortcuts see them; what is typed replaces the headline. No shortcut uses A–G.
@@ -34,7 +36,7 @@ The look and behaviour settled in Phase 0. Keep to these when changing a screen.
 ## Session
 
 - First in the sidebar, and the first-launch default. S4 on branch `prototype/phase2-screens`.
-- Setup: the theme (key large, position under it) with Reroll until the day's first session has started; minutes with − and +, Start (↩), the planned blocks, then Naturals / All notes and First 12 frets / Whole neck. Start is disabled, with the reason under it, when nothing can be heard or prompted, or microphone access hasn't been given yet.
+- Setup: the theme (key large, position under it, then on a whole neck, left out when the window is too short for it) with Reroll until the day's first session has started; minutes with − and +, Start (↩), the planned blocks grouped by module, then Naturals / All notes and First 12 frets / Whole neck. Start is disabled, with the reason under it, when nothing can be heard or prompted, or microphone access hasn't been given yet.
 - The drills bar stays on top through Ready cards and drills: time left per block (orange and counting up in overtime), or time spent once it is over, then "Ends 18:42".
 - + (or =) extends the block while it plays. Chimes sound only in a gap, and the next prompt, or the next block's first, waits for them to end. In a sweep the next location stays up without its ring, S and R work, and notes from before the chime still count; a card that would say "Listening…" says "Wait for the chime".
 - With no output, Setup says so and the plan leaves out drills that need sound; chimes flash the screen orange. Losing it mid-block pauses; Resume then goes on without a drill that needs sound.
@@ -49,7 +51,7 @@ The look and behaviour settled in Phase 0. Keep to these when changing a screen.
 
 P4 on branch `prototype/phase3-screens`.
 
-- Setup: as Session, with the theme's position on a whole neck under the theme, the string set beside the position, and the blocks grouped by module.
+- Setup: as Session, with the string set beside the position.
 - Playing: no target card. A header line (what to play, feedback, beats and BPM), a tall zoomed neck, then the pass as a line that rises and falls with pitch and fills in as it is played. The drills bar moves below that. The count-in is a big number over the neck.
 - The zoomed neck keeps the wood, inlays, string names and fret numbers, stays still during a pass, and has a thin bar showing which part of the neck it is. Scales: the position and two frets either side. Triads: the whole practised range, since a tighter zoom would give the voicing away (so none with Whole neck).
 - Only the last note played is lit, ringed in yellow; never the next, and not the earlier ones, which would give the shape away.

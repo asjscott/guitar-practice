@@ -16,6 +16,9 @@ enum FretboardPalette {
     /// The band along a highlighted string (a drill's target string).
     static let stringHighlight = Color.yellow.opacity(0.22)
 
+    /// The ring around the last note played.
+    static let lastPlayedRing = Color.yellow
+
     static let root = Color(red: 0.91, green: 0.45, blue: 0.23)
     static let tone = Color(red: 0.23, green: 0.51, blue: 0.96)
 
