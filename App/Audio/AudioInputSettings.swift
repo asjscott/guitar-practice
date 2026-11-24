@@ -1,4 +1,5 @@
 import Foundation
+import ListenCore
 
 /// The persisted audio input choice, in UserDefaults (the same store as `@AppStorage`).
 enum AudioInputSettings {

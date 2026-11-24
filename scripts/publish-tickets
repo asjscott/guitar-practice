@@ -1,0 +1,172 @@
+#!/usr/bin/env python3
+"""Publishes a folder of tickets as GitHub issues, checking them all before creating any.
+
+  scripts/publish-tickets <folder>            check only: creates nothing
+  scripts/publish-tickets <folder> --publish  create, then verify each issue on GitHub
+
+Each <name>.md is one ticket, published in filename order (01-engine.md, 02-screen.md …):
+
+  title: Scale drill engine
+  labels: ready-for-agent
+  parent: 21
+  blocked-by: 01-engine, 20
+  ---
+  The body, in Markdown. {{01-engine}} becomes that ticket's number, as in #34.
+
+labels, parent and blocked-by are optional. parent and blocked-by take an issue number or an earlier ticket's name.
+Created issues are recorded in <folder>/published.json, so running it again carries on after a failure.
+"""
+import json
+import re
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+FIELDS = {"title", "labels", "parent", "blocked-by"}
+REFERENCE = re.compile(r"\{\{(.*?)\}\}")
+
+
+def gh(*args, check=True):
+    result = subprocess.run(["gh", *args], capture_output=True, text=True)
+    if check and result.returncode:
+        sys.exit(f"✗ gh {' '.join(args[:3])}: {result.stderr.strip()}")
+    return result
+
+
+def split(value):
+    return [part.strip() for part in value.split(",") if part.strip()]
+
+
+def read(path, problems):
+    head, separator, body = path.read_text(encoding="utf-8").partition("\n---\n")
+    fields = {}
+    if not separator:
+        problems.append(f"{path.name}: no --- line between the fields and the body")
+    for line in head.splitlines():
+        key, colon, value = line.partition(":")
+        key = key.strip()
+        if not colon or key not in FIELDS or key in fields:
+            problems.append(f"{path.name}: unexpected or repeated field line: {line!r}")
+        else:
+            fields[key] = value.strip()
+    if not fields.get("title"):
+        problems.append(f"{path.name}: no title")
+    if not body.strip():
+        problems.append(f"{path.name}: no body")
+    return {"title": fields.get("title", ""), "labels": split(fields.get("labels", "")),
+            "parent": split(fields.get("parent", "")), "blockers": split(fields.get("blocked-by", "")),
+            "body": body.strip() + "\n"}
+
+
+def check(tickets, problems):
+    known_labels = {label["name"] for label in json.loads(gh("label", "list", "--limit", "500", "--json", "name").stdout)}
+    issues = {}
+    earlier = set()
+    for name, ticket in tickets.items():
+        for label in ticket["labels"]:
+            if label not in known_labels:
+                problems.append(f"{name}: no label {label!r} on GitHub")
+        if len(ticket["parent"]) > 1:
+            problems.append(f"{name}: more than one parent")
+        for reference in ticket["parent"] + ticket["blockers"]:
+            if reference.isdigit():
+                if reference not in issues:
+                    issues[reference] = gh("issue", "view", reference, "--json", "number", check=False).returncode == 0
+                if not issues[reference]:
+                    problems.append(f"{name}: no issue {reference} on GitHub")
+            elif reference not in earlier:
+                problems.append(f"{name}: {reference!r} is neither an issue number nor an earlier ticket")
+        for reference in REFERENCE.findall(ticket["body"]):
+            if reference not in earlier:
+                problems.append(f"{name}: {{{{{reference}}}}} is not an earlier ticket")
+        earlier.add(name)
+
+
+def resolve(ticket, numbers):
+    number = lambda reference: int(reference) if reference.isdigit() else numbers[reference]
+    return {**ticket, "parent": [number(r) for r in ticket["parent"]], "blockers": [number(r) for r in ticket["blockers"]],
+            "body": REFERENCE.sub(lambda match: f"#{numbers[match[1]]}", ticket["body"])}
+
+
+def create(name, ticket, folder):
+    body = folder / f".{name}.body"
+    body.write_text(ticket["body"], encoding="utf-8")
+    args = ["issue", "create", "--title", ticket["title"], "--body-file", str(body)]
+    for label in ticket["labels"]:
+        args += ["--label", label]
+    for parent in ticket["parent"]:
+        args += ["--parent", str(parent)]
+    if ticket["blockers"]:
+        args += ["--blocked-by", ",".join(map(str, ticket["blockers"]))]
+    result = gh(*args, check=False)
+    body.unlink()
+    # gh can create the issue and still fail, so the URL decides.
+    url = re.search(r"/issues/(\d+)\s*$", result.stdout)
+    return (int(url[1]) if url else None), result.stderr.strip()
+
+
+def differences(number, ticket):
+    found = json.loads(gh("issue", "view", str(number), "--json", "title,body,labels,parent,blockedBy").stdout)
+    tidy = lambda text: text.replace("\r\n", "\n").strip()
+    pairs = {
+        "title": (ticket["title"], found["title"]),
+        "body": (tidy(ticket["body"]), tidy(found["body"])),
+        "labels": (sorted(ticket["labels"]), sorted(label["name"] for label in found["labels"])),
+        "parent": (ticket["parent"], [found["parent"]["number"]] if found["parent"] else []),
+        "blocked-by": (sorted(ticket["blockers"]), sorted(node["number"] for node in found["blockedBy"]["nodes"])),
+    }
+    return [f"{field} is {got!r}, not {wanted!r}" for field, (wanted, got) in pairs.items() if wanted != got]
+
+
+def main():
+    args = sys.argv[1:]
+    publish = "--publish" in args
+    paths = [arg for arg in args if arg != "--publish"]
+    if len(paths) != 1 or not Path(paths[0]).is_dir():
+        sys.exit(__doc__)
+    folder = Path(paths[0])
+
+    problems = []
+    tickets = {path.stem: read(path, problems) for path in sorted(folder.glob("*.md"))}
+    if not tickets:
+        sys.exit(f"✗ no .md tickets in {folder}")
+    check(tickets, problems)
+    if problems:
+        sys.exit("\n".join(f"✗ {problem}" for problem in problems) + "\nNothing was created.")
+
+    repo = json.loads(gh("repo", "view", "--json", "nameWithOwner").stdout)["nameWithOwner"]
+    print(f"✓ {len(tickets)} tickets ready for {repo}")
+    record = folder / "published.json"
+    numbers = json.loads(record.read_text()) if record.exists() else {}
+    if not publish:
+        for name, ticket in tickets.items():
+            print(f"  {name}: {ticket['title']}" + (f" (already #{numbers[name]})" if name in numbers else ""))
+        return
+
+    wrong = False
+    for name, ticket in tickets.items():
+        resolved = resolve(ticket, numbers)
+        if name not in numbers:
+            number, error = create(name, resolved, folder)
+            if number is None:
+                sys.exit(f"✗ {name}: not created: {error}\nFix it and run this again to carry on.")
+            numbers[name] = number
+            record.write_text(json.dumps(numbers, indent=2) + "\n")
+        found = differences(numbers[name], resolved)
+        for _ in range(3):      # GitHub can take a moment to show a new issue's links
+            if not found:
+                break
+            time.sleep(2)
+            found = differences(numbers[name], resolved)
+        print(f"{'✗' if found else '✓'} #{numbers[name]} {ticket['title']}")
+        for difference in found:
+            print(f"    {difference}")
+        wrong = wrong or bool(found)
+        if found:
+            break
+    if wrong:
+        sys.exit("✗ stopped: correct that issue with gh issue edit, then run this again to check it and carry on")
+
+
+main()

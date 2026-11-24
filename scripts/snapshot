@@ -1,14 +1,32 @@
 #!/bin/bash
 # Builds the Debug app and renders its screens to PNGs, without screen-recording or microphone permission.
-#   scripts/snapshot [output-dir] [light|dark]     default: build/snapshots light
+#   scripts/snapshot [--only <prefix>[,<prefix>…]] [--sheet] [output-dir] [light|dark]
+# default: every screen, to build/snapshots, light
+#   --only   renders only the screens whose names start with a prefix: --only session-paused,tuner
+#   --sheet  also writes the screens rendered, nine to a page, as sheet-1.png, sheet-2.png …
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
+usage() { sed -n '2,6s/^# *//p' "$0" >&2; exit 2; }
+only=""
+sheet=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --only) [ -n "${2:-}" ] || usage; only="$2"; shift 2 ;;
+    --sheet) sheet=1; shift ;;
+    -*) usage ;;
+    *) break ;;
+  esac
+done
+[ $# -le 2 ] || usage
 out="${1:-build/snapshots}"
 appearance="${2:-light}"
+case "$out" in light|dark) usage ;; esac
+case "$appearance" in light|dark) ;; *) usage ;; esac
 mkdir -p "$out"
 out="$(cd "$out" && pwd)"
+rm -f "$out"/sheet-[0-9]*.png
 xcodegen generate --quiet
 derived="$PWD/build/DerivedData"
 xcodebuild -scheme GuitarPractice -configuration Debug -destination 'platform=macOS' -derivedDataPath "$derived" -quiet build
-GP_SNAPSHOT="$out" GP_SNAPSHOT_APPEARANCE="$appearance" \
+GP_SNAPSHOT="$out" GP_SNAPSHOT_APPEARANCE="$appearance" GP_SNAPSHOT_ONLY="$only" GP_SNAPSHOT_SHEET="$sheet" \
   "$derived/Build/Products/Debug/GuitarPractice.app/Contents/MacOS/GuitarPractice"

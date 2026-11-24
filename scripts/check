@@ -56,6 +56,17 @@ while IFS= read -r -d '' entry; do
   esac
 done < <(git ls-files -s -z)
 
+# Rule: prototype code (a Prototype folder, or the word PROTOTYPE in Swift) stays on prototype/* branches. A pull
+# request in CI has no branch checked out, so it is never exempt.
+case "$(git symbolic-ref --quiet --short HEAD || true)" in
+  prototype/*) ;;
+  *)
+    while IFS= read -r hit; do
+      fail "$hit: prototype code stays on a prototype/* branch"
+    done < <(git ls-files -- '*/Prototype/*'; git grep --cached -nw PROTOTYPE -- '*.swift' || true)
+    ;;
+esac
+
 [ "$failed" -eq 0 ] || exit 1
 echo "✓ repo rules"
 [ "$mode" != "--rules" ] || exit 0

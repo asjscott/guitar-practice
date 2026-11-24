@@ -2,7 +2,7 @@
 
 Native macOS app for a daily, varied guitar practice routine: fretboard notes, scales in position, triads, triads over progressions, and building licks into solos. The guitar comes in through an audio interface; the app listens with pitch detection, plays backing, and adapts to weak spots.
 
-Full spec and roadmap: Claude Docs `c1631de5-f295-4bd8-a9fe-f1c1948a980d`. Before starting a phase, read that phase's section with the docs connector (not the Artifact tool); edit it with full node ids (`ms84a902bdp.13168`, not `.13168`). The link for people: https://claude.ai/artifact/Qt4EnpkCLa34Z3Fa5icthA
+Full spec and roadmap: Claude Docs `c1631de5-f295-4bd8-a9fe-f1c1948a980d`. Before starting a phase, read that phase's section with the docs connector (not the Artifact tool): read body node `32106882-4615` (engine `prose`) with `{"projection":"outline"}` (~8 KB; the whole doc is over 50 KB), then each table or list you need with `{"kind":"view","parentId":"<id>"}`. Give node ids in full (`ms84a902bdp.13168`, not `.13168`). The link for people: https://claude.ai/artifact/Qt4EnpkCLa34Z3Fa5icthA
 
 ## Current phase
 
@@ -26,17 +26,17 @@ Phase order: 0 Foundations → 1 Hear the guitar → 2 Session MVP → 3 Scales 
 git config core.hooksPath .githooks   # once per clone: the pre-commit hook runs scripts/check
 scripts/check                         # repo rules + all package tests, ~10 s
 scripts/check --build                 # the same, then generates the project and builds the app
-scripts/snapshot                      # renders each screen to build/snapshots/*.png
+scripts/snapshot                      # renders each screen to build/snapshots/*.png; --only <prefix>, --sheet
 scripts/log-check                     # logs practice, relaunches and compares, in a throwaway store
 ```
 
 Run `scripts/check` after package changes and `scripts/check --build` after app changes. Fix failures before moving on.
 
-To see a UI change, run `scripts/snapshot` and read the PNGs (screen recording is not permitted). Add a `save` in `App/Debug/Snapshots.swift` for each new screen or state.
+To see a UI change, run `scripts/snapshot --only <prefix> --sheet` and read the sheets, opening single PNGs only for detail (screen recording is not permitted). Add a `save` in `App/Debug/Snapshots.swift` for each new screen or state.
 
 ## Architecture rules
 
-- **ListenCore and PracticeCore are pure too** (`scripts/check` enforces each package's imports). ListenCore: samples in, tuner readings and played notes out; the input unit and Core Audio device code live in the app. PracticeCore: drill engines driven by played notes (a `Pitch` and an onset time) and a clock. The app connects them.
+- **ListenCore and PracticeCore are pure too** (`scripts/check` enforces each package's imports). ListenCore: samples in, tuner readings and played notes out, and the audio input decisions (which device, when to restart); the input unit and Core Audio device code live in the app. PracticeCore: drill engines driven by played notes (a `Pitch` and an onset time) and a clock. The app connects them.
 - **TheoryCore is pure.** Value types, no side effects. Every public function has tests. Exercises ask TheoryCore what is correct; they never do note or fret maths themselves.
 - **Layers:** Views → Session engine / Exercise modules / Progress engine → TheoryCore + Audio engine → SwiftData. Lower layers never import higher ones.
 - Before changing the fretboard, explorer or Settings, read `docs/ui.md`.

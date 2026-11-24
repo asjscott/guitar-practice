@@ -1,4 +1,5 @@
 import Foundation
+import ListenCore
 import os
 
 /// One block of mono samples from the chosen input channel, as delivered to a consumer.

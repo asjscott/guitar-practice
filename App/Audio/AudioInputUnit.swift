@@ -1,17 +1,13 @@
 import AudioToolbox
 import AVFoundation
+import ListenCore
 import os
 
-/// The device and format an input unit listens to: compared to tell a real change from a repeat notice.
-struct InputSetup: Equatable, Sendable {
-    var deviceID: AudioDeviceID
-    var sampleRate: Double
-    var channelCount: Int
-
+extension InputSetup {
+    /// A device's set-up now.
     init(deviceID: AudioDeviceID) {
-        self.deviceID = deviceID
-        sampleRate = CoreAudioDevices.sampleRate(of: deviceID)
-        channelCount = CoreAudioDevices.inputChannelCount(of: deviceID)
+        self.init(deviceID: deviceID, sampleRate: CoreAudioDevices.sampleRate(of: deviceID),
+                  channelCount: CoreAudioDevices.inputChannelCount(of: deviceID))
     }
 }
 
