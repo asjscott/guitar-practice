@@ -169,6 +169,108 @@ enum Snapshots {
             naming.start(seed: 1)
         }
 
+        let triads = DrillViewModel()
+        triads.kind = .triadPlayIt
+        try await save("triad-idle", DrillView(model: triads))
+        triads.stop()
+        try await save("triad-waiting", DrillView(model: triads)) { triads.start(seed: 1) }
+        triads.stop()
+        try await save("triad-one-note", DrillView(model: triads)) {
+            triads.start(seed: 1)
+            triads.playForSnapshot(right: true)
+        }
+        triads.stop()
+        try await save("triad-wrong", DrillView(model: triads)) {
+            triads.start(seed: 1)
+            triads.playForSnapshot(right: true)
+            triads.playForSnapshot(right: false)
+        }
+        triads.stop()
+        try await save("triad-right", DrillView(model: triads), settle: .milliseconds(150)) {
+            triads.start(seed: 1)
+            for _ in 0..<3 { triads.playForSnapshot(right: true) }
+        }
+        triads.stop()
+        try await save("triad-revealed", DrillView(model: triads)) {
+            triads.start(seed: 1)
+            triads.playForSnapshot(right: true)
+            triads.timeOutForSnapshot()
+        }
+        triads.stop()
+        try await save("triad-paused", DrillView(model: triads)) {
+            triads.start(seed: 1)
+            triads.togglePause()
+        }
+        triads.stop()
+        // Short, with the longest headline, a key with flats and the whole neck.
+        try await save("triad-whole-neck", DrillView(model: triads), size: CGSize(width: 920, height: 520)) {
+            triads.options.key = .minor(.bFlat)
+            triads.options.frets = 0...22
+            triads.options.stringSets = [.eAD, .aDG]
+            triads.start(seed: 2)
+            triads.playForSnapshot(right: true)
+        }
+        triads.stop()
+        try await save("triad-no-voicing", DrillView(model: triads)) {
+            triads.options = DrillOptions()
+            triads.options.stringSets = [.eAD]
+            triads.options.inversions = [.root]
+            triads.capo = 12
+        }
+
+        let climb = DrillViewModel()
+        climb.kind = .inversions
+        climb.options.stringSets = [.dGB]
+        func playVoicing() { for _ in 0..<3 { climb.playForSnapshot(right: true) } }
+        try await save("inversions-idle", DrillView(model: climb))
+        climb.stop()
+        try await save("inversions-waiting", DrillView(model: climb)) { climb.start(seed: 1) }
+        climb.stop()
+        try await save("inversions-climbing", DrillView(model: climb)) {
+            climb.start(seed: 1)
+            playVoicing()
+            climb.skip()
+            climb.skip()
+            climb.playForSnapshot(right: true)
+        }
+        climb.stop()
+        try await save("inversions-wrong", DrillView(model: climb)) {
+            climb.start(seed: 1)
+            climb.playForSnapshot(right: true)
+            climb.playForSnapshot(right: false)
+        }
+        climb.stop()
+        try await save("inversions-right", DrillView(model: climb), settle: .milliseconds(150)) {
+            climb.start(seed: 1)
+            playVoicing()
+        }
+        climb.stop()
+        try await save("inversions-revealed", DrillView(model: climb)) {
+            climb.start(seed: 1)
+            climb.playForSnapshot(right: true)
+            climb.timeOutForSnapshot()
+        }
+        climb.stop()
+        try await save("inversions-paused", DrillView(model: climb)) {
+            climb.start(seed: 1)
+            climb.togglePause()
+        }
+        climb.stop()
+        // Short, with the longest line: the whole neck.
+        try await save("inversions-whole-neck", DrillView(model: climb), size: CGSize(width: 920, height: 520)) {
+            climb.options = DrillOptions()
+            climb.options.key = .minor(.bFlat)
+            climb.options.frets = 0...22
+            climb.start(seed: 1)
+            climb.playForSnapshot(right: true)
+        }
+        climb.stop()
+        try await save("inversions-none", DrillView(model: climb)) {
+            climb.options = DrillOptions()
+            climb.options.stringSets = [.dGB]
+            climb.capo = 12
+        }
+
         try await save("drill-not-saving", DrillView(model: DrillViewModel()), log: .inMemory(problem: "The file couldn’t be opened."))
 
         // A menu can't be drawn offscreen, so its items are laid out inline.
@@ -393,14 +495,13 @@ enum Snapshots {
         }
     }
 
-    /// Today's drills, with made-up ones in the other modules.
+    /// Today's drills, with made-up ones for those to come.
     private static var drillsOfEveryModule: [DrillKind] {
         func madeUp(_ title: String, _ module: DrillModule) -> DrillKind {
             DrillKind(id: title, module: module, title: title, instructions: "", symbol: "star", rules: NotePlayItRules.self)
         }
-        return DrillKind.all.filter { $0.module == .notes }
-            + [madeUp("Up and down", .scales), madeUp("From a degree", .scales),
-               madeUp("Triad → play it", .triads), madeUp("Inversions", .triads)]
+        return DrillKind.all.filter { $0.module != .scales }
+            + [madeUp("Up and down", .scales), madeUp("From a degree", .scales)]
     }
 
     private static var newestWindow: NSWindow? { NSApp.windows.last { $0.isVisible } }

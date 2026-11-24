@@ -8,7 +8,12 @@ extension Attempt {
     public func summaryLine(in tuning: Tuning, key: Key? = nil) -> String {
         let time = responseTime.map { "\(secondsText($0, decimals: 2)) s" } ?? (skipped ? "skipped" : "timed out")
         let wrong = wrongAnswers.isEmpty ? "" : " · \(wrongVerb) \(wrongAnswers.map { $0.text(in: key) }.joined(separator: ", ")) first"
-        return "\(prompt.text(in: tuning)) — \(time)\(wrong)"
+        return "\(chordText)\(prompt.text(in: tuning)) — \(time)\(wrong)"
+    }
+
+    /// "A minor · 1st inversion: " for a note of a triad, else empty.
+    private var chordText: String {
+        if case .triad(let facts) = facts { "\(facts.text): " } else { "" }
     }
 
     private var wrongVerb: String {

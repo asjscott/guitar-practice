@@ -81,7 +81,7 @@ public struct AllInstancesRules: DrillRules {
         display.headline = "Every \(prompt.noteName)"
         display.subline = isOver ? "\(locations.count) of \(locations.count)"
             : "next: \(prompt.stringLabel(in: setup.fretboard.tuning)) · \(dealtWith.count + 1) of \(locations.count)"
-        display.highlightedString = isOver ? nil : prompt.string
+        display.highlightedStrings = isOver ? [] : [prompt.string]
         display.markers = zip(locations, dealtWith).filter { !$1.skipped }.map {
             DrillDisplay.Marker(location: $0, label: prompt.noteName, isAnswer: !$1.timedOut)
         }

@@ -2,7 +2,7 @@ import PracticeCore
 import SwiftUI
 import TheoryCore
 
-/// The Drill screen (free practice), D4: a drill picker and options in the toolbar with Start (↩), Pause/Resume (P),
+/// The Drill screen (free practice), D4 (or P4 for triads): a drill picker and options in the toolbar with Start (↩), Pause/Resume (P),
 /// Skip (S) and Stop (Esc), plus Repeat (R) where the drill has one; the neck card with the target string lit; under
 /// it the target card with its countdown ring, a feedback line and a strip of recent attempts; a status bar with
 /// running stats and the input meter; a summary sheet on Stop. A listening screen: audio input runs while it is
@@ -60,19 +60,10 @@ struct DrillView: View {
 
     private var drill: some View {
         VStack(spacing: 0) {
-            DrillNeck(display: model.snapshot.display, fretboard: model.fretboard)
-                .padding(.horizontal, 24)
-                .padding(.top, 20)
-
-            Spacer(minLength: 12)
-            if let display = model.snapshot.display {
-                DrillTarget(display: display, countdown: model.countdown, typed: model.nameEntry.text)
-            } else {
-                DrillRestingCard(model: model)
+            switch model.kind.module {
+            case .notes, .scales: notes
+            case .triads: triads
             }
-            DrillAttemptStrip(model: model).padding(.top, 10)
-            Spacer(minLength: 12)
-
             Divider()
             HStack(spacing: 18) {
                 Text("\(model.stats.prompts) \(model.stats.prompts == 1 ? "prompt" : "prompts")")
@@ -87,6 +78,35 @@ struct DrillView: View {
             .sessionStatusBar()
         }
     }
+
+    @ViewBuilder private var notes: some View {
+        DrillNeck(display: model.snapshot.display, fretboard: model.fretboard)
+            .padding(.horizontal, 24)
+            .padding(.top, 20)
+        Spacer(minLength: 12)
+        if let display = model.snapshot.display {
+            DrillTarget(display: display, countdown: model.countdown, typed: model.nameEntry.text)
+        } else {
+            DrillRestingCard(model: model)
+        }
+        DrillAttemptStrip(model: model).padding(.top, 10)
+        Spacer(minLength: 12)
+    }
+
+    private var triads: some View {
+        TriadPrompt(display: model.snapshot.display, hasClimbs: model.kind == .inversions, frets: model.options.frets, fretboard: model.fretboard) {
+            TriadCountdown(model: model)
+        } resting: {
+            DrillRestingText(model: model)
+        }
+    }
+}
+
+/// Apart, so that only it is redrawn on every tick.
+private struct TriadCountdown: View {
+    let model: DrillViewModel
+
+    var body: some View { DrillCountdownRing(countdown: model.countdown) }
 }
 
 /// Warns that attempts aren't being saved; otherwise nothing.
@@ -107,24 +127,32 @@ struct AttemptLogNotice: View {
 
 // MARK: - Toolbar
 
-/// The drill, then Notes, Frets, Strings and (where the drill offers it) Order. Locked (disabled) while a run goes.
+/// The drill, then the options that apply to its module. Locked (disabled) while a run goes.
 private struct DrillOptionsBar: View {
     @Bindable var model: DrillViewModel
 
     var body: some View {
         DrillPicker(kind: $model.kind)
+        switch model.kind.module {
+        case .notes: NoteOptions(model: model)
+        case .scales: EmptyView()
+        case .triads: TriadOptions(kind: model.kind, options: $model.options)
+        }
+    }
+}
+
+/// Notes, Frets, Strings and (where the drill offers it) Order.
+private struct NoteOptions: View {
+    @Bindable var model: DrillViewModel
+
+    var body: some View {
         Picker("Notes", selection: $model.options.notes) {
             Text("Naturals").tag(DrillOptions.Notes.naturals)
             Text("All notes").tag(DrillOptions.Notes.all)
         }
         .help("Notes (an In order check walks every note)")
         .disabled(model.isSetToCheck)
-        Picker("Frets", selection: $model.options.frets) {
-            ForEach(DrillOptions.fretRanges, id: \.self) { range in
-                Text("\(range.lowerBound)–\(range.upperBound)").tag(range)
-            }
-        }
-        .help("Frets")
+        FretsPicker(frets: $model.options.frets)
         Menu(stringsTitle) {
             ForEach(model.tuning.strings, id: \.self) { string in
                 Toggle(isOn: included(string)) {
@@ -158,6 +186,19 @@ private struct DrillOptionsBar: View {
                 if isOn { strings.insert(string) } else if strings.count > 1 { strings.remove(string) }
                 model.options.strings = strings == all ? nil : strings
             })
+    }
+}
+
+struct FretsPicker: View {
+    @Binding var frets: ClosedRange<Int>
+
+    var body: some View {
+        Picker("Frets", selection: $frets) {
+            ForEach(DrillOptions.fretRanges, id: \.self) { range in
+                Text("\(range.lowerBound)–\(range.upperBound)").tag(range)
+            }
+        }
+        .help("Frets")
     }
 }
 
@@ -219,14 +260,19 @@ private struct DrillRestingCard: View {
         // The same layout as DrillTarget, so nothing jumps.
         VStack(spacing: 10) {
             HStack(spacing: 24) {
-                DrillTargetCard { content }
+                DrillTargetCard { DrillRestingText(model: model) }
                 DrillCountdownRing(countdown: nil).frame(width: 64, height: 64)
             }
             Text(" ").font(.title2.weight(.medium))
         }
     }
+}
 
-    @ViewBuilder private var content: some View {
+/// The drill and how to start (or why it can't), or Paused.
+private struct DrillRestingText: View {
+    let model: DrillViewModel
+
+    var body: some View {
         if model.isPaused {
             Label("Paused", systemImage: "pause.circle").font(.title.weight(.semibold))
             if let reason = model.inputProblem?.text ?? model.soundProblem ?? model.pauseNotice {
@@ -336,7 +382,7 @@ private struct DrillRunSummary: View {
 
     /// Check runs name the fret that was checked.
     private func line(_ attempt: Attempt) -> String {
-        let line = attempt.summaryLine(in: model.tuning)
+        let line = attempt.summaryLine(in: model.tuning, key: model.key)
         guard model.isCheckRun, let target = attempt.prompt.target else { return line }
         return "Fret \(target.fret): \(line)"
     }

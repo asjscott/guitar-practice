@@ -20,6 +20,15 @@ public protocol DrillRules: Sendable {
 
     func judge(_ answer: DrillAnswer, for prompt: NotePrompt) -> DrillJudgement
 
+    /// The current prompt was answered, timed out or skipped. Default: nothing.
+    mutating func dealtWith(_ attempt: Attempt)
+
+    /// The group the current prompt's attempt is in. Default: its sweep, if any.
+    func group(for prompt: NotePrompt) -> AttemptGroup?
+
+    /// What else to log about the current prompt. Default: nothing.
+    func facts(for prompt: NotePrompt) -> AttemptFacts?
+
     /// Every location that answers a prompt: revealed after a timeout.
     func correctLocations(for prompt: NotePrompt) -> [FretboardLocation]
 
@@ -103,11 +112,17 @@ public enum DrillResumeRule: Hashable, Sendable {
     case newPrompt
     /// The same prompt with its timer restarted.
     case samePrompt(keepingWrongAnswers: Bool)
+    /// The rules' next prompt, which goes back to the start of what the old one was part of. To the player it is the
+    /// same prompt.
+    case samePart
 }
 
 extension DrillRules {
     public static var timeout: Duration { .seconds(10) }
     public mutating func begin() {}
+    public mutating func dealtWith(_ attempt: Attempt) {}
+    public func group(for prompt: NotePrompt) -> AttemptGroup? { nil }
+    public func facts(for prompt: NotePrompt) -> AttemptFacts? { nil }
     public var nothingToPromptReason: String? { setup.nothingToPromptReason }
     public func sounds(for prompt: NotePrompt) -> [DrillTone] { [] }
     public func timerDelay(for prompt: NotePrompt) -> Duration { .zero }
