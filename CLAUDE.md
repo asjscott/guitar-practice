@@ -6,11 +6,9 @@ Full spec and roadmap: Claude Docs `c1631de5-f295-4bd8-a9fe-f1c1948a980d`. Befor
 
 ## Current phase
 
-**Phase 2 · Session MVP.** Scope: All instances, Hear → find it and Fret → name it drills; time budget input, daily theme seed, block planner, block player; auto-advance, keyboard shortcuts, end-of-block chime; SwiftData attempt log and session summary. Done when: a timed notes session runs start to finish.
+**Phase 3 · Scales and triads.** Scope: scale drills in position with metronome, memory-mode fade; triad drills by string set and inversion (arpeggiated); the theme applies across notes, scales and triads blocks. The spec and tickets aren't written yet.
 
-Also in Phase 2: the input-device bug, #20.
-
-Phases 0 (spec #1) and 1 (spec #11) are complete.
+Phases 0 (spec #1), 1 (spec #11) and 2 (spec #21) are complete.
 
 Phase order: 0 Foundations → 1 Hear the guitar → 2 Session MVP → 3 Scales and triads → 4 Backing and progressions → 5 Lick → solo → 6 Adaptive and polish. Don't start work from a later phase unless asked.
 
