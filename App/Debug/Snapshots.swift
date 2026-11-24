@@ -38,6 +38,16 @@ enum Snapshots {
     }
 
     private static func saveAll() async throws {
+        // PROTOTYPE: only the Phase 3 variants.
+        for variant in ProtoVariant.allCases {
+            for scene in ProtoScene.allCases {
+                try await save("p3-\(variant.rawValue)-\(scene.rawValue)", ProtoScreen(model: ProtoModel(scene: scene, variant: variant), showsSwitcher: false))
+            }
+            for stage in [ProtoStage.faded, .hidden] {
+                try await save("p3-\(variant.rawValue)-pass-\(stage.rawValue)", ProtoScreen(model: ProtoModel(scene: .pass, variant: variant, stage: stage), showsSwitcher: false))
+            }
+        }
+        return
         try await save("explorer", ExplorerView(model: ExplorerViewModel()))
 
         let tuner = TunerViewModel()

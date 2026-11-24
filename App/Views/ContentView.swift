@@ -57,6 +57,7 @@ struct ContentView: View {
         case .explorer: ExplorerView(model: explorer)
         case .tuner: TunerView()
         case .drill: DrillView(model: drill)
+        case .prototype: ProtoScreen(model: ProtoModel())
         }
     }
 }
@@ -81,7 +82,7 @@ struct Sidebar: View {
 
 /// A screen in the main window's sidebar. The raw value is what `@SceneStorage` saves.
 enum Screen: String, CaseIterable, Identifiable {
-    case session, explorer, tuner, drill
+    case session, explorer, tuner, drill, prototype
 
     var id: Self { self }
 
@@ -91,6 +92,7 @@ enum Screen: String, CaseIterable, Identifiable {
         case .explorer: "Explorer"
         case .tuner: "Tuner"
         case .drill: "Drill"
+        case .prototype: "PROTOTYPE Phase 3"
         }
     }
 
@@ -100,6 +102,7 @@ enum Screen: String, CaseIterable, Identifiable {
         case .explorer: "guitars"
         case .tuner: "tuningfork"
         case .drill: "target"
+        case .prototype: "hammer"
         }
     }
 }

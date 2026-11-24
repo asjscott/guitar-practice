@@ -127,10 +127,11 @@ struct FretboardView: View {
     /// A soft yellow band along `diagram.highlightedString`, from its name to the end of the neck,
     /// over the strings and capo but under the markers. Off when nil.
     private func drawStringHighlight(in context: inout GraphicsContext, _ g: FretboardGeometry) {
-        guard let string = diagram.highlightedString, (0..<diagram.stringCount).contains(string) else { return }
+        for string in diagram.highlightedStrings + (diagram.highlightedString.map { [$0] } ?? []) where (0..<diagram.stringCount).contains(string) {
         let height = g.rowHeight * 0.9
         let band = CGRect(x: 0, y: g.y(ofString: string) - height / 2, width: g.neck.maxX, height: height)
         context.fill(Path(roundedRect: band, cornerRadius: 3), with: .color(FretboardPalette.stringHighlight))
+        }
     }
 
     private func drawStringNames(in context: inout GraphicsContext, _ g: FretboardGeometry) {
@@ -163,12 +164,13 @@ struct FretboardView: View {
         var shadowed = context
         shadowed.addFilter(.shadow(color: .black.opacity(0.45), radius: 1.5, x: 0, y: 1))
         for marker in markers {
-            shadowed.fill(Path(ellipseIn: dotRect(marker)), with: .color(FretboardPalette.color(for: marker.role)))
+            shadowed.fill(Path(ellipseIn: dotRect(marker)), with: .color(FretboardPalette.color(for: marker.role).opacity(marker.isFaint ? 0.28 : 1)))
         }
         for marker in markers {
             let rect = dotRect(marker)
-            context.stroke(Path(ellipseIn: rect), with: .color(.white.opacity(0.85)), lineWidth: 1.25)
-            drawLabel(marker.label, in: rect, context: &context)
+            context.stroke(Path(ellipseIn: rect), with: .color(.white.opacity(marker.isFaint ? 0.25 : 0.85)), lineWidth: 1.25)
+            if marker.isCurrent { context.stroke(Path(ellipseIn: rect.insetBy(dx: -3, dy: -3)), with: .color(.yellow), lineWidth: 3) }
+            if !marker.isFaint { drawLabel(marker.label, in: rect, context: &context) }
         }
     }
 

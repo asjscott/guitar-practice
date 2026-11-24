@@ -26,6 +26,10 @@ struct FretboardDiagram: Equatable {
         var location: FretboardLocation
         var label: String
         var role: Role
+        /// PROTOTYPE: faded memory stage.
+        var isFaint = false
+        /// PROTOTYPE: the last note played.
+        var isCurrent = false
     }
 
     /// One name per string, string 6 first (index 0 = physical string 6, drawn at the bottom).
@@ -50,6 +54,9 @@ struct FretboardDiagram: Equatable {
     /// A string to highlight with a band along its length (internal index, 0 = string 6), such as a
     /// drill's target string. `nil` highlights none.
     var highlightedString: Int? = nil
+
+    /// PROTOTYPE: more than one, for a string set.
+    var highlightedStrings: [Int] = []
 
     var stringCount: Int { stringNames.count }
 
