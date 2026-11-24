@@ -2,7 +2,7 @@ import TheoryCore
 
 extension DrillKind {
     public static let fretNameIt = DrillKind(
-        id: "fretNameIt", title: "Fret → name it", instructions: "A fret lights up. Type its name, then Return.",
+        id: "fretNameIt", module: .notes, title: "Fret → name it", instructions: "A fret lights up. Type its name, then Return.",
         symbol: "keyboard", usesKeyboard: true, hidesNote: true, rules: FretNameItRules.self)
 }
 

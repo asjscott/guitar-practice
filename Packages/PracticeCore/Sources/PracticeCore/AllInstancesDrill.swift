@@ -2,7 +2,7 @@ import TheoryCore
 
 extension DrillKind {
     public static let allInstances = DrillKind(
-        id: "allInstances", title: "All instances",
+        id: "allInstances", module: .notes, title: "All instances",
         instructions: "Find every one, string 6 to string 1, lowest fret first.",
         symbol: "square.grid.3x3", repeatTitle: "Restart", rules: AllInstancesRules.self)
 }

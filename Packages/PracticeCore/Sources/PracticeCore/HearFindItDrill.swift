@@ -2,7 +2,7 @@ import TheoryCore
 
 extension DrillKind {
     public static let hearFindIt = DrillKind(
-        id: "hearFindIt", title: "Hear → find it", instructions: "Hear the open string, then a pitch. Find that pitch.",
+        id: "hearFindIt", module: .notes, title: "Hear → find it", instructions: "Hear the open string, then a pitch. Find that pitch.",
         symbol: "ear", needsSound: true, hidesNote: true, repeatTitle: "Replay", rules: HearFindItRules.self)
 }
 

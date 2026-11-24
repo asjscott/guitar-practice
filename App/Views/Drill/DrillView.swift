@@ -112,10 +112,7 @@ private struct DrillOptionsBar: View {
     @Bindable var model: DrillViewModel
 
     var body: some View {
-        Picker("Drill", selection: $model.kind) {
-            ForEach(DrillKind.all) { Text($0.title).tag($0) }
-        }
-        .help("Drill")
+        DrillPicker(kind: $model.kind)
         Picker("Notes", selection: $model.options.notes) {
             Text("Naturals").tag(DrillOptions.Notes.naturals)
             Text("All notes").tag(DrillOptions.Notes.all)
@@ -161,6 +158,23 @@ private struct DrillOptionsBar: View {
                 if isOn { strings.insert(string) } else if strings.count > 1 { strings.remove(string) }
                 model.options.strings = strings == all ? nil : strings
             })
+    }
+}
+
+/// Drills by module.
+struct DrillPicker: View {
+    @Binding var kind: DrillKind
+    var kinds = DrillKind.all
+
+    var body: some View {
+        Picker("Drill", selection: $kind) {
+            ForEach(DrillModule.groups(of: kinds, by: \.module), id: \.module) { group in
+                Section(group.module.title) {
+                    ForEach(group.members) { Text($0.title).tag($0) }
+                }
+            }
+        }
+        .help("Drill")
     }
 }
 

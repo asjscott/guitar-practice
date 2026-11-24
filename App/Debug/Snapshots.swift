@@ -171,6 +171,10 @@ enum Snapshots {
 
         try await save("drill-not-saving", DrillView(model: DrillViewModel()), log: .inMemory(problem: "The file couldn’t be opened."))
 
+        // A menu can't be drawn offscreen, so its items are laid out inline.
+        try await save("drill-picker", DrillPicker(kind: .constant(.notePlayIt), kinds: drillsOfEveryModule)
+            .pickerStyle(.inline).padding(), size: CGSize(width: 320, height: 360))
+
         try await saveSession()
 
         try await save("settings-instrument", InstrumentSettingsView(), size: CGSize(width: 520, height: 640))
@@ -195,6 +199,15 @@ enum Snapshots {
         }
         let session = SessionViewModel()
         try await save("session-setup", SessionView(model: session))
+
+        for minutes in [10, 60] {
+            try await save("session-setup-modules-\(minutes)", SessionSetupView(
+                minutes: .constant(minutes), naturalsOnly: .constant(true), range: .constant(.first12),
+                theme: SessionTheme(Theme(key: .major(.bFlat), position: Position.ID(system: .caged, number: 3)),
+                                    on: Fretboard(tuning: .standard)),
+                reroll: {}, blocks: SessionPlanner.plan(drillsOfEveryModule, budget: .seconds(minutes * 60), day: 1),
+                problem: nil, start: {}), size: CGSize(width: 920, height: 620))
+        }
 
         let silent = AppSoundOutput(isInert: true, problem: "There’s no sound output device.")
         try await save("session-setup-no-sound", SessionView(model: SessionViewModel()), sound: silent)
@@ -329,6 +342,16 @@ enum Snapshots {
             play(.notePlayIt)
             session.end()
         }
+    }
+
+    /// Today's drills, with made-up ones in the other modules.
+    private static var drillsOfEveryModule: [DrillKind] {
+        func madeUp(_ title: String, _ module: DrillModule) -> DrillKind {
+            DrillKind(id: title, module: module, title: title, instructions: "", symbol: "star", rules: NotePlayItRules.self)
+        }
+        return DrillKind.all.filter { $0.module == .notes }
+            + [madeUp("Up and down", .scales), madeUp("From a degree", .scales),
+               madeUp("Triad → play it", .triads), madeUp("Inversions", .triads)]
     }
 
     private static var newestWindow: NSWindow? { NSApp.windows.last { $0.isVisible } }
