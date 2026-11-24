@@ -134,17 +134,15 @@ final class SessionViewModel {
     /// What a session without sound does differently; nil with sound.
     var noSoundNotice: String? { hasSound ? nil : SessionPlanner.noSoundNotice(from: DrillKind.all) }
 
-    /// The blocks a session would have: every drill that has something to prompt, and can be heard if it needs to be.
+    /// The blocks a session would have, of the drills that have something to prompt, and can be heard if they need to be.
     func plan(on date: Date = .now) -> [SessionBlock] {
         let drills = SessionPlanner.drills(from: DrillKind.all, for: drillSetup(seed: 0), hasSound: hasSound)
-        return SessionPlanner.plan(drills.map { WeightedDrill($0) }, budget: setup.budget, day: Calendar.dayNumber(of: date))
+        return SessionPlanner.plan(drills, budget: setup.budget, day: Calendar.dayNumber(of: date))
     }
 
     /// Why no drill can prompt anything; nil when one can.
     var nothingToPromptReason: String? {
-        let drillSetup = drillSetup(seed: 0)
-        let reasons = DrillKind.all.filter { hasSound || !$0.needsSound }.map { $0.makeDrill(drillSetup).nothingToPromptReason }
-        return reasons.contains(nil) ? nil : reasons.compactMap { $0 }.first
+        SessionPlanner.nothingToPromptReason(from: DrillKind.all, for: drillSetup(seed: 0), hasSound: hasSound)
     }
 
     /// Why nothing can be heard: a session can't start or resume. Nil when it can.

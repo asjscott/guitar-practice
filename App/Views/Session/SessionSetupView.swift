@@ -71,18 +71,7 @@ struct SessionSetupView: View {
             if let noSoundNotice {
                 Label(noSoundNotice, systemImage: "speaker.slash.fill").foregroundStyle(.orange)
             }
-            HStack(spacing: 12) {
-                ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
-                    VStack(spacing: 4) {
-                        Image(systemName: block.kind.symbol).font(.title2).foregroundStyle(.secondary)
-                        Text(block.kind.title).font(.callout)
-                        Text(clockText(block.length)).font(.callout.monospacedDigit()).foregroundStyle(.secondary)
-                    }
-                    .frame(width: 150, height: 84)
-                    .sessionCard()
-                    .accessibilityElement(children: .combine)
-                }
-            }
+            SessionBlocksByModule(blocks: blocks)
             HStack {
                 Picker("Notes", selection: $naturalsOnly) {
                     Text("Naturals").tag(true)

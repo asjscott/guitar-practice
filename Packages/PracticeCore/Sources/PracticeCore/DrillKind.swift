@@ -14,6 +14,8 @@ public struct DrillKind: Identifiable, Sendable {
     /// Saved in the attempt log: never change it.
     public let id: String
 
+    public let module: DrillModule
+
     /// "Note → play it".
     public let title: String
 
@@ -32,6 +34,9 @@ public struct DrillKind: Identifiable, Sendable {
     /// The note isn't shown while it is prompted, so a skip must not show it either.
     public let hidesNote: Bool
 
+    /// Whether sessions use it; one that isn't is for free practice only.
+    public let isInSessions: Bool
+
     /// Whether "In order (check)" applies to it.
     public let offersOrder: Bool
 
@@ -40,16 +45,18 @@ public struct DrillKind: Identifiable, Sendable {
 
     private let make: @Sendable (DrillSetup) -> any Drill
 
-    public init<Rules: DrillRules>(id: String, title: String, instructions: String, symbol: String,
+    public init<Rules: DrillRules>(id: String, module: DrillModule, title: String, instructions: String, symbol: String,
                                    usesKeyboard: Bool = false, needsSound: Bool = false, hidesNote: Bool = false,
-                                   offersOrder: Bool = false, repeatTitle: String? = nil, rules: Rules.Type) {
+                                   isInSessions: Bool = true, offersOrder: Bool = false, repeatTitle: String? = nil, rules: Rules.Type) {
         self.id = id
+        self.module = module
         self.title = title
         self.instructions = instructions
         self.symbol = symbol
         self.usesKeyboard = usesKeyboard
         self.needsSound = needsSound
         self.hidesNote = hidesNote
+        self.isInSessions = isInSessions
         self.offersOrder = offersOrder
         self.repeatTitle = repeatTitle
         make = { PromptDrill<Rules>(setup: $0) }
