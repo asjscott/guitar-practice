@@ -1,6 +1,6 @@
 import TheoryCore
 
-/// Which of a run's groups an attempt is in: the attempts of one sweep, pass or triad prompt.
+/// Which of a run's groups an attempt is in: the attempts of one sweep, pass, triad prompt or climb.
 public struct AttemptGroup: Hashable, Sendable {
     /// Tells the run's groups apart.
     public let number: Int

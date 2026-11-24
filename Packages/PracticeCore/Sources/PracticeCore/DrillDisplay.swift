@@ -42,7 +42,8 @@ public struct DrillDisplay: Hashable, Sendable {
         }
     }
 
-    /// One part of a prompt with several, such as a location of a sweep ("6" over "fret 8") or a string of a triad.
+    /// One part of a prompt with several, such as a location of a sweep ("6" over "fret 8"), a string of a triad or
+    /// a voicing of a climb.
     public struct Chip: Hashable, Sendable {
         public enum State: Hashable, Sendable {
             case waiting, current, found, timedOut, skipped
@@ -81,6 +82,9 @@ public struct DrillDisplay: Hashable, Sendable {
 
     /// A row under the feedback; empty in most drills.
     public var chips: [Chip] = []
+
+    /// A climb's voicings, up and back; empty in other drills.
+    public var voicings: [Chip] = []
 
     /// Waiting for a typed name: what is typed so far replaces the headline.
     public var acceptsTypedName = false

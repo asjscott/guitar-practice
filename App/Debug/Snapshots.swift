@@ -218,6 +218,59 @@ enum Snapshots {
             triads.capo = 12
         }
 
+        let climb = DrillViewModel()
+        climb.kind = .inversions
+        climb.options.stringSets = [.dGB]
+        func playVoicing() { for _ in 0..<3 { climb.playForSnapshot(right: true) } }
+        try await save("inversions-idle", DrillView(model: climb))
+        climb.stop()
+        try await save("inversions-waiting", DrillView(model: climb)) { climb.start(seed: 1) }
+        climb.stop()
+        try await save("inversions-climbing", DrillView(model: climb)) {
+            climb.start(seed: 1)
+            playVoicing()
+            climb.skip()
+            climb.skip()
+            climb.playForSnapshot(right: true)
+        }
+        climb.stop()
+        try await save("inversions-wrong", DrillView(model: climb)) {
+            climb.start(seed: 1)
+            climb.playForSnapshot(right: true)
+            climb.playForSnapshot(right: false)
+        }
+        climb.stop()
+        try await save("inversions-right", DrillView(model: climb), settle: .milliseconds(150)) {
+            climb.start(seed: 1)
+            playVoicing()
+        }
+        climb.stop()
+        try await save("inversions-revealed", DrillView(model: climb)) {
+            climb.start(seed: 1)
+            climb.playForSnapshot(right: true)
+            climb.timeOutForSnapshot()
+        }
+        climb.stop()
+        try await save("inversions-paused", DrillView(model: climb)) {
+            climb.start(seed: 1)
+            climb.togglePause()
+        }
+        climb.stop()
+        // Short, with the longest line: the whole neck.
+        try await save("inversions-whole-neck", DrillView(model: climb), size: CGSize(width: 920, height: 520)) {
+            climb.options = DrillOptions()
+            climb.options.key = .minor(.bFlat)
+            climb.options.frets = 0...22
+            climb.start(seed: 1)
+            climb.playForSnapshot(right: true)
+        }
+        climb.stop()
+        try await save("inversions-none", DrillView(model: climb)) {
+            climb.options = DrillOptions()
+            climb.options.stringSets = [.dGB]
+            climb.capo = 12
+        }
+
         try await save("drill-not-saving", DrillView(model: DrillViewModel()), log: .inMemory(problem: "The file couldn’t be opened."))
 
         // A menu can't be drawn offscreen, so its items are laid out inline.
@@ -448,8 +501,7 @@ enum Snapshots {
             DrillKind(id: title, module: module, title: title, instructions: "", symbol: "star", rules: NotePlayItRules.self)
         }
         return DrillKind.all.filter { $0.module != .scales }
-            + [madeUp("Up and down", .scales), madeUp("From a degree", .scales),
-               madeUp("Inversions", .triads)]
+            + [madeUp("Up and down", .scales), madeUp("From a degree", .scales)]
     }
 
     private static var newestWindow: NSWindow? { NSApp.windows.last { $0.isVisible } }

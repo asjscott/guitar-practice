@@ -28,7 +28,7 @@ The look and behaviour settled in Phase 0. Keep to these when changing a screen.
 - Where the drill hides the note (Hear → find it shows ♪, Fret → name it ?), a skip shows – in the attempt strip.
 - Leaving the screen, sleep and losing the input (or access to it) pause a run, as they do a session, with the reason on the card. A paused run is still there on coming back; the sidebar shows a "Paused" badge. Closing the window ends it.
 - Start, and Resume, are disabled until microphone access is given and there is an input, with the reason on the card.
-- Prompt counts, here and in summaries, count a sweep as one prompt, from its first attempt on, and a triad once one of its notes is answered or timed out. Accuracy, median and skips are per attempt.
+- Prompt counts, here and in summaries, count a sweep as one prompt, from its first attempt on, and a triad or a climb once one of its notes is answered or timed out. Accuracy, median and skips are per attempt.
 - Hear → find it is timed from the target being heard, output latency included.
 - A drill that needs sound pauses if the output fails, with the reason on the card. No output device disables Start.
 - Start is disabled, with the reason on the card, when nothing can be prompted.
@@ -56,7 +56,7 @@ P4 on branch `prototype/phase3-screens`.
 - The zoomed neck keeps the wood, inlays, string names and fret numbers, stays still during a pass, and has a thin bar showing which part of the neck it is. Scales: the position and two frets either side. Triads: the whole practised range, since a tighter zoom would give the voicing away (so none with Whole neck).
 - Only the last note played is lit, ringed in yellow; never the next, and not the earlier ones, which would give the shape away.
 - Fade stages: Shown has dots and names, Faded faint dots without names, Hidden faint roots only.
-- Triads: the set's strings lit, and a circle per string with its note once played. The countdown ring is at the right of the header. Once the voicing is played or revealed, all of it shows. No attempt strip. At rest, the header is empty and the text is where the circles go.
+- Triads: the set's strings lit, and a circle per string with its note once played. The countdown ring is at the right of the header. Once the voicing is played or revealed, all of it shows. No attempt strip. At rest, the header is empty and the text is where the circles go. Inversions has a line between the neck and the circles: a dot per voicing, rising to the highest and back, over its inversion (green played, orange revealed, grey skipped), and the Inversions option is left out.
 - Beats: every beat of the bar shown, emphasised ones larger and blue, the current one orange.
 - Metronome panel: over the status-bar button ("♩ = 72 · 4/4") or on M: BPM, Hold tempo, time signature, a circle per beat to emphasise, volume, sound.
 - Summary: a card per block that started, as now, with the scale and triad figures.

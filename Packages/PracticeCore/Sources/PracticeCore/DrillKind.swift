@@ -10,6 +10,7 @@ public struct DrillKind: Identifiable, Sendable {
         .hearFindIt,
         .fretNameIt,
         .triadPlayIt,
+        .inversions,
     ]
 
     /// Saved in the attempt log: never change it.
@@ -41,6 +42,9 @@ public struct DrillKind: Identifiable, Sendable {
     /// Whether "In order (check)" applies to it.
     public let offersOrder: Bool
 
+    /// Whether the player chooses its inversions.
+    public let offersInversions: Bool
+
     /// What R does, as a button title ("Replay"); nil = nothing.
     public let repeatTitle: String?
 
@@ -48,7 +52,8 @@ public struct DrillKind: Identifiable, Sendable {
 
     public init<Rules: DrillRules>(id: String, module: DrillModule, title: String, instructions: String, symbol: String,
                                    usesKeyboard: Bool = false, needsSound: Bool = false, hidesNote: Bool = false,
-                                   isInSessions: Bool = true, offersOrder: Bool = false, repeatTitle: String? = nil, rules: Rules.Type) {
+                                   isInSessions: Bool = true, offersOrder: Bool = false,
+                                   offersInversions: Bool = false, repeatTitle: String? = nil, rules: Rules.Type) {
         self.id = id
         self.module = module
         self.title = title
@@ -59,6 +64,7 @@ public struct DrillKind: Identifiable, Sendable {
         self.hidesNote = hidesNote
         self.isInSessions = isInSessions
         self.offersOrder = offersOrder
+        self.offersInversions = offersInversions
         self.repeatTitle = repeatTitle
         make = { PromptDrill<Rules>(setup: $0) }
     }
