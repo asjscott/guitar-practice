@@ -59,12 +59,14 @@ public struct PromptDrill<Rules: DrillRules>: Drill {
     public var promptStart: Duration? { phase == .paused ? nil : timerStart }
 
     public var resumesSamePrompt: Bool {
-        guard phase == .paused, wasAnswerableBeforePause, case .samePrompt = rules.resumeRule else { return false }
-        return true
+        phase == .paused && wasAnswerableBeforePause && canHold
     }
 
     public var canHold: Bool {
-        if case .samePrompt = rules.resumeRule { true } else { false }
+        switch rules.resumeRule {
+        case .samePrompt, .samePart: true
+        case .newPrompt: false
+        }
     }
 
     /// The location to light on a right answer.

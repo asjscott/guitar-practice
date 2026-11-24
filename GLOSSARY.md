@@ -102,6 +102,10 @@ _Avoid_: Round, lap, pass
 One scale played once through a position in a set order, such as up and down from its lowest root. (All instances has sweeps instead.)
 _Avoid_: Run, sweep, lap
 
+**Climb**:
+The single prompt of the Inversions drill: one chord on one string set, through every voicing in range by fret, up and back, the highest once.
+_Avoid_: Ladder (that is the tempo ladder), run, sweep, pass
+
 **Clean**:
 Said of a pass whose every expected note was played with no wrong note, timeout, skip or hint. Timing does not affect it.
 _Avoid_: Perfect, correct (for a whole pass)

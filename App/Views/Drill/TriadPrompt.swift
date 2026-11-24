@@ -3,10 +3,11 @@ import SwiftUI
 import TheoryCore
 
 /// A triad drill (P4): what to play and the feedback, with the countdown ring; the neck, showing the whole practised
-/// range; and a circle per string, with its note once played. With no display (idle or paused), the resting text is
+/// range; a climb's line of voicings; and a circle per string, with its note once played. With no display (idle or paused), the resting text is
 /// in place of the circles.
 struct TriadPrompt<Countdown: View, Resting: View>: View {
     let display: DrillDisplay?
+    let hasClimbs: Bool
     let frets: ClosedRange<Int>
     let fretboard: Fretboard
     @ViewBuilder let countdown: Countdown
@@ -22,14 +23,18 @@ struct TriadPrompt<Countdown: View, Resting: View>: View {
                 .padding(16)
                 .sessionCard()
                 .padding(.horizontal, 24)
+            // The same height at rest, so that the neck stays still.
             Group {
                 if let display {
-                    TriadCircles(chips: display.chips)
+                    VStack(spacing: 8) {
+                        if hasClimbs { ClimbLine(voicings: display.voicings) }
+                        TriadCircles(chips: display.chips, size: hasClimbs ? 56 : 72)
+                    }
                 } else {
                     VStack(spacing: 4) { resting }.multilineTextAlignment(.center)
                 }
             }
-            .frame(height: 112)
+            .frame(height: hasClimbs ? 140 : 112)
         }
         .padding(.vertical, 12)
     }
@@ -58,6 +63,7 @@ struct TriadPrompt<Countdown: View, Resting: View>: View {
 /// A circle per string, lowest first.
 private struct TriadCircles: View {
     let chips: [DrillDisplay.Chip]
+    let size: CGFloat
 
     var body: some View {
         HStack(spacing: 40) {
@@ -67,7 +73,7 @@ private struct TriadCircles: View {
                         .fill(chip.state.fill)
                         .overlay { if chip.state == .current { Circle().strokeBorder(Color.accentColor, lineWidth: 2) } }
                         .overlay { Text(chip.text).font(.title.bold()) }
-                        .frame(width: 72, height: 72)
+                        .frame(width: size, height: size)
                     Text(chip.spokenTitle).font(.callout).foregroundStyle(.secondary)
                 }
                 .accessibilityElement()
@@ -77,8 +83,65 @@ private struct TriadCircles: View {
     }
 }
 
-/// Key, String sets, Inversions and Frets.
+/// A climb as a line that rises and falls, with a dot per voicing over its inversion.
+private struct ClimbLine: View {
+    let voicings: [DrillDisplay.Chip]
+
+    private static let spacing: CGFloat = 46
+    private static let rise: CGFloat = 18
+    private static let dotSize: CGFloat = 16
+
+    var body: some View {
+        ZStack {
+            Path { path in path.addLines(voicings.indices.map(center)) }
+                .stroke(Color.secondary.opacity(0.35), lineWidth: 2)
+            ForEach(Array(voicings.enumerated()), id: \.offset) { index, chip in
+                let center = center(index)
+                dot(chip).position(center)
+                Text(chip.title)
+                    .font(.caption.weight(chip.state == .current ? .bold : .regular))
+                    .foregroundStyle(chip.state == .current ? .primary : .secondary)
+                    .position(x: center.x, y: center.y + Self.dotSize + 1)
+                    .accessibilityHidden(true)
+            }
+        }
+        .frame(width: Self.spacing * CGFloat(voicings.count), height: Self.rise + Self.dotSize + 18)
+    }
+
+    /// The highest voicing is in the middle of the line.
+    private func center(_ index: Int) -> CGPoint {
+        let top = voicings.count / 2
+        let drop = top == 0 ? 0 : CGFloat(abs(index - top)) / CGFloat(top)
+        return CGPoint(x: Self.spacing * (CGFloat(index) + 0.5), y: Self.dotSize / 2 + Self.rise * drop)
+    }
+
+    private func dot(_ chip: DrillDisplay.Chip) -> some View {
+        Circle()
+            .fill(Color(nsColor: .windowBackgroundColor))
+            .overlay { Circle().fill(chip.state.dotFill) }
+            .overlay { Circle().strokeBorder(chip.state == .current ? Color.accentColor : .secondary.opacity(0.5), lineWidth: 2) }
+            .frame(width: Self.dotSize, height: Self.dotSize)
+            .accessibilityElement()
+            .accessibilityLabel("\(chip.spokenTitle): \(chip.state.spoken(chip.text))")
+    }
+}
+
+private extension DrillDisplay.Chip.State {
+    /// Stronger than `fill`, for a dot.
+    var dotFill: Color {
+        switch self {
+        case .waiting: .clear
+        case .current: .accentColor.opacity(0.25)
+        case .found: .green
+        case .timedOut: .orange
+        case .skipped: .gray
+        }
+    }
+}
+
+/// Key, String sets, Inversions (where the drill offers them) and Frets.
 struct TriadOptions: View {
+    let kind: DrillKind
     @Binding var options: DrillOptions
 
     var body: some View {
@@ -94,10 +157,12 @@ struct TriadOptions: View {
             ForEach(StringSet.allCases, id: \.self) { Toggle($0.name, isOn: included($0, in: \.stringSets)) }
         }
         .help("String sets")
-        Menu(title("Inversions", options.inversions, of: Triad.Inversion.allCases, name: \.shortName)) {
-            ForEach(Triad.Inversion.allCases, id: \.self) { Toggle($0.name, isOn: included($0, in: \.inversions)) }
+        if kind.offersInversions {
+            Menu(title("Inversions", options.inversions, of: Triad.Inversion.allCases, name: \.shortName)) {
+                ForEach(Triad.Inversion.allCases, id: \.self) { Toggle($0.name, isOn: included($0, in: \.inversions)) }
+            }
+            .help("Inversions")
         }
-        .help("Inversions")
         FretsPicker(frets: $options.frets)
     }
 
@@ -119,15 +184,5 @@ struct TriadOptions: View {
                     options[keyPath: choices].remove(choice)
                 }
             })
-    }
-}
-
-private extension Triad.Inversion {
-    var shortName: String {
-        switch self {
-        case .root: "root"
-        case .first: "1st"
-        case .second: "2nd"
-        }
     }
 }

@@ -94,7 +94,7 @@ struct DrillView: View {
     }
 
     private var triads: some View {
-        TriadPrompt(display: model.snapshot.display, frets: model.options.frets, fretboard: model.fretboard) {
+        TriadPrompt(display: model.snapshot.display, hasClimbs: model.kind == .inversions, frets: model.options.frets, fretboard: model.fretboard) {
             TriadCountdown(model: model)
         } resting: {
             DrillRestingText(model: model)
@@ -136,7 +136,7 @@ private struct DrillOptionsBar: View {
         switch model.kind.module {
         case .notes: NoteOptions(model: model)
         case .scales: EmptyView()
-        case .triads: TriadOptions(options: $model.options)
+        case .triads: TriadOptions(kind: model.kind, options: $model.options)
         }
     }
 }

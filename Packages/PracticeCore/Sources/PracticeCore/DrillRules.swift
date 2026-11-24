@@ -112,6 +112,9 @@ public enum DrillResumeRule: Hashable, Sendable {
     case newPrompt
     /// The same prompt with its timer restarted.
     case samePrompt(keepingWrongAnswers: Bool)
+    /// The rules' next prompt, which goes back to the start of what the old one was part of. To the player it is the
+    /// same prompt.
+    case samePart
 }
 
 extension DrillRules {

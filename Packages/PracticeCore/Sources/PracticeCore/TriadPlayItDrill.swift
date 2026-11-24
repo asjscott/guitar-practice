@@ -4,7 +4,8 @@ extension DrillKind {
     public static let triadPlayIt = DrillKind(
         id: "triadPlayIt", module: .triads, title: "Triad → play it",
         instructions: "Arpeggiate the triad on the strings shown, low to high.",
-        symbol: "triangle", hidesNote: true, isInSessions: false, rules: TriadPlayItRules.self)
+        symbol: "triangle", hidesNote: true, isInSessions: false, offersInversions: true,
+        rules: TriadPlayItRules.self)
 }
 
 extension TriadFacts {
@@ -98,35 +99,41 @@ public struct TriadPlayItRules: DrillRules {
     }
 
     public func display(of moment: DrillMoment) -> DrillDisplay {
-        var display = DrillDisplay(standard: moment, in: setup)
-        guard let asked else { return display }
+        guard let asked else { return DrillDisplay(standard: moment, in: setup) }
         let played = moment.attempts.filter { $0.group?.number == group && $0.outcome == .answered }
-        let isOver = display.result == .timedOut || played.count == asked.noteCount
-        let tones = asked.triad.tones(in: asked.inversion)
+        return DrillDisplay(triad: asked, at: revealed?.locations ?? [], played: played, moment: moment, in: setup)
+    }
+}
+
+extension DrillDisplay {
+    /// A voicing being arpeggiated, with the notes played so far; the rest are hidden until it is over.
+    init(triad facts: TriadFacts, at locations: [FretboardLocation], played: [Attempt], moment: DrillMoment, in setup: DrillSetup) {
+        self.init(standard: moment, in: setup)
+        let isOver = result == .timedOut || played.count == facts.noteCount
+        let tones = facts.triad.tones(in: facts.inversion)
         let tuning = setup.fretboard.tuning
 
-        display.headline = asked.text
-        display.subline = asked.stringSet.name
-        display.highlightedStrings = Set(asked.stringSet.strings)
+        headline = facts.text
+        subline = facts.stringSet.name
+        highlightedStrings = Set(facts.stringSet.strings)
         // Until it is over, the earlier notes would give the voicing away.
-        display.markers = (revealed?.locations ?? []).enumerated().compactMap { index, location in
+        markers = locations.enumerated().compactMap { index, location in
             guard isOver || index == played.count - 1 else { return nil }
-            return DrillDisplay.Marker(location: location, label: tones[index].description, isAnswer: tones[index] == asked.triad.root,
-                                       isLastPlayed: index == played.count - 1)
+            return Marker(location: location, label: tones[index].description, isAnswer: tones[index] == facts.triad.root,
+                          isLastPlayed: index == played.count - 1)
         }
-        display.chips = asked.stringSet.strings.enumerated().map { index, string in
-            let state: DrillDisplay.Chip.State = if index < played.count { .found } else if isOver { .timedOut }
-                else { index == place ? .current : .waiting }
+        chips = facts.stringSet.strings.enumerated().map { index, string in
+            let state: Chip.State = if index < played.count { .found } else if isOver { .timedOut }
+                else { index == played.count ? .current : .waiting }
             let isNamed = index < played.count || isOver
-            return DrillDisplay.Chip(title: "\(tuning.stringNumber(ofString: string))", spokenTitle: tuning.stringLabel(ofString: string),
-                                     text: isNamed ? tones[index].description : "?", state: state)
+            return Chip(title: "\(tuning.stringNumber(ofString: string))", spokenTitle: tuning.stringLabel(ofString: string),
+                        text: isNamed ? tones[index].description : "?", state: state)
         }
-        if display.result == .wrong, moment.wrongAnswers.last?.pitchClass == moment.prompt.pitchClass {
-            display.feedback += ", in another octave"
-        } else if display.result == .right {
-            display.feedback = "\(secondsText(played.compactMap(\.responseTime).reduce(.zero, +), decimals: 2)) s"
+        if result == .wrong, moment.wrongAnswers.last?.pitchClass == moment.prompt.pitchClass {
+            feedback += ", in another octave"
+        } else if result == .right {
+            feedback = "\(secondsText(played.compactMap(\.responseTime).reduce(.zero, +), decimals: 2)) s"
         }
-        return display
     }
 }
 
