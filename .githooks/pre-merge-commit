@@ -1,0 +1,3 @@
+#!/bin/bash
+# A clean merge doesn't run pre-commit.
+exec "$(git rev-parse --show-toplevel)/scripts/check"

@@ -1,5 +1,6 @@
 #if DEBUG
 import AppKit
+import ListenCore
 import PracticeCore
 import SwiftData
 import TheoryCore
