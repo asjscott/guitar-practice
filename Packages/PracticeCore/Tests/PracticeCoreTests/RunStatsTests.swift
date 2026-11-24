@@ -60,6 +60,23 @@ struct RunStatsTests {
         #expect(stats.medianResponseTime == s(0.9))
     }
 
+    @Test func aSweepIsOnePrompt() {
+        func attempt(_ sweep: Int, _ outcome: Attempt.Outcome, _ time: Double? = nil) -> Attempt {
+            Attempt(prompt: NotePrompt(name: .c, string: 0, target: FretboardLocation(string: 0, fret: 8), sweep: sweep),
+                    outcome: outcome, responseTime: time.map(s))
+        }
+        let whole = (0..<3).flatMap { sweep in (0..<6).map { attempt(sweep, .answered, Double($0 + 1)) } }
+        #expect(RunStats(attempts: whole).prompts == 3)
+
+        // A partial sweep counts once, as soon as it has an attempt. The rest is per attempt.
+        let stats = RunStats(attempts: whole + [attempt(3, .timedOut), attempt(3, .skipped), attempt(4, .skipped)])
+        #expect(stats.prompts == 5)
+        #expect(stats.skips == 2)
+        #expect(stats.firstTryAccuracy == 18.0 / 19)
+        #expect(stats.medianResponseTime == s(3.5))
+        #expect(RunStats(attempts: [attempt(0, .skipped)]).firstTryAccuracy == nil)
+    }
+
     @Test func emptyRunHasNoAccuracyOrMedian() {
         let stats = RunStats(attempts: [])
         #expect(stats.prompts == 0)

@@ -1,26 +1,24 @@
 import SwiftUI
 import TheoryCore
 
-/// The main window's root: a sidebar of screens (Explorer · Tuner · Drill) and the selected
-/// screen as the detail. Remembers the selected screen per window; Explorer on first launch.
+/// The main window's root: a sidebar of screens (Session · Explorer · Tuner · Drill) and the selected
+/// screen as the detail. Remembers the selected screen per window; Session on first launch.
 ///
-/// Owns the explorer's (unpersisted) state, so it survives switching screens, and feeds the
+/// Owns the session's, free practice's and the explorer's (unpersisted) state, so it survives switching screens, and feeds the
 /// persisted tuning, capo and position system from Settings into it, live.
 struct ContentView: View {
-    @SceneStorage("main.screen") private var screen: Screen = .explorer
+    @SceneStorage("main.screen") private var screen: Screen = .session
+    @State private var session = SessionViewModel()
+    @State private var sessionID = UUID()
+    @Environment(ActiveSessions.self) private var activeSessions: ActiveSessions?
+    @State private var drill = DrillViewModel()
     @State private var explorer = ExplorerViewModel()
     @AppStorage(InstrumentSettings.Key.positionSystem) private var positionSystem = InstrumentSettings.defaultPositionSystem
 
     var body: some View {
         NavigationSplitView {
-            List(selection: selection) {
-                Section("Practice") {
-                    ForEach(Screen.allCases) { screen in
-                        Label(screen.title, systemImage: screen.icon).tag(screen)
-                    }
-                }
-            }
-            .navigationSplitViewColumnWidth(min: 160, ideal: 180)
+            Sidebar(selection: selection, pausedScreens: pausedScreens)
+                .navigationSplitViewColumnWidth(min: 160, ideal: 180)
         } detail: {
             detail
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -28,6 +26,13 @@ struct ContentView: View {
         .followsInstrumentSettings { tuning, capo in
             explorer.tuning = tuning
             explorer.capo = capo
+        }
+        .onChange(of: session.isActive) { activeSessions?.set(sessionID, isActive: session.isActive) }
+        .onDisappear {
+            // The window closed, so there is no way back to a paused session or run.
+            session.end()
+            drill.stop()
+            activeSessions?.set(sessionID, isActive: false)
         }
         .onChange(of: positionSystem, initial: true) {
             explorer.positionSystem = positionSystem
@@ -39,23 +44,50 @@ struct ContentView: View {
         Binding(get: { screen }, set: { if let newScreen = $0 { screen = newScreen } })
     }
 
+    private var pausedScreens: Set<Screen> {
+        var screens = Set<Screen>()
+        if session.stage == .paused { screens.insert(.session) }
+        if drill.isPaused { screens.insert(.drill) }
+        return screens
+    }
+
     @ViewBuilder private var detail: some View {
         switch screen {
+        case .session: SessionView(model: session)
         case .explorer: ExplorerView(model: explorer)
         case .tuner: TunerView()
-        case .drill: DrillView()
+        case .drill: DrillView(model: drill)
+        }
+    }
+}
+
+/// The sidebar's list of screens. One with paused practice says so.
+struct Sidebar: View {
+    let selection: Binding<Screen?>
+    let pausedScreens: Set<Screen>
+
+    var body: some View {
+        List(selection: selection) {
+            Section("Practice") {
+                ForEach(Screen.allCases) { screen in
+                    Label(screen.title, systemImage: screen.icon)
+                        .badge(pausedScreens.contains(screen) ? Text("Paused") : nil)
+                        .tag(screen)
+                }
+            }
         }
     }
 }
 
 /// A screen in the main window's sidebar. The raw value is what `@SceneStorage` saves.
 enum Screen: String, CaseIterable, Identifiable {
-    case explorer, tuner, drill
+    case session, explorer, tuner, drill
 
     var id: Self { self }
 
     var title: String {
         switch self {
+        case .session: "Session"
         case .explorer: "Explorer"
         case .tuner: "Tuner"
         case .drill: "Drill"
@@ -64,6 +96,7 @@ enum Screen: String, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
+        case .session: "timer"
         case .explorer: "guitars"
         case .tuner: "tuningfork"
         case .drill: "target"
@@ -73,5 +106,8 @@ enum Screen: String, CaseIterable, Identifiable {
 
 #Preview {
     ContentView()
+        .environment(AudioInputService(isInert: true))
+        .environment(AppSoundOutput(isInert: true))
+        .environment(AttemptLog.inMemory())
         .frame(width: 1100, height: 420)
 }

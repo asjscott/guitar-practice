@@ -6,11 +6,9 @@ Full spec and roadmap: Claude Docs `c1631de5-f295-4bd8-a9fe-f1c1948a980d`. Befor
 
 ## Current phase
 
-**Phase 2 · Session MVP.** Scope: All instances, Hear → find it and Fret → name it drills; time budget input, daily theme seed, block planner, block player; auto-advance, keyboard shortcuts, end-of-block chime; SwiftData attempt log and session summary. Done when: a timed notes session runs start to finish.
+**Phase 3 · Scales and triads.** Scope: scale drills in position with metronome, memory-mode fade; triad drills by string set and inversion (arpeggiated); the theme applies across notes, scales and triads blocks. The spec and tickets aren't written yet.
 
-Also in Phase 2: the input-device bug, #20.
-
-Phases 0 (spec #1) and 1 (spec #11) are complete.
+Phases 0 (spec #1), 1 (spec #11) and 2 (spec #21) are complete.
 
 Phase order: 0 Foundations → 1 Hear the guitar → 2 Session MVP → 3 Scales and triads → 4 Backing and progressions → 5 Lick → solo → 6 Adaptive and polish. Don't start work from a later phase unless asked.
 
@@ -29,6 +27,7 @@ git config core.hooksPath .githooks   # once per clone: the pre-commit hook runs
 scripts/check                         # repo rules + all package tests, ~10 s
 scripts/check --build                 # the same, then generates the project and builds the app
 scripts/snapshot                      # renders each screen to build/snapshots/*.png
+scripts/log-check                     # logs practice, relaunches and compares, in a throwaway store
 ```
 
 Run `scripts/check` after package changes and `scripts/check --build` after app changes. Fix failures before moving on.
@@ -42,7 +41,7 @@ To see a UI change, run `scripts/snapshot` and read the PNGs (screen recording i
 - **Layers:** Views → Session engine / Exercise modules / Progress engine → TheoryCore + Audio engine → SwiftData. Lower layers never import higher ones.
 - Before changing the fretboard, explorer or Settings, read `docs/ui.md`.
 - Use `@Observable` for view state; keep views thin.
-- SwiftData models live in `App/Models` only.
+- SwiftData models live in `App/Models` only. Run `scripts/log-check` after changing them. The player's store is opened only by `AttemptLog.live()`; snapshots and previews use `.inMemory()`.
 - No new dependencies without asking first.
 
 ## Music conventions (TheoryCore)

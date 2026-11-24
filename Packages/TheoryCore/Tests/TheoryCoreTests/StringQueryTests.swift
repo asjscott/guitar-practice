@@ -33,6 +33,34 @@ struct StringQueryTests {
         #expect(capo2.locations(of: PitchClass(4), onString: 0, frets: 0...12).map(\.fret) == [12])
     }
 
+    @Test func locationsByTheirIntervalAboveTheOpenString() {
+        func frets(capo: Int = 0, string: Int = 0, within range: ClosedRange<Int>) -> [Int] {
+            Fretboard(tuning: .standard, capo: capo)
+                .locations(onString: string, frets: range, aboveOpen: Interval(1)...Interval(12)).map(\.fret)
+        }
+        #expect(frets(within: 0...22) == Array(1...12))
+        #expect(frets(within: 0...3) == [1, 2, 3])
+        // With a capo the open string sounds at the capo.
+        #expect(frets(capo: 5, string: 5, within: 0...22) == Array(6...17))
+        // Capo 12: the neck ends 10 frets up.
+        #expect(frets(capo: 12, within: 0...22) == Array(13...22))
+        #expect(frets(capo: 12, within: 0...12) == [])
+    }
+
+    @Test(arguments: [TuningPreset.dropD, .dadgad, .openG], [0, 3, 12])
+    func intervalsAboveTheOpenStringInOtherTunings(preset: TuningPreset, capo: Int) {
+        let board = Fretboard(tuning: preset.tuning, capo: capo)
+        let intervals = Interval(1)...Interval(12)
+        for string in board.strings {
+            let found = board.locations(onString: string, frets: 0...22, aboveOpen: intervals)
+            #expect(found.allSatisfy { $0.string == string && (capo...22).contains($0.fret) })
+            #expect(found.allSatisfy { intervals.contains(board.pitch(at: $0) - board.soundingOpenPitch(ofString: string)) })
+            // A fret per semitone, in order and none missing.
+            #expect(found.map(\.fret) == Array(capo + 1...min(capo + 12, 22)))
+            #expect(board.locations(onString: string, frets: 0...12, aboveOpen: intervals) == found.filter { $0.fret <= 12 })
+        }
+    }
+
     @Test func exactPitchOnOneStringWithinFrets() {
         // E3 (52) on string 6 is fret 12; E2 (40) is fret 0.
         #expect(standard.location(of: Pitch(52), onString: 0, frets: 0...12) == FretboardLocation(string: 0, fret: 12))

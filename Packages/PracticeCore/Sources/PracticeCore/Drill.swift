@@ -1,0 +1,122 @@
+import TheoryCore
+
+/// What a drill is doing now.
+public enum DrillPhase: Hashable, Sendable {
+    /// Not running: before Start, after Stop, or after an "In order (check)" run ends.
+    case idle
+    /// A prompt is up; no answer yet.
+    case waiting
+    /// The last answer was wrong (this pitch class); the prompt stays up.
+    case wrong(PitchClass)
+    /// The prompt was answered here; the next prompt follows shortly.
+    case correct(FretboardLocation)
+    /// No right answer in time; the right locations are revealed.
+    case timedOut
+    /// Paused: the prompt is hidden and the clock stopped.
+    case paused
+}
+
+/// Something that happens to a drill, with its time on the drill's clock.
+public enum DrillEvent: Hashable, Sendable {
+    case start(at: Duration)
+    case pause(at: Duration)
+    case resume(at: Duration)
+    case stop(at: Duration)
+    /// A played note: its pitch and onset, handled at time `at` (when it was detected).
+    case played(Pitch, onset: Duration, at: Duration)
+    /// A note name, typed and submitted.
+    case typed(NoteName, at: Duration)
+    /// Move on from the prompt without a reveal.
+    case skip(at: Duration)
+    /// R: what it does is up to the drill.
+    case `repeat`(at: Duration)
+    /// The sounds just asked for were sent to the output, to be heard `latency` later.
+    case soundStarted(at: Duration, latency: Duration)
+    /// Answers can't be heard until then: the prompt that is up, and any that follows, isn't timed before it.
+    /// For drills that can be held (`canHold`); pausing drops it.
+    case hold(until: Duration)
+    /// The clock moved on; timeouts and the next prompt happen on ticks.
+    case tick(at: Duration)
+}
+
+/// One tone a drill wants heard.
+public struct DrillTone: Hashable, Sendable {
+    public let pitch: Pitch
+    public let duration: Duration
+
+    public init(pitch: Pitch, duration: Duration) {
+        self.pitch = pitch
+        self.duration = duration
+    }
+}
+
+/// Tones to play one after another, starting at a time on the drill's clock.
+public struct DrillSoundRequest: Hashable, Sendable {
+    public let tones: [DrillTone]
+    public let at: Duration
+
+    public init(tones: [DrillTone], at: Duration) {
+        self.tones = tones
+        self.at = at
+    }
+}
+
+/// The one interface to every drill: a pure state machine driven by events and a clock.
+///
+/// Free practice and the session player feed it events with times on one clock (played notes' onsets use the
+/// same clock). It shows a prompt, checks answers against it, times them, and moves on by itself.
+public protocol Drill: Sendable {
+    var kind: DrillKind { get }
+    var setup: DrillSetup { get }
+    var phase: DrillPhase { get }
+
+    /// The prompt on screen; nil when idle or paused.
+    var prompt: NotePrompt? { get }
+
+    /// Every attempt in this run, oldest first.
+    var attempts: [Attempt] { get }
+
+    /// When the current prompt's timer starts; nil when idle or paused.
+    var promptStart: Duration? { get }
+
+    /// How long a prompt waits for an answer.
+    var timeLimit: Duration { get }
+
+    /// Time left before the current prompt times out, while it is waiting for an answer.
+    func timeRemaining(at now: Duration) -> Duration?
+
+    /// While paused: whether resuming continues the same prompt rather than giving a new one.
+    var resumesSamePrompt: Bool { get }
+
+    /// Whether `hold` does anything: the prompt that is up is kept, as it is when resuming.
+    var canHold: Bool { get }
+
+    /// What to show for the current prompt; nil when idle or paused.
+    var display: DrillDisplay? { get }
+
+    /// Why Start would show nothing; nil when there is something to prompt.
+    var nothingToPromptReason: String? { get }
+
+    mutating func handle(_ event: DrillEvent)
+
+    /// The sounds asked for since the last call: call it after every event. A new prompt, pausing and stopping
+    /// drop any not yet taken; the caller also stops what is playing then.
+    mutating func takeSounds() -> [DrillSoundRequest]
+}
+
+extension Drill {
+    /// True from Start until Stop (or the end of an "In order (check)" run), paused included.
+    public var isRunning: Bool { phase != .idle }
+
+    /// An "In order (check)" run, which is never logged.
+    public var isCheckRun: Bool { kind.offersOrder && setup.options.order == .inOrder }
+
+    /// This run's attempts as the attempt log wants them, oldest first: none from a check run (ADR 0003).
+    public var attemptsToLog: [Attempt] { isCheckRun ? [] : attempts }
+
+    public var fretboard: Fretboard { setup.fretboard }
+    public var options: DrillOptions { setup.options }
+
+    /// Stats for this run's attempts so far.
+    public var stats: RunStats { RunStats(attempts: attempts) }
+}

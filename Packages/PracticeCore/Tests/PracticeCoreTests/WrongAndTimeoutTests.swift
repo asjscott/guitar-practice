@@ -85,15 +85,17 @@ struct TimingTests {
         #expect(drill.attempts.first?.responseTime == s(1.25))
     }
 
-    @Test func resumeKeepsTheWrongNotesSoFar() {
+    @Test func resumeDropsTheWrongNotesWithTheOldPrompt() {
         var drill = lowEDrill()
         drill.handle(.played(Pitch(43), onset: s(1), at: s(1.1)))
         drill.handle(.pause(at: s(2)))
         drill.handle(.resume(at: s(5)))
-        #expect(drill.phase == .wrong(PitchClass(7)))
+        #expect(drill.phase == .waiting)
+        #expect(drill.attempts.isEmpty)
+        // A check walks every location, so it asks for the same one again, as a new prompt.
         drill.handle(.played(Pitch(40), onset: s(6), at: s(6.1)))
-        #expect(drill.attempts.first?.wrongNotes == [PitchClass(7)])
-        #expect(drill.attempts.first?.firstRight == false)
+        #expect(drill.attempts.first?.wrongNotes == [])
+        #expect(drill.attempts.first?.firstRight == true)
         #expect(drill.attempts.first?.responseTime == s(1))
     }
 

@@ -16,6 +16,35 @@ The look and behaviour settled in Phase 0. Keep to these when changing a screen.
 - Key, scale, position and triad (string set, inversion) pickers in the native window toolbar. Not persisted; defaults are C major, CAGED E shape.
 - A header naming key, scale and position, with the notes as chips (root highlighted); the fretboard in a rounded card; a status bar with the legend (root / scale or chord tone).
 
+## Drill
+
+- A drill picker at the left of the toolbar, from `DrillKind.all`. Options are shared by every drill and not persisted; Order shows only for drills that offer it.
+- The neck and target card (`App/Views/Drill/DrillTarget.swift`) draw a `DrillDisplay`, for any drill, on both the Drill and session screens.
+- Pause hides the prompt; Resume gives a new one and drops the old. An "In order (check)" run asks for the same location again, as a new prompt, so that none is missed.
+- In a drill answered by typing, `.typesNoteNames` (`App/Views/Drill/NoteNameKeys.swift`) takes A–G, # and b, Backspace and Return before focused controls, the sidebar or shortcuts see them; what is typed replaces the headline. No shortcut uses A–G.
+- S skips with no reveal: grey in the attempt strip, and in neither accuracy nor median.
+- Where the drill hides the note (Hear → find it shows ♪, Fret → name it ?), a skip shows – in the attempt strip.
+- Leaving the screen, sleep and losing the input (or access to it) pause a run, as they do a session, with the reason on the card. A paused run is still there on coming back; the sidebar shows a "Paused" badge. Closing the window ends it.
+- Start, and Resume, are disabled until microphone access is given and there is an input, with the reason on the card.
+- Prompt counts, here and in summaries, count a sweep as one prompt, from its first attempt on. Accuracy, median and skips are per attempt.
+- Hear → find it is timed from the target being heard, output latency included.
+- A drill that needs sound pauses if the output fails, with the reason on the card. No output device disables Start.
+- Start is disabled, with the reason on the card, when nothing can be prompted.
+
+## Session
+
+- First in the sidebar, and the first-launch default. S4 on branch `prototype/phase2-screens`.
+- Setup: the theme (key large, position under it) with Reroll until the day's first session has started; minutes with − and +, Start (↩), the planned blocks, then Naturals / All notes and First 12 frets / Whole neck. Start is disabled, with the reason under it, when nothing can be heard or prompted, or microphone access hasn't been given yet.
+- The drills bar stays on top through Ready cards and drills: time left per block (orange and counting up in overtime), or time spent once it is over, then "Ends 18:42".
+- + (or =) extends the block while it plays. Chimes sound only in a gap, and the next prompt, or the next block's first, waits for them to end. In a sweep the next location stays up without its ring, S and R work, and notes from before the chime still count; a card that would say "Listening…" says "Wait for the chime".
+- With no output, Setup says so and the plan leaves out drills that need sound; chimes flash the screen orange. Losing it mid-block pauses; Resume then goes on without a drill that needs sound.
+- Keys go through `onPlainKey`, which sees them before any focused control: Space, Return, S and R work whatever has focus, and held-down repeats do nothing.
+- A session keeps the tuning, capo and theme it started with; Settings locks the tuning, capo and position system until it ends. The theme is in the status bar while it goes.
+- P pauses, on a Ready card too, which then counts down afresh. Leaving the screen, sleep and losing the input (or access to it) pause, with the reason for the last two on the Paused screen; the sidebar shows a "Paused" badge. Without an input or access, Resume is disabled.
+- Esc pauses and asks "End session?" on the Paused screen: Return ends, Esc stays paused, P resumes. Its End session button doesn't ask.
+- Closing the window ends the session early.
+- The summary shows a card per block that started; one where nothing was answered shows no speed.
+
 ## Settings
 
 - Persisted with `@AppStorage`, not SwiftData.

@@ -138,3 +138,11 @@ struct KeySpellingTests {
         #expect(Key.minor(.dSharp).shortName == "D♯m")
     }
 }
+
+@Suite("A key's own scale")
+struct KeyScaleTests {
+    @Test func majorOrNaturalMinorOnTheTonic() {
+        #expect(Key.major(.bFlat).scale == Scale(.major, tonic: .bFlat))
+        #expect(Key.minor(.dSharp).scale == Scale(.naturalMinor, tonic: .dSharp))
+    }
+}

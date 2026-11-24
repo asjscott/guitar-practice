@@ -4,12 +4,17 @@ import TheoryCore
 /// Settings › Instrument: tuning, capo and position system, persisted with `@AppStorage`.
 ///
 /// Picking a preset sets every string; stepping any string switches the picker to Custom.
-/// Each string is limited to MIDI 24–72 by TheoryCore; re-entrant tunings are allowed.
+/// Each string is limited to MIDI 24–72 by TheoryCore; re-entrant tunings are allowed. All of it is
+/// disabled while a session is active.
 struct InstrumentSettingsView: View {
     @AppStorage(InstrumentSettings.Key.tuningChoice) private var storedChoice = InstrumentSettings.defaultTuningChoice
     @AppStorage(InstrumentSettings.Key.openPitches) private var storedOpenPitches = InstrumentSettings.defaultOpenPitches
     @AppStorage(InstrumentSettings.Key.capo) private var storedCapo = InstrumentSettings.defaultCapo
     @AppStorage(InstrumentSettings.Key.positionSystem) private var positionSystem = InstrumentSettings.defaultPositionSystem
+
+    @Environment(ActiveSessions.self) private var activeSessions: ActiveSessions?
+
+    private var isLocked: Bool { activeSessions?.isAny == true }
 
     private var tuning: Tuning { InstrumentSettings.tuning(from: storedOpenPitches) }
 
@@ -30,6 +35,9 @@ struct InstrumentSettingsView: View {
 
     var body: some View {
         Form {
+            if isLocked {
+                Label("Locked until the session ends.", systemImage: "lock.fill").foregroundStyle(.secondary)
+            }
             Section("Tuning") {
                 Picker("Tuning", selection: choice) {
                     ForEach(TuningChoice.allCases, id: \.self) { Text($0.name).tag($0) }
@@ -39,6 +47,7 @@ struct InstrumentSettingsView: View {
                     stringRow(string)
                 }
             }
+            .disabled(isLocked)
 
             Section("Capo") {
                 Picker("Capo", selection: capo) {
@@ -46,6 +55,7 @@ struct InstrumentSettingsView: View {
                     ForEach(1...Fretboard.capoFrets.upperBound, id: \.self) { Text("Fret \($0)").tag($0) }
                 }
             }
+            .disabled(isLocked)
 
             Section {
                 Picker("Position system", selection: $positionSystem) {
@@ -58,6 +68,7 @@ struct InstrumentSettingsView: View {
                 Text(positionsFooter)
                     .foregroundStyle(.secondary)
             }
+            .disabled(isLocked)
         }
         .formStyle(.grouped)
         .frame(width: 420)

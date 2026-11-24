@@ -6,6 +6,7 @@ enum Main {
     @MainActor static func main() {
         #if DEBUG
         if Snapshots.isRequested { Snapshots.run() }
+        if LogCheck.isRequested { LogCheck.run() }
         #endif
         GuitarPracticeApp.main()
     }
@@ -15,11 +16,23 @@ struct GuitarPracticeApp: App {
     /// The app's one audio input, shared by every listening screen in every window.
     @State private var audioInput = AudioInputService()
 
+    /// The app's one sound output.
+    @State private var soundOutput = AppSoundOutput()
+
+    /// The app's one attempt log.
+    @State private var log = AttemptLog.live()
+
+    /// The sessions going, in any window.
+    @State private var activeSessions = ActiveSessions()
+
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .frame(minWidth: 1100, minHeight: 400)
                 .environment(audioInput)
+                .environment(soundOutput)
+                .environment(log)
+                .environment(activeSessions)
         }
         .commands {
             // Replace the system "Settings…" item with one that explicitly activates
@@ -32,6 +45,7 @@ struct GuitarPracticeApp: App {
         Settings {
             SettingsView()
                 .environment(audioInput)
+                .environment(activeSessions)
         }
     }
 }

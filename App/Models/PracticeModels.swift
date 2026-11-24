@@ -1,0 +1,114 @@
+import Foundation
+import PracticeCore
+import SwiftData
+import TheoryCore
+
+// The current version's models. `LoggedAttempt` is the saved record; PracticeCore's `Attempt` is the drill's.
+typealias PracticeSession = PracticeSchemaV1.Session
+typealias LoggedAttempt = PracticeSchemaV1.Attempt
+typealias DayTheme = PracticeSchemaV1.DayTheme
+
+enum PracticeMigrationPlan: SchemaMigrationPlan {
+    static var schemas: [any VersionedSchema.Type] { [PracticeSchemaV1.self] }
+    static var stages: [MigrationStage] { [] }
+}
+
+extension Theme {
+    /// As `Session` and `DayTheme` save it; nil if that is unusable.
+    fileprivate init?(tonic: Int?, mode: String?, system: String?, number: Int?, octave: Int?) {
+        guard let tonic, let mode = mode.flatMap(Key.Mode.init), let system = system.flatMap(Position.System.init),
+              let number, let octave else { return nil }
+        self.init(key: .app(tonic: PitchClass(tonic), mode: mode),
+                  position: Position.ID(system: system, number: number, octave: octave))
+    }
+}
+
+extension DayTheme {
+    convenience init(day: String, theme: Theme, rerolls: Int = 0) {
+        self.init(day: day, rerolls: rerolls, tonic: theme.key.tonic.pitchClass.value, mode: theme.key.mode.rawValue,
+                  positionSystem: theme.position.system.rawValue, positionNumber: theme.position.number,
+                  positionOctave: theme.position.octave)
+    }
+
+    /// Nil only if what is saved is unusable.
+    var theme: Theme? {
+        get { Theme(tonic: tonic, mode: mode, system: positionSystem, number: positionNumber, octave: positionOctave) }
+        set {
+            guard let newValue else { return }
+            tonic = newValue.key.tonic.pitchClass.value
+            mode = newValue.key.mode.rawValue
+            positionSystem = newValue.position.system.rawValue
+            positionNumber = newValue.position.number
+            positionOctave = newValue.position.octave
+        }
+    }
+}
+
+extension PracticeSession {
+    var state: SessionState {
+        get { SessionState(rawValue: stateRaw) ?? .endedEarly }
+        set { stateRaw = newValue.rawValue }
+    }
+
+    /// Nil in a session without a theme.
+    var theme: Theme? {
+        get {
+            Theme(tonic: themeTonic, mode: themeMode, system: themePositionSystem, number: themePositionNumber,
+                  octave: themePositionOctave)
+        }
+        set {
+            themeTonic = newValue?.key.tonic.pitchClass.value
+            themeMode = newValue?.key.mode.rawValue
+            themePositionSystem = newValue?.position.system.rawValue
+            themePositionNumber = newValue?.position.number
+            themePositionOctave = newValue?.position.octave
+        }
+    }
+}
+
+extension LoggedAttempt {
+    /// The record of an attempt at a drill, ending now.
+    convenience init(_ attempt: Attempt, in drill: any Drill, date: Date, source: AttemptSource, sweepID: UUID?,
+                     blockIndex: Int?) {
+        let fretboard = drill.fretboard
+        let location = attempt.prompt.target ?? attempt.location
+        self.init(date: date, sourceRaw: source.rawValue, drill: drill.kind.id,
+                  tuning: fretboard.tuning.openPitches.map(\.midi), capo: fretboard.capo,
+                  targetName: attempt.prompt.noteName, targetPitchClass: attempt.prompt.pitchClass.value,
+                  targetString: attempt.prompt.string, targetFret: location?.fret,
+                  targetPitch: location.map { fretboard.pitch(at: $0).midi },
+                  outcomeRaw: attempt.outcome.rawValue, firstRight: attempt.firstRight,
+                  responseSeconds: attempt.responseTime.map { $0 / .seconds(1) },
+                  wrongAnswers: attempt.rawWrongAnswers.map(WrongAnswerRecord.init), sweepID: sweepID,
+                  blockIndex: blockIndex)
+    }
+
+    var source: AttemptSource? { AttemptSource(rawValue: sourceRaw) }
+    var outcome: Attempt.Outcome? { Attempt.Outcome(rawValue: outcomeRaw) }
+}
+
+extension WrongAnswerRecord {
+    init(_ answer: DrillAnswer) {
+        switch answer {
+        case .played(let pitch): self.init(pitch: pitch.midi)
+        case .named(let name): self.init(name: name.description)
+        }
+    }
+}
+
+extension Calendar {
+    /// The local calendar day, as `Session.day` and `DayTheme.day` save it: "2026-07-25".
+    static func practiceDay(of date: Date) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        let day = calendar.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", day.year ?? 0, day.month ?? 0, day.day ?? 0)
+    }
+
+    /// A count of local calendar days, one more each day.
+    static func dayNumber(of date: Date) -> Int {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        return calendar.ordinality(of: .day, in: .era, for: date) ?? 0
+    }
+}
