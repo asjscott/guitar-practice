@@ -4,8 +4,8 @@ import Observation
 import SwiftUI
 import TheoryCore
 
-enum ProtoVariant: String, CaseIterable { case p1 = "P1", p2 = "P2", p3 = "P3"
-    var title: String { switch self { case .p1: "Card (as Phase 2)"; case .p2: "Wide neck + contour"; case .p3: "Metronome rail + close-up" } }
+enum ProtoVariant: String, CaseIterable { case p1 = "P1", p2 = "P2", p3 = "P3", p4 = "P4"
+    var title: String { switch self { case .p1: "Card (as Phase 2)"; case .p2: "Wide neck + contour"; case .p3: "Metronome rail + close-up"; case .p4: "Mix: P1 + P2, zoomed" } }
 }
 enum ProtoScene: String, CaseIterable { case setup, countIn, pass, wrong, triad, metronome, summary }
 enum ProtoStage: String, CaseIterable { case shown = "Shown", faded = "Faded", hidden = "Hidden" }
@@ -89,6 +89,7 @@ struct ProtoScreen: View {
             case .p1: ProtoP1(m: model)
             case .p2: ProtoP2(m: model)
             case .p3: ProtoP3(m: model)
+            case .p4: ProtoP4(m: model)
             }
         }
         .overlay(alignment: .bottom) { if showsSwitcher { switcher.padding(.bottom, 40) } }

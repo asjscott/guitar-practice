@@ -12,6 +12,7 @@ private let plan: [(module: String, drills: [(String, String)], seconds: Double)
 
 struct ProtoP1: View {
     @Bindable var m: ProtoModel
+    var showsNeck = false
     var body: some View {
         switch m.scene {
         case .setup: setup
@@ -72,9 +73,10 @@ struct ProtoP1: View {
         }
     }
     private var setup: some View {
-        VStack(spacing: 20) {
-            Text("A major").font(.system(size: 64, weight: .bold, design: .rounded))
+        VStack(spacing: showsNeck ? 14 : 20) {
+            Text("A major").font(.system(size: showsNeck ? 52 : 64, weight: .bold, design: .rounded))
             HStack { Text("D shape · strings D-G-B").foregroundStyle(.secondary); Button("Reroll") {} }.font(.title3)
+            if showsNeck { FretboardView(diagram: { var d = m.passDiagram; d.markers = m.position.locations.map { m.marker($0) }; return d }()).frame(height: 200).padding(.horizontal, 24) }
             Text("− 15 min +").font(.system(size: 44, weight: .semibold, design: .rounded))
             Button { } label: { Text("Start ↩").font(.title).padding(.horizontal, 48).padding(.vertical, 8) }.buttonStyle(.borderedProminent)
             HStack(alignment: .top, spacing: 24) { ForEach(plan, id: \.module) { mod in
@@ -228,6 +230,92 @@ private struct ProtoCloseUp: View {
                 if k.isCurrent { c.stroke(Path(ellipseIn: CGRect(x: x - r - 3, y: y - r - 3, width: 2 * r + 6, height: 2 * r + 6)), with: .color(.yellow), lineWidth: 4) }
                 if !k.isFaint { c.draw(Text(k.label).font(.title3.bold()).foregroundColor(.white), at: .init(x: x, y: y)) }
             }
+        }
+    }
+}
+
+// MARK: P4 — the mix: P1's setup with the scale on a neck, P2's playing screen zoomed in, P1's metronome panel and summary.
+
+struct ProtoP4: View {
+    @Bindable var m: ProtoModel
+    var body: some View {
+        switch m.scene {
+        case .setup, .summary: ProtoP1(m: m, showsNeck: true)
+        default:
+            VStack(spacing: 0) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(title).font(.system(size: 34, weight: .bold, design: .rounded))
+                    Spacer()
+                    feedback.font(.title2)
+                    Spacer()
+                    if m.scene != .triad { ProtoBeats(m: m, size: 26); Text("\(Int(m.bpm))").font(.title.monospacedDigit().bold()) }
+                }.padding(.horizontal, 28).padding(.vertical, 12)
+                ProtoZoomNeck(diagram: m.scene == .triad ? m.triadDiagram : m.passDiagram, frets: frets)
+                    .frame(maxHeight: .infinity).padding(.horizontal, 24)
+                    .overlay { if m.scene == .countIn { Text("\(m.beat + 1)").font(.system(size: 150, weight: .heavy, design: .rounded)).foregroundStyle(.white).shadow(radius: 8) } }
+                if m.scene == .triad {
+                    HStack(spacing: 40) { ForEach(0..<3, id: \.self) { i in VStack { Circle().fill(i == 0 ? Color.green : .secondary.opacity(0.15)).overlay { Text(i == 0 ? "D" : "?").font(.title.bold()) }.frame(width: 64); Text(["string 4 (D)", "string 3 (G)", "string 2 (B)"][i]).foregroundStyle(.secondary) } } }.frame(height: 120)
+                } else { ProtoContour(m: m).frame(height: 120).padding(.horizontal, 28) }
+                ProtoBlocksBar()
+                Divider(); ProtoKeys(m: m)
+            }
+            .overlay(alignment: .bottomTrailing) {
+                if m.scene == .metronome {
+                    ProtoMetronomePanel(m: m).background(RoundedRectangle(cornerRadius: 12).fill(.background)).shadow(radius: 12).padding(.trailing, 190).padding(.bottom, 38)
+                }
+            }
+        }
+    }
+    private var title: String { m.scene == .triad ? "B minor · 1st inversion" : m.scene == .metronome ? "Paused" : "A major · up and down" }
+    @ViewBuilder private var feedback: some View {
+        if m.scene == .wrong { Label("You played G", systemImage: "xmark.circle.fill").foregroundStyle(.red) }
+        else if m.scene == .triad { Text("strings D-G-B").foregroundStyle(.secondary) }
+        else { Text("Last: clean · ±28 ms · \(m.stage.rawValue)").foregroundStyle(.secondary) }
+    }
+    /// Scales: two frets either side of the position. Triads: the whole practised range, so that the zoom never gives the voicing away.
+    private var frets: ClosedRange<Int> {
+        m.scene == .triad ? 0...12 : max(0, m.position.frets.lowerBound - 2)...min(22, m.position.frets.upperBound + 2)
+    }
+}
+
+/// A section of the neck, with a small whole neck under it showing which.
+struct ProtoZoomNeck: View {
+    let diagram: FretboardDiagram
+    let frets: ClosedRange<Int>
+    var body: some View {
+        Canvas { c, size in
+            let left: CGFloat = 30, hasOpen = frets.lowerBound == 0
+            let lo = max(1, frets.lowerBound), hi = frets.upperBound
+            let open: CGFloat = hasOpen ? 34 : 0
+            let x0 = left + open, w = (size.width - x0) / CGFloat(hi - lo + 1), h = (size.height - 46) / 6
+            func cx(_ f: Int) -> CGFloat { f == 0 ? left + open / 2 : x0 + (CGFloat(f - lo) + 0.5) * w }
+            func y(_ s: Int) -> CGFloat { h * (5.5 - CGFloat(s)) }
+            c.fill(Path(CGRect(x: x0, y: 0, width: size.width - x0, height: h * 6)), with: .linearGradient(Gradient(colors: [FretboardPalette.woodTop, FretboardPalette.woodBottom]), startPoint: .zero, endPoint: CGPoint(x: 0, y: h * 6)))
+            if hasOpen { c.fill(Path(CGRect(x: x0 - 3, y: 0, width: 6, height: h * 6)), with: .color(FretboardPalette.bone)) }
+            for f in lo...hi {
+                let x = x0 + CGFloat(f - lo + 1) * w, marked = FretboardGeometry.inlayFrets.contains(f)
+                c.stroke(Path { $0.move(to: .init(x: x, y: 0)); $0.addLine(to: .init(x: x, y: h * 6)) }, with: .color(FretboardPalette.fretWire), lineWidth: 2)
+                c.draw(Text("\(f)").font(marked ? .callout.bold() : .callout).foregroundColor(.secondary), at: .init(x: cx(f), y: h * 6 + 11))
+                if marked { for yy in f == 12 ? [h * 2, h * 4] : [h * 3] { c.fill(Path(ellipseIn: CGRect(x: cx(f) - 5, y: yy - 5, width: 10, height: 10)), with: .color(FretboardPalette.pearl.opacity(0.85))) } }
+            }
+            for s in 0..<6 {
+                if diagram.highlightedStrings.contains(s) { c.fill(Path(CGRect(x: 0, y: y(s) - h * 0.45, width: size.width, height: h * 0.9)), with: .color(FretboardPalette.stringHighlight)) }
+                c.stroke(Path { $0.move(to: .init(x: left, y: y(s))); $0.addLine(to: .init(x: size.width, y: y(s))) }, with: .color(s < 3 ? FretboardPalette.woundString : FretboardPalette.plainString), lineWidth: 3 - CGFloat(s) * 0.35)
+                c.draw(Text(diagram.stringNames[s]).font(.callout.weight(.medium)).foregroundColor(.secondary), at: .init(x: 12, y: y(s)))
+            }
+            for k in diagram.markers where k.location.fret == 0 ? hasOpen : (lo...hi).contains(k.location.fret) {
+                let r = min(w, h) * 0.4, rect = CGRect(x: cx(k.location.fret) - r, y: y(k.location.string) - r, width: 2 * r, height: 2 * r)
+                c.fill(Path(ellipseIn: rect), with: .color(FretboardPalette.color(for: k.role).opacity(k.isFaint ? 0.28 : 1)))
+                if k.isCurrent { c.stroke(Path(ellipseIn: rect.insetBy(dx: -3, dy: -3)), with: .color(.yellow), lineWidth: 4) }
+                if !k.isFaint { c.draw(Text(k.label).font(.title3.bold()).foregroundColor(.white), at: .init(x: rect.midX, y: rect.midY)) }
+            }
+            // Which part of the neck this is.
+            let mini = CGRect(x: left, y: size.height - 14, width: size.width - left, height: 8)
+            c.fill(Path(roundedRect: mini, cornerRadius: 4), with: .color(.secondary.opacity(0.2)))
+            let a = FretboardGeometry(size: CGSize(width: mini.width, height: 200), stringCount: 6, lastFret: 22)
+            func frac(_ f: Int) -> CGFloat { (a.wireX(f) - a.wireX(0)) / (a.wireX(22) - a.wireX(0)) }
+            let from = mini.minX + mini.width * frac(lo - 1), to = mini.minX + mini.width * frac(hi)
+            c.fill(Path(roundedRect: CGRect(x: from, y: mini.minY, width: to - from, height: 8), cornerRadius: 4), with: .color(FretboardPalette.woundString))
         }
     }
 }

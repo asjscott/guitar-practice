@@ -39,7 +39,7 @@ enum Snapshots {
 
     private static func saveAll() async throws {
         // PROTOTYPE: only the Phase 3 variants.
-        for variant in ProtoVariant.allCases {
+        for variant in [ProtoVariant.p4] {
             for scene in ProtoScene.allCases {
                 try await save("p3-\(variant.rawValue)-\(scene.rawValue)", ProtoScreen(model: ProtoModel(scene: scene, variant: variant), showsSwitcher: false))
             }
