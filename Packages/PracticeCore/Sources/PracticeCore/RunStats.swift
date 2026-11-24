@@ -9,10 +9,11 @@ public struct RunStats: Hashable, Sendable {
     /// The attempts that count: answered or timed out.
     private var done: [Attempt] { attempts.filter { !$0.skipped } }
 
-    /// Prompts done (answered or timed out). A sweep is one, as soon as it has an attempt; everything else here is per
-    /// attempt.
+    /// Prompts done (answered or timed out). A sweep is one, as soon as it has an attempt, and a triad as soon as one of
+    /// its notes is done; everything else here is per attempt.
     public var prompts: Int {
-        Set(attempts.compactMap(\.prompt.sweep)).count + done.filter { $0.prompt.sweep == nil }.count
+        let counted = attempts.filter { !$0.skipped || $0.prompt.sweep != nil }
+        return Set(counted.compactMap(\.group?.number)).count + counted.filter { $0.group == nil }.count
     }
 
     /// Attempts skipped. They count in nothing else.

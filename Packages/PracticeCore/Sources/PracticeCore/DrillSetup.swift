@@ -31,6 +31,15 @@ public struct DrillOptions: Hashable, Sendable {
 
     public var order: Order = .random
 
+    /// What drills built on a key use when the setup has none.
+    public var key: Key = .major(.c)
+
+    /// Triads only.
+    public var stringSets = Set(StringSet.allCases)
+
+    /// Triads only.
+    public var inversions = Set(Triad.Inversion.allCases)
+
     public init() {}
 }
 

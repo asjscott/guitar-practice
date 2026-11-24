@@ -26,20 +26,23 @@ public struct DrillDisplay: Hashable, Sendable {
         case waiting, wrong, right, timedOut
     }
 
-    /// A dot on the neck. The answer has its own colour.
+    /// A dot on the neck. The answer, or in a triad the root, has its own colour.
     public struct Marker: Hashable, Sendable {
         public var location: FretboardLocation
         public var label: String
         public var isAnswer: Bool
+        /// Ringed as the last note played.
+        public var isLastPlayed: Bool
 
-        public init(location: FretboardLocation, label: String, isAnswer: Bool) {
+        public init(location: FretboardLocation, label: String, isAnswer: Bool, isLastPlayed: Bool = false) {
             self.location = location
             self.label = label
             self.isAnswer = isAnswer
+            self.isLastPlayed = isLastPlayed
         }
     }
 
-    /// One part of a prompt with several, such as a location of a sweep: "6" over "fret 8".
+    /// One part of a prompt with several, such as a location of a sweep ("6" over "fret 8") or a string of a triad.
     public struct Chip: Hashable, Sendable {
         public enum State: Hashable, Sendable {
             case waiting, current, found, timedOut, skipped
@@ -71,8 +74,8 @@ public struct DrillDisplay: Hashable, Sendable {
     /// Tints the card.
     public var result: Result
 
-    /// A string lit along its length (internal index); nil = none.
-    public var highlightedString: Int?
+    /// Strings lit along their length (internal indices).
+    public var highlightedStrings: Set<Int>
 
     public var markers: [Marker]
 
@@ -87,7 +90,7 @@ public struct DrillDisplay: Hashable, Sendable {
         let prompt = moment.prompt
         headline = prompt.noteName
         subline = "on \(prompt.stringLabel(in: setup.fretboard.tuning))"
-        highlightedString = prompt.string
+        highlightedStrings = [prompt.string]
         markers = []
         switch moment.phase {
         case .wrong(let played):

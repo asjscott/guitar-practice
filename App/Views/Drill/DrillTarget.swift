@@ -6,16 +6,17 @@ import TheoryCore
 // and know nothing of which drill is running.
 
 extension FretboardDiagram {
-    /// The neck for a drill: no labels except on the display's markers, its string highlighted. No display (idle,
+    /// The neck for a drill: no labels except on the display's markers, its strings highlighted. No display (idle,
     /// paused) draws the bare neck.
-    init(drill display: DrillDisplay?, on fretboard: Fretboard) {
+    init(drill display: DrillDisplay?, on fretboard: Fretboard, fretWindow: ClosedRange<Int>? = nil) {
         self.init(stringNames: fretboard.stringNames(in: nil).map(\.description))
+        self.fretWindow = fretWindow
         capo = fretboard.capo
         labelMode = .shown
         markers = (display?.markers ?? []).map {
-            Marker(location: $0.location, label: $0.label, role: $0.isAnswer ? .root : .tone)
+            Marker(location: $0.location, label: $0.label, role: $0.isAnswer ? .root : .tone, isLastPlayed: $0.isLastPlayed)
         }
-        highlightedStrings = Set([display?.highlightedString].compactMap { $0 })
+        highlightedStrings = display?.highlightedStrings ?? []
     }
 }
 
@@ -131,7 +132,7 @@ struct DrillCountdownRing: View {
     }
 }
 
-private extension DrillDisplay.Chip.State {
+extension DrillDisplay.Chip.State {
     var fill: Color {
         switch self {
         case .waiting: .secondary.opacity(0.08)
@@ -153,11 +154,11 @@ private extension DrillDisplay.Chip.State {
     }
 }
 
-private extension DrillDisplay {
+extension DrillDisplay {
     var symbol: String { result == .waiting && acceptsTypedName ? "keyboard" : result.symbol }
 }
 
-private extension DrillDisplay.Result {
+extension DrillDisplay.Result {
     var tint: Color {
         switch self {
         case .waiting: Color(nsColor: .controlBackgroundColor)
