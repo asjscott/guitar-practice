@@ -47,11 +47,16 @@ extension PassResult {
     }
 }
 
+extension PassResult {
+    /// "evenness 18 ms".
+    static func evennessText(_ evenness: Duration) -> String {
+        "evenness \(Int((evenness / .milliseconds(1)).rounded())) ms"
+    }
+}
+
 extension PassProgress {
     /// "evenness 18 ms".
-    public var evennessText: String? {
-        evenness.map { "evenness \(Int(($0 / .milliseconds(1)).rounded())) ms" }
-    }
+    public var evennessText: String? { evenness.map(PassResult.evennessText) }
 }
 
 extension PassSettings {

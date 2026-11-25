@@ -129,8 +129,8 @@ struct SessionPlannerDrillsTests {
 
     @Test func withoutSoundHearFindItIsLeftOutAndTheRestShareTheTime() {
         let kinds = SessionPlanner.drills(from: DrillKind.all, for: setup, hasSound: false)
-        #expect(kinds == [.notePlayIt, .allInstances, .fretNameIt])
-        #expect(plan(15, day: 1, kinds: kinds).map(\.length) == [s(300), s(300), s(300)])
+        #expect(kinds == [.notePlayIt, .allInstances, .fretNameIt, .upAndDown, .fromADegree])
+        #expect(plan(15, day: 1, kinds: kinds.filter { $0.module == .notes }).map(\.length) == [s(300), s(300), s(300)])
         #expect(SessionPlanner.noSoundNotice(from: DrillKind.all)
                 == "No sound: Hear → find it is left out, and chimes flash.")
     }
@@ -158,7 +158,7 @@ struct SessionPlannerDrillsTests {
         var setup = setup
         setup.options.frets = 0...0     // no target above the open string for Hear → find it
         #expect(SessionPlanner.drills(from: DrillKind.all, for: setup, hasSound: true)
-                == [.notePlayIt, .allInstances, .fretNameIt])
+                == [.notePlayIt, .allInstances, .fretNameIt, .upAndDown, .fromADegree])
     }
 }
 

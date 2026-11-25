@@ -37,8 +37,10 @@ public struct PassDrill<Rules: PassRules>: Drill {
     /// over, the next one's).
     private var track: ClickTrack
     private var countInClick = 0
-    /// Once this pass is over: when its last bar ends.
+    /// When the last pass's last bar ended, or will.
     private var barEnd: Duration = .zero
+    /// This pass has clicks of its own, rather than going on with the last one's.
+    private var hasNewClicks = false
     private var pendingClicks: [ClickRequest] = []
     private var now: Duration = .zero
 
@@ -59,6 +61,10 @@ public struct PassDrill<Rules: PassRules>: Drill {
     /// Between passes: the next count-in is put off.
     public var canHold: Bool { true }
     public var passSettings: PassSettings? { nextSettings }
+    public var passEnd: Duration? {
+        let isAboutToCountIn = hasNewClicks && isAnswerable && place == 0 && now <= countInStart
+        return isRunning && phase != .paused && (isOver || isAboutToCountIn) ? barEnd : nil
+    }
     public var resumesSamePrompt: Bool { phase == .paused && !isOver }
 
     /// The note that is up; once the pass is over, its last.
@@ -146,7 +152,7 @@ public struct PassDrill<Rules: PassRules>: Drill {
             change(from: old, to: new)
             if isOver, phase != .paused { askForNextClicks() }
         case .hold(let end):
-            if isOver, phase != .paused, end > countInStart { askForClicks(from: end) }
+            if passEnd != nil, end > countInStart { askForClicks(from: end) }
         case .tick(let now):
             advance(to: now)
         case .typed, .soundStarted:
@@ -170,6 +176,8 @@ public struct PassDrill<Rules: PassRules>: Drill {
     private mutating func begin(_ pass: Pass, at now: Duration) {
         self.now = max(self.now, now)
         show(pass)
+        hasNewClicks = true
+        barEnd = now
         track = ClickTrack(meter: settings.meter, bpm: settings.tempo, start: now)
         countInClick = 0
         pendingClicks = [.start(track)]
@@ -232,7 +240,9 @@ public struct PassDrill<Rules: PassRules>: Drill {
     }
 
     private mutating func askForClicks(from start: Duration) {
-        track = ClickTrack(meter: nextSettings.meter, bpm: nextSettings.tempo, start: start)
+        // Once over, the next pass's.
+        let settings = isOver ? nextSettings : settings
+        track = ClickTrack(meter: settings.meter, bpm: settings.tempo, start: start)
         countInClick = 0
         pendingClicks += [.stop(at: barEnd), .start(track)]
     }
@@ -248,6 +258,7 @@ public struct PassDrill<Rules: PassRules>: Drill {
         if isOver, phase != .paused, now >= countInStart {
             guard let next = rules.nextPass() else { return stop(at: now) }
             show(next)
+            hasNewClicks = false
         }
     }
 
@@ -303,10 +314,11 @@ public struct PassDrill<Rules: PassRules>: Drill {
         guard isRunning, phase != .paused, let pass else { return nil }
         let done = passAttempts
         let (result, feedback) = resultAndFeedback(after: done, in: pass)
-        var display = DrillDisplay(headline: rules.headline(of: pass), subline: pass.position.name, feedback: feedback,
+        var display = DrillDisplay(headline: rules.headline(of: pass), subline: rules.subline(of: pass), feedback: feedback,
                                    result: result, markers: markers(of: pass, last: done.last?.prompt.target))
         display.pass = PassProgress(notes: line(of: pass, done: done), countIn: countInBeat,
-                                    evenness: evenness, settings: settings)
+                                    evenness: evenness, settings: settings,
+                                    fretWindow: pass.position.fretWindow)
         return display
     }
 

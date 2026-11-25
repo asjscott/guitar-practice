@@ -79,6 +79,9 @@ public struct DrillSetup: Hashable, Sendable {
     /// Notes to ask for more often; nil = all alike.
     public var weighting: NoteWeighting?
 
+    /// The session's: scale drills take turns through the scales of its mode, in its position. Nil in free practice.
+    public var theme: Theme?
+
     /// Scales only: the fade stages reached before the run.
     public var fadeStages = FadeStages()
 

@@ -45,11 +45,11 @@ private func facts(_ attempt: Attempt) -> PassFacts? {
 
 @Suite("Up and down")
 struct UpAndDownTests {
-    @Test func itIsAScalesDrillForFreePracticeOnly() {
+    @Test func itIsAScalesDrill() {
         #expect(DrillKind.all.contains(.upAndDown))
         #expect(DrillKind.upAndDown.id == "upAndDown")
         #expect(DrillKind.upAndDown.module == .scales)
-        #expect(!DrillKind.upAndDown.isInSessions)
+        #expect(DrillKind.upAndDown.isInSessions)
         #expect(DrillKind.upAndDown.usesMetronome)
         #expect(!DrillKind.upAndDown.needsSound)
         #expect(DrillKind.upAndDown.repeatTitle == "Restart")

@@ -31,13 +31,17 @@ private func headlines(_ count: Int, of setup: DrillSetup) -> [String] { passes(
 
 @Suite("From a degree")
 struct FromADegreeTests {
-    @Test func itIsAScalesDrillForFreePracticeOnly() {
+    @Test func itIsAScalesDrill() {
         #expect(DrillKind.all.filter { $0.module == .scales } == [.upAndDown, .fromADegree])
         #expect(DrillKind.fromADegree.id == "fromADegree")
         #expect(DrillKind.fromADegree.title == "From a degree")
-        #expect(!DrillKind.fromADegree.isInSessions)
+        #expect(DrillKind.fromADegree.isInSessions)
         #expect(DrillKind.fromADegree.usesMetronome)
         #expect(DrillKind.fromADegree.repeatTitle == "Restart")
+    }
+
+    @Test func theSublineNamesTheScale() {
+        #expect(started(setup()).display?.subline == "A minor pentatonic · G shape")
     }
 
     @Test func everyDegreeButTheRootOnItsLowestLocation() {

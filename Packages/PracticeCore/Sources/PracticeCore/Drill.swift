@@ -121,12 +121,18 @@ public protocol Drill: Sendable {
     /// The clicks asked for since the last call, to be done in order: call it after every event.
     mutating func takeClicks() -> [ClickRequest]
 
+    /// Between passes, when the last one's last bar ends: a chime waits for that. Nil during a pass, while paused, and in
+    /// drills without passes.
+    var passEnd: Duration? { get }
+
     /// What the next pass will be played at, as the tempo ladder moves it; nil in drills without passes.
     var passSettings: PassSettings? { get }
 }
 
 extension Drill {
     public mutating func takeClicks() -> [ClickRequest] { [] }
+
+    public var passEnd: Duration? { nil }
 
     public var passSettings: PassSettings? { nil }
 

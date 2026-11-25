@@ -72,13 +72,14 @@ private struct BPMField: View {
 }
 
 extension View {
-    /// The panel over the top right corner, under its button. A click elsewhere closes it, and so do M and Esc; M also
+    /// The panel over the corner nearest its button. A click elsewhere closes it, and so do M and Esc; M also
     /// opens it, and [ and ] change the tempo by 4. While it is open the view's own keys are kept from acting, but
     /// those typed into it are not.
-    func metronomePanel(isOpen: Binding<Bool>, isAvailable: Bool, settings: Binding<PassSettings>) -> some View {
-        overlay(alignment: .topTrailing) {
+    func metronomePanel(isOpen: Binding<Bool>, isAvailable: Bool, settings: Binding<PassSettings>,
+                        alignment: Alignment = .topTrailing) -> some View {
+        overlay(alignment: alignment) {
             if isOpen.wrappedValue {
-                ZStack(alignment: .topTrailing) {
+                ZStack(alignment: alignment) {
                     Color.black.opacity(0.08)
                         .contentShape(Rectangle())
                         .onTapGesture { isOpen.wrappedValue = false }
