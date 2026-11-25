@@ -7,4 +7,5 @@ The spec named AudioKit's PitchTap for pitch detection. We use our own MPM (McLe
 - `ListenCore` is pure like TheoryCore (samples in, pitch estimates and played notes out); only device selection and the engine tap (now the input unit, ADR 0004) live in the app.
 - Small self-recorded guitar clips (< 1 MB each) may be committed as test fixtures under `Packages/ListenCore/Tests/ListenCoreTests/Fixtures/`, a narrow exception to the no-audio-in-git rule.
 - `ListenCore` may import Accelerate (a system framework: vDSP keeps the detector fast enough to listen live in Debug builds) besides Foundation; it still has no UI, AVFoundation or SwiftData.
+- How an onset is found is ADR 0005.
 - `ListenCore` reports pitches as plain MIDI note numbers (`Int`), not TheoryCore's `Pitch`, so it stays free of TheoryCore; the app wraps them in `Pitch` where it connects ListenCore to PracticeCore.
