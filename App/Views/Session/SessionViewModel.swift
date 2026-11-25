@@ -33,7 +33,7 @@ struct SessionTheme: Equatable {
 ///
 /// The session's clock is the drill clock: host time, as in `DrillViewModel`.
 @MainActor @Observable
-final class SessionViewModel {
+final class SessionViewModel: MetronomePanelOwner {
     /// What the view draws from the player, copied after each event and only replaced when it changes.
     struct Snapshot: Equatable {
         var stage: SessionStage = .idle
@@ -82,7 +82,9 @@ final class SessionViewModel {
 
     /// What scale blocks are played to, and where their tempos are remembered; the view sets it. None (in `LogCheck`) is
     /// silent.
-    @ObservationIgnored var metronome: Metronome?
+    @ObservationIgnored var metronome: Metronome? {
+        didSet { if stage == .paused { loadPassSettings() } }
+    }
 
     /// The time signature and emphasis in Settings.
     var meter = Meter(.fourFour) {
@@ -111,6 +113,9 @@ final class SessionViewModel {
 
     /// The fret range the session was started with.
     private(set) var frets = 0...0
+
+    /// The positions its passes go through.
+    @ObservationIgnored private var passPositions: [Position.ID] = []
 
     /// Why the session paused by itself, for the Paused screen.
     private(set) var pauseNotice: String?
@@ -223,7 +228,8 @@ final class SessionViewModel {
         soundOutput?.prepare()
         let blocks = plan(on: date)
         var drillSetup = drillSetup(seed: seed)
-        drillSetup.fadeStages = log?.fadeStages(in: drillSetup.passPositions.map(\.id)) ?? FadeStages()
+        passPositions = drillSetup.passPositions.map(\.id)
+        drillSetup.fadeStages = log?.fadeStages(in: passPositions) ?? FadeStages()
         fretboard = drillSetup.fretboard
         frets = drillSetup.options.frets
         player = SessionPlayer(blocks: blocks, setup: drillSetup, hasSound: hasSound)
@@ -272,6 +278,8 @@ final class SessionViewModel {
         pauseNotice = nil
         asksToEnd = false
         loadPassSettings()
+        // Free practice may have moved them.
+        if let log { send(.fadeStages(log.fadeStages(in: passPositions))) }
         send(.resume(at: clockNow()))
     }
 
@@ -288,7 +296,7 @@ final class SessionViewModel {
         } else if !hasSound, !wasPaused, stage == .paused {
             if losesPanelResume { resumesOnPanelClose = false }
             let resuming = blockKind?.needsSound == true ? "Resuming goes on without this drill."
-                : blockKind?.usesMetronome == true ? "Resuming goes on by the beats shown, and chimes flash." : "Chimes will flash."
+                : blockKind?.hasPasses == true ? "Resuming goes on by the beats shown, and chimes flash." : "Chimes will flash."
             pauseNotice = [soundOutput?.problem, resuming].compactMap { $0 }.joined(separator: " ")
             isPausedForSound = true
         }
@@ -350,26 +358,17 @@ final class SessionViewModel {
         passSettings = settings
     }
 
-    /// The metronome panel, in scale blocks. Opening it pauses, on a Ready card too, and closing it goes on if it did,
-    /// unless something else would have paused since. The view keeps the session's keys from acting while it is open.
+    /// The metronome panel, in scale blocks; it pauses a Ready card too. The view keeps the session's keys from acting
+    /// while it is open.
     var isPanelOpen = false {
-        didSet {
-            guard isPanelOpen != oldValue else { return }
-            if isPanelOpen {
-                guard isActive, stage != .paused else { return }
-                pause()
-                resumesOnPanelClose = true
-            } else if resumesOnPanelClose {
-                resumesOnPanelClose = false
-                resume()
-            }
-        }
+        didSet { if isPanelOpen != oldValue { panelChanged() } }
     }
 
-    @ObservationIgnored private var resumesOnPanelClose = false
+    @ObservationIgnored var resumesOnPanelClose = false
+    var canPause: Bool { isActive && stage != .paused }
 
     /// Whether H is the drill's: on Ready cards and while paused too, so that it doesn't do something else.
-    var takesHint: Bool { isActive && blockKind?.usesMetronome == true && !isPanelOpen }
+    var takesHint: Bool { isActive && blockKind?.hasPasses == true && !isPanelOpen }
 
     /// H held or let go.
     func hint(isShown: Bool) { send(.hint(isShown: isShown, at: clockNow())) }
@@ -432,14 +431,9 @@ final class SessionViewModel {
         if player.stage == .ready, before.stage != .ready { loadPassSettings() }
     }
 
-    /// Does what the drill asks of the metronome, and tells it when the clicks will be heard.
     private func playClicks() {
-        for request in player?.takeClicks() ?? [] {
-            switch request {
-            case .start(let track): player?.handle(.clicksStarted(metronome?.start(track) ?? track))
-            case .stop(let time): metronome?.stop(at: time)
-            }
-        }
+        let requests = player?.takeClicks() ?? []
+        metronome?.perform(requests) { player?.handle(.clicksStarted($0)) }
     }
 
     private func logAttempts(of player: SessionPlayer) {
@@ -554,8 +548,7 @@ final class SessionViewModel {
         let now = max(clockNow(), drill.promptStart ?? .zero)
         if blockKind?.usesKeyboard == true {
             send(.typed(right ? prompt.name : prompt.pitchClass == PitchClass(0) ? .g : .c, at: now))
-        } else if let location = prompt.target ?? triadLocation(for: prompt) ?? fretboard.locations(of: prompt.pitchClass, onString: prompt.string,
-                                                                     frets: drill.options.frets).first {
+        } else if let location = drill.rightLocationForSnapshot {
             let pitch = fretboard.pitch(at: location)
             send(.played(right ? pitch : pitch + Interval(1), onset: now, at: now))
         }
@@ -565,10 +558,6 @@ final class SessionViewModel {
     func timeOutForSnapshot() {
         guard let drill = player?.drill, let left = drill.timeRemaining(at: clockNow()) else { return }
         passTimeForSnapshot((left + DrillTiming.detectionGrace) / .seconds(1))
-    }
-
-    private func triadLocation(for prompt: NotePrompt) -> FretboardLocation? {
-        (player?.drill as? PromptDrill<TriadPlayItRules>)?.correctLocations.first { $0.string == prompt.string }
     }
     #endif
 }

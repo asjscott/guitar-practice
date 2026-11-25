@@ -32,9 +32,7 @@ public struct PassFacts: Hashable, Sendable {
     /// BPM, counting clicks.
     public var tempo: Int
 
-    /// The time signature: 6 and 8 in 6/8.
-    public var beatsPerBar: Int
-    public var beatUnit: Int
+    public var signature: TimeSignature
 
     /// What the pass was played at.
     public var fadeStage: FadeStage
@@ -45,14 +43,13 @@ public struct PassFacts: Hashable, Sendable {
     /// The onset less the time the nearest click was heard: positive = late. Nil unless answered.
     public var clickOffset: Duration?
 
-    public init(scale: Scale, position: Position.ID, startDegree: Scale.Degree, tempo: Int, beatsPerBar: Int,
-                beatUnit: Int, fadeStage: FadeStage, hinted: Bool, clickOffset: Duration?) {
+    public init(scale: Scale, position: Position.ID, startDegree: Scale.Degree, tempo: Int, signature: TimeSignature,
+                fadeStage: FadeStage, hinted: Bool, clickOffset: Duration?) {
         self.scale = scale
         self.position = position
         self.startDegree = startDegree
         self.tempo = tempo
-        self.beatsPerBar = beatsPerBar
-        self.beatUnit = beatUnit
+        self.signature = signature
         self.fadeStage = fadeStage
         self.hinted = hinted
         self.clickOffset = clickOffset

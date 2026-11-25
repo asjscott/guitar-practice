@@ -29,26 +29,42 @@ public struct DrillKind: Identifiable, Sendable {
     /// An SF Symbol name.
     public let symbol: String
 
+    /// What sets a drill apart from most.
+    public struct Traits: OptionSet, Hashable, Sendable {
+        public let rawValue: Int
+        public init(rawValue: Int) { self.rawValue = rawValue }
+
+        public static let usesKeyboard = Traits(rawValue: 1 << 0)
+        public static let needsSound = Traits(rawValue: 1 << 1)
+        public static let hidesNote = Traits(rawValue: 1 << 2)
+        public static let offersOrder = Traits(rawValue: 1 << 3)
+        public static let offersInversions = Traits(rawValue: 1 << 4)
+        public static let hasPasses = Traits(rawValue: 1 << 5)
+        public static let hasClimbs = Traits(rawValue: 1 << 6)
+    }
+
+    private let traits: Traits
+
     /// Answered by typing rather than on the guitar.
-    public let usesKeyboard: Bool
+    public var usesKeyboard: Bool { traits.contains(.usesKeyboard) }
 
     /// Can't run without sound output.
-    public let needsSound: Bool
+    public var needsSound: Bool { traits.contains(.needsSound) }
 
     /// The note isn't shown while it is prompted, so a skip must not show it either.
-    public let hidesNote: Bool
-
-    /// Whether sessions use it; one that isn't is for free practice only.
-    public let isInSessions: Bool
+    public var hidesNote: Bool { traits.contains(.hidesNote) }
 
     /// Whether "In order (check)" applies to it.
-    public let offersOrder: Bool
+    public var offersOrder: Bool { traits.contains(.offersOrder) }
 
     /// Whether the player chooses its inversions.
-    public let offersInversions: Bool
+    public var offersInversions: Bool { traits.contains(.offersInversions) }
 
-    /// Played to the metronome.
-    public let usesMetronome: Bool
+    /// A scale drill: passes, played to the metronome at a tempo of its own.
+    public var hasPasses: Bool { traits.contains(.hasPasses) }
+
+    /// Its prompts are climbs.
+    public var hasClimbs: Bool { traits.contains(.hasClimbs) }
 
     /// What R does, as a button title ("Replay"); nil = nothing.
     public let repeatTitle: String?
@@ -56,40 +72,26 @@ public struct DrillKind: Identifiable, Sendable {
     private let make: @Sendable (DrillSetup) -> any Drill
 
     public init<Rules: DrillRules>(id: String, module: DrillModule, title: String, instructions: String, symbol: String,
-                                   usesKeyboard: Bool = false, needsSound: Bool = false, hidesNote: Bool = false,
-                                   isInSessions: Bool = true, offersOrder: Bool = false,
-                                   offersInversions: Bool = false, repeatTitle: String? = nil, rules: Rules.Type) {
-        self.init(id: id, module: module, title: title, instructions: instructions, symbol: symbol,
-                  usesKeyboard: usesKeyboard, needsSound: needsSound, hidesNote: hidesNote, isInSessions: isInSessions,
-                  offersOrder: offersOrder, offersInversions: offersInversions, usesMetronome: false,
+                                   traits: Traits = [], repeatTitle: String? = nil, rules: Rules.Type) {
+        self.init(id: id, module: module, title: title, instructions: instructions, symbol: symbol, traits: traits,
                   repeatTitle: repeatTitle) { PromptDrill<Rules>(setup: $0) }
     }
 
     /// A scale drill.
-    public init<Rules: PassRules>(id: String, title: String, instructions: String, symbol: String,
-                                  isInSessions: Bool = true, rules: Rules.Type) {
-        self.init(id: id, module: .scales, title: title, instructions: instructions, symbol: symbol, usesKeyboard: false,
-                  needsSound: false, hidesNote: false, isInSessions: isInSessions, offersOrder: false,
-                  offersInversions: false, usesMetronome: true, repeatTitle: "Restart") { PassDrill<Rules>(setup: $0) }
+    public init<Rules: PassRules>(id: String, title: String, instructions: String, symbol: String, rules: Rules.Type) {
+        self.init(id: id, module: .scales, title: title, instructions: instructions, symbol: symbol, traits: .hasPasses,
+                  repeatTitle: "Restart") { PassDrill<Rules>(setup: $0) }
     }
 
-    private init(id: String, module: DrillModule, title: String, instructions: String, symbol: String,
-                 usesKeyboard: Bool, needsSound: Bool, hidesNote: Bool, isInSessions: Bool, offersOrder: Bool,
-                 offersInversions: Bool, usesMetronome: Bool, repeatTitle: String?,
-                 make: @escaping @Sendable (DrillSetup) -> any Drill) {
+    private init(id: String, module: DrillModule, title: String, instructions: String, symbol: String, traits: Traits,
+                 repeatTitle: String?, make: @escaping @Sendable (DrillSetup) -> any Drill) {
         self.id = id
         self.module = module
         self.title = title
         self.instructions = instructions
         self.symbol = symbol
-        self.usesKeyboard = usesKeyboard
-        self.needsSound = needsSound
-        self.hidesNote = hidesNote
-        self.isInSessions = isInSessions
-        self.offersOrder = offersOrder
-        self.offersInversions = offersInversions
+        self.traits = traits
         self.repeatTitle = repeatTitle
-        self.usesMetronome = usesMetronome
         self.make = make
     }
 

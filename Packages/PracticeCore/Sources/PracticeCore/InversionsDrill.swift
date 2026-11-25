@@ -4,7 +4,7 @@ extension DrillKind {
     public static let inversions = DrillKind(
         id: "inversions", module: .triads, title: "Inversions",
         instructions: "Arpeggiate every voicing of the chord up the string set and back, each low to high.",
-        symbol: "stairs", hidesNote: true, repeatTitle: "Restart", rules: InversionsRules.self)
+        symbol: "stairs", traits: [.hidesNote, .hasClimbs], repeatTitle: "Restart", rules: InversionsRules.self)
 }
 
 extension Triad.Inversion {
@@ -49,7 +49,7 @@ public struct InversionsRules: DrillRules {
     private var climb: Climb?
     private var group = -1
     /// Which voicing of the climb is up.
-    private var step = 0
+    private var voicingIndex = 0
     /// Its notes played since it last started, lowest first.
     private var played: [Attempt] = []
     /// How the climb's voicings went, so far.
@@ -57,8 +57,7 @@ public struct InversionsRules: DrillRules {
     private var next = Next.climb
 
     public init(setup: DrillSetup) {
-        var setup = setup
-        setup.key = setup.key ?? setup.options.key
+        let setup = setup.spelledInChosenKey()
         self.setup = setup
         choices = setup.climbableVoicings.map { Climb(up: $0) }
         chooser = PromptChooser(setup: setup)
@@ -78,7 +77,7 @@ public struct InversionsRules: DrillRules {
             guard let chosen = chooser.choose(from: choices, avoiding: climb, note: \.triad.root.pitchClass) else { return nil }
             start(chosen)
         case .voicing:
-            step += 1
+            voicingIndex += 1
             played = []
         case .sameVoicing:
             played = []
@@ -88,22 +87,23 @@ public struct InversionsRules: DrillRules {
         // Unless this prompt is dealt with first: then a pause dropped it.
         next = .sameVoicing
         return voicing.map {
-            NotePrompt(name: $0.triad.tones(in: $0.inversion)[place], string: $0.locations[place].string, target: $0.locations[place])
+            let target = $0.locations[noteIndex]
+            return NotePrompt(name: $0.triad.tones(in: $0.inversion)[noteIndex], string: target.string, target: target)
         }
     }
 
     private mutating func start(_ climb: Climb) {
         self.climb = climb
         group += 1
-        step = 0
+        voicingIndex = 0
         played = []
         results = []
     }
 
-    private var voicing: TriadVoicing? { climb?.voicings[step] }
+    private var voicing: TriadVoicing? { climb?.voicings[voicingIndex] }
 
     /// Which note of the voicing is up (0 = lowest).
-    private var place: Int { played.count }
+    private var noteIndex: Int { played.count }
 
     private var facts: TriadFacts? {
         voicing.map { TriadFacts(triad: $0.triad, inversion: $0.inversion, stringSet: $0.stringSet) }
@@ -128,7 +128,7 @@ public struct InversionsRules: DrillRules {
         case .skipped:
             results.append(.skipped)
         }
-        next = step + 1 < climb.voicings.count ? .voicing : .climb
+        next = voicingIndex + 1 < climb.voicings.count ? .voicing : .climb
     }
 
     public mutating func repeated() -> DrillRepeat {
@@ -138,14 +138,14 @@ public struct InversionsRules: DrillRules {
         return .newPrompt
     }
 
-    public var isPartWay: Bool { place > 0 }
+    public var isPartWay: Bool { noteIndex > 0 }
 
     public func correctLocations(for prompt: NotePrompt) -> [FretboardLocation] { voicing?.locations ?? [] }
 
     public func group(for prompt: NotePrompt) -> AttemptGroup? {
         guard let climb, let voicing else { return nil }
         let noteCount = voicing.locations.count
-        return AttemptGroup(number: group, size: climb.voicings.count * noteCount, place: step * noteCount + place)
+        return AttemptGroup(number: group, size: climb.voicings.count * noteCount, place: voicingIndex * noteCount + noteIndex)
     }
 
     public func facts(for prompt: NotePrompt) -> AttemptFacts? { facts.map { .triad($0) } }
@@ -161,7 +161,7 @@ public struct InversionsRules: DrillRules {
         guard let climb, let voicing, let facts else { return DrillDisplay(standard: moment, in: setup) }
         var display = DrillDisplay(triad: facts, at: voicing.locations, played: played, moment: moment, in: setup)
         display.voicings = climb.voicings.enumerated().map { index, voicing in
-            let state: DrillDisplay.Chip.State = if index < results.count { results[index] } else { index == step ? .current : .waiting }
+            let state: DrillDisplay.Chip.State = if index < results.count { results[index] } else { index == voicingIndex ? .current : .waiting }
             return DrillDisplay.Chip(title: voicing.inversion.shortName, spokenTitle: "voicing \(index + 1) of \(climb.voicings.count)",
                                      text: voicing.inversion.name, state: state)
         }
@@ -173,11 +173,9 @@ extension DrillSetup {
     /// Per chord of the key and included string set, its voicings in range in every inversion, ordered up the neck.
     /// Those with fewer than two are left out.
     fileprivate var climbableVoicings: [[TriadVoicing]] {
-        (key ?? options.key).chords.flatMap { triad in
-            fretboard.stringSets.filter(options.stringSets.contains).map { set in
-                Triad.Inversion.allCases
-                    .flatMap { fretboard.voicings(of: triad, inversion: $0, on: set, frets: options.frets) }
-                    .sorted { ($0.frets.lowerBound, $0.locations[0].fret) < ($1.frets.lowerBound, $1.locations[0].fret) }
+        chosenKey.chords.flatMap { triad in
+            fretboard.stringSets.filter(options.stringSets.contains).map {
+                fretboard.voicings(of: triad, on: $0, frets: options.frets)
             }
         }
         .filter { $0.count >= 2 }

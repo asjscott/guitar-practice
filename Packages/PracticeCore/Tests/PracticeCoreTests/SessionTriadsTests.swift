@@ -23,9 +23,9 @@ extension SessionPlayer {
         guard let drill, let prompt = drill.prompt else { return }
         let locations = prompt.target.map { [$0] } ?? (0...12).map { FretboardLocation(string: prompt.string, fret: $0) }
         for pitch in locations.map(drill.fretboard.pitch(at:)) where pitch.pitchClass == prompt.pitchClass {
-            var trial = drill
-            trial.handle(.played(pitch, onset: s(time), at: s(time)))
-            if trial.attempts.count > drill.attempts.count {
+            var copy = drill
+            copy.handle(.played(pitch, onset: s(time), at: s(time)))
+            if copy.attempts.count > drill.attempts.count {
                 return handle(.played(pitch, onset: s(time), at: s(time)))
             }
         }

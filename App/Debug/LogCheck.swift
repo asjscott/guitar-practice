@@ -35,6 +35,7 @@ enum LogCheck {
                     try checkSessions()
                     try checkThemes()
                     try checkFreePractice()
+                    try checkResume()
                     try await write(log)
                 }
                 if let problem = log.problem { throw LogCheckError.notSaved(problem) }
@@ -112,7 +113,7 @@ enum LogCheck {
 
         // Passes and triads.
         let pass = PassFacts(scale: Scale(.blues, tonic: .a), position: Position.ID(system: .caged, number: 4, octave: 1),
-                             startDegree: Scale.Degree(5, -1), tempo: 72, beatsPerBar: 7, beatUnit: 8, fadeStage: .faded,
+                             startDegree: Scale.Degree(5, -1), tempo: 72, signature: TimeSignature(beats: 7, unit: 8) ?? .fourFour, fadeStage: .faded,
                              hinted: true, clickOffset: .milliseconds(-125))
         let triad = TriadFacts(triad: Triad(.minor, root: .bFlat), inversion: .second, stringSet: .dGB)
         for (place, facts) in [AttemptFacts.pass(pass), .triad(triad)].enumerated() {
@@ -245,6 +246,39 @@ enum LogCheck {
         drill.resume()
         drill.pause(notice: "The Mac went to sleep.")
         try require(drill.isPaused, "sleep didn't pause")
+        drill.stop()
+    }
+
+    /// Resuming a scale drill takes up the tempo and the fade stage that a session has moved meanwhile. In memory.
+    private static func checkResume() throws {
+        let suite = "LogCheck-\(UUID())"
+        guard let defaults = UserDefaults(suiteName: suite) else { throw LogCheckError.freePractice("no defaults") }
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let log = AttemptLog.inMemory()
+        let drill = DrillViewModel()
+        drill.log = log
+        drill.kind = .upAndDown
+        drill.metronome = Metronome(output: AppSoundOutput(isInert: true), defaults: defaults)
+        drill.start(seed: 1)
+        drill.pause()
+
+        defaults.set(76, forKey: MetronomeSettings.Key.tempo(of: .upAndDown))
+        var other = DrillKind.upAndDown.makeDrill(DrillSetup(fretboard: Fretboard(tuning: .standard), seed: 1))
+        let run = log.run()
+        other.handle(.start(at: .zero))
+        for _ in 0..<(other.display?.pass?.notes.count ?? 0) {
+            guard let target = other.prompt?.target, let start = other.promptStart else { break }
+            other.handle(.played(other.fretboard.pitch(at: target), onset: start, at: start))
+            run.update(from: other)
+        }
+
+        drill.resume()
+        guard drill.passSettings.tempo == 76, defaults.integer(forKey: MetronomeSettings.Key.tempo(of: .upAndDown)) == 76 else {
+            throw LogCheckError.freePractice("resumed at \(drill.passSettings.tempo) BPM")
+        }
+        guard let markers = drill.snapshot.display?.markers, !markers.isEmpty, markers.allSatisfy(\.isFaint) else {
+            throw LogCheckError.freePractice("resumed at the old fade stage")
+        }
         drill.stop()
     }
 

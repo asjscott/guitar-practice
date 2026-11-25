@@ -16,14 +16,14 @@ extension AttemptLog {
         }
         let notes = FetchDescriptor<LoggedAttempt>(predicate: inPasses, sortBy: [SortDescriptor(\.date)])
         let attempts = (try? context.fetch(notes)) ?? []
-        return FadeStages(log: attempts.compactMap { attempt -> (group: UUID, note: PassNote)? in
-            guard let group = attempt.groupID, let note = PassNote(attempt) else { return nil }
+        return FadeStages(log: attempts.compactMap { attempt -> (group: UUID, note: FadeStages.Note)? in
+            guard let group = attempt.groupID, let note = FadeStages.Note(attempt) else { return nil }
             return (group, note)
         })
     }
 }
 
-extension PassNote {
+extension FadeStages.Note {
     /// Nil unless the attempt was in a pass, or if what is saved is unusable.
     fileprivate init?(_ attempt: LoggedAttempt) {
         guard let kind = attempt.scaleKind.flatMap(Scale.Kind.init), let number = attempt.positionNumber,

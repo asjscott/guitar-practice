@@ -127,7 +127,7 @@ public struct PromptDrill<Rules: DrillRules>: Drill {
             soundStarted(at: start, latency: latency)
         case .hold(let end):
             if canHold, isAnswerable { heldUntil = end }
-        case .clicksStarted, .hint, .passSettings:
+        case .clicksStarted, .hint, .passSettings, .fadeStages:
             break
         case .tick(let now):
             advance(to: now)

@@ -99,7 +99,7 @@ enum PracticeSchemaV2: VersionedSchema {
         /// In the order they were given.
         var wrongAnswers: [WrongAnswerRecord]
 
-        /// Shared by the attempts of one sweep, pass or triad prompt; nil when the attempt stands alone.
+        /// Shared by the attempts of one sweep, pass, triad prompt or climb; nil when the attempt stands alone.
         @Attribute(originalName: "sweepID") var groupID: UUID?
         /// How many attempts the whole group has, and which this is (0 = first). Nil in sweeps.
         var groupSize: Int?

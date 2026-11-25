@@ -10,7 +10,7 @@ import TheoryCore
 /// One clock for everything the drill sees: host time in seconds (`AudioInputService.hostTimeNow()`), as a
 /// `Duration`. Played notes arrive on it from `PlayedNoteFeed`. It outlives its screen, so a paused run does too.
 @MainActor @Observable
-final class DrillViewModel {
+final class DrillViewModel: MetronomePanelOwner {
     /// What the view draws from the drill, copied after each event and only replaced when it changes.
     struct Snapshot: Equatable {
         var phase: DrillPhase = .idle
@@ -33,7 +33,7 @@ final class DrillViewModel {
         get { options.positionSystem }
         set {
             guard newValue != options.positionSystem else { return }
-            if kind.module == .scales { stop() }
+            if kind.hasPasses { stop() }
             options.positionSystem = newValue
         }
     }
@@ -76,34 +76,30 @@ final class DrillViewModel {
     private func setPassSettings(_ new: PassSettings) {
         let old = options.pass
         options.pass = new
-        if kind.usesMetronome, new.tempo != old.tempo || new.holdsTempo != old.holdsTempo {
+        if kind.hasPasses, new.tempo != old.tempo || new.holdsTempo != old.holdsTempo {
             metronome?.storeTempo(of: kind, from: new)
         }
     }
 
-    /// Takes up the drill's remembered tempo, but for a run that is going.
+    /// Takes up the drill's remembered tempo, which a session may have changed, but for a run that is going.
     private func loadTempo() {
-        guard !isRunning, kind.usesMetronome, let metronome else { return }
+        guard !isRunning || isPaused, kind.hasPasses, let metronome else { return }
         metronome.loadTempo(of: kind, into: &options.pass)
+        if isRunning { send(.passSettings(options.pass, at: clockNow())) }
     }
 
-    /// The metronome panel. Opening it pauses a run, and closing it goes on with one that it paused, unless something
-    /// else would have paused it since. The view keeps the run's buttons and keys from acting while it is open.
+    /// Those reached by now in the positions passes go through, a session's passes included.
+    private func loggedFadeStages() -> FadeStages? {
+        kind.hasPasses ? log?.fadeStages(in: setup.passPositions.map(\.id)) : nil
+    }
+
+    /// The metronome panel. The view keeps the run's buttons and keys from acting while it is open.
     var isPanelOpen = false {
-        didSet {
-            guard isPanelOpen != oldValue else { return }
-            if isPanelOpen {
-                guard isRunning, !isPaused else { return }
-                pause()
-                resumesOnPanelClose = true
-            } else if resumesOnPanelClose {
-                resumesOnPanelClose = false
-                resume()
-            }
-        }
+        didSet { if isPanelOpen != oldValue { panelChanged() } }
     }
 
-    @ObservationIgnored private var resumesOnPanelClose = false
+    @ObservationIgnored var resumesOnPanelClose = false
+    var canPause: Bool { isRunning && !isPaused }
 
     private(set) var snapshot = Snapshot()
 
@@ -165,8 +161,7 @@ final class DrillViewModel {
     func start(seed: UInt64 = .random(in: .min ... .max)) {
         loadTempo()
         guard !isRunning, inputProblem == nil, nothingToPromptReason == nil, prepareSound() else { return }
-        let positions = kind.module == .scales ? [position?.id].compactMap { $0 } : []
-        drill = newDrill(seed: seed, fadeStages: log?.fadeStages(in: positions) ?? FadeStages())
+        drill = newDrill(seed: seed, fadeStages: loggedFadeStages() ?? FadeStages())
         runLog = log?.run()
         send(.start(at: clockNow()))
         startTicking()
@@ -188,6 +183,8 @@ final class DrillViewModel {
     func resume() {
         guard isPaused, inputProblem == nil, prepareSound() else { return }
         pauseNotice = nil
+        loadTempo()
+        if let stages = loggedFadeStages() { send(.fadeStages(stages)) }
         send(.resume(at: clockNow()))
         startTicking()
     }
@@ -202,7 +199,7 @@ final class DrillViewModel {
     func repeatPrompt() { send(.repeat(at: clockNow())) }
 
     /// Whether H is the drill's: while paused too, so that it doesn't do something else.
-    var takesHint: Bool { isRunning && kind.module == .scales }
+    var takesHint: Bool { isRunning && kind.hasPasses }
 
     /// H held or let go.
     func hint(isShown: Bool) { send(.hint(isShown: isShown, at: clockNow())) }
@@ -218,7 +215,7 @@ final class DrillViewModel {
     /// on by the beats shown.
     func soundProblemChanged() {
         if soundProblem != nil { pause() }
-        if kind.usesMetronome, let problem = soundOutput?.problem { pause(notice: problem) }
+        if kind.hasPasses, let problem = soundOutput?.problem { pause(notice: problem) }
     }
 
     /// True unless the drill needs sound and there is none. Ready before the clock is read, so that the first sound
@@ -303,14 +300,9 @@ final class DrillViewModel {
         if !drill.isRunning || drill.phase == .paused { soundOutput.release() }
     }
 
-    /// Does what the drill asks of the metronome, and tells it when the clicks will be heard.
     private func playClicks() {
-        for request in drill.takeClicks() {
-            switch request {
-            case .start(let track): drill.handle(.clicksStarted(metronome?.start(track) ?? track))
-            case .stop(let time): metronome?.stop(at: time)
-            }
-        }
+        let requests = drill.takeClicks()
+        metronome?.perform(requests) { drill.handle(.clicksStarted($0)) }
     }
 
     // MARK: - Listening
@@ -330,16 +322,10 @@ final class DrillViewModel {
     #if DEBUG
     /// Answers the current prompt, as if a right or wrong note had been played now (see `Snapshots` and `LogCheck`).
     func playForSnapshot(right: Bool) {
-        guard let prompt = drill.prompt,
-              let location = prompt.target ?? triadLocation(for: prompt) ?? fretboard.locations(of: prompt.pitchClass, onString: prompt.string,
-                                                                  frets: options.frets).first else { return }
+        guard let location = drill.rightLocationForSnapshot else { return }
         let pitch = fretboard.pitch(at: location)
         let now = max(clockNow(), drill.promptStart ?? .zero)
         send(.played(right ? pitch : pitch + Interval(1), onset: now, at: now))
-    }
-
-    private func triadLocation(for prompt: NotePrompt) -> FretboardLocation? {
-        (drill as? PromptDrill<TriadPlayItRules>)?.correctLocations.first { $0.string == prompt.string }
     }
 
     /// Lets the current prompt's time run out now.

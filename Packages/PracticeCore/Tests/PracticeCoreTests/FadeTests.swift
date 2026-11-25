@@ -6,20 +6,20 @@ private let eShape = FadeStages.Subject(tuning: .standard, scaleKind: .major, po
 
 /// A pass of three notes, one attempt each.
 private func pass(_ subject: FadeStages.Subject = eShape, at stage: FadeStage = .shown, clean: Bool = true,
-                  hinted: Bool = false, places: [Int] = [0, 1, 2], last: Attempt.Outcome = .answered) -> [PassNote] {
+                  hinted: Bool = false, places: [Int] = [0, 1, 2], last: Attempt.Outcome = .answered) -> [FadeStages.Note] {
     places.map { place in
         let outcome: Attempt.Outcome = place == places.last ? last : .answered
-        return PassNote(subject: subject, stage: stage, hinted: hinted && place > 0, size: 3, place: place,
+        return FadeStages.Note(subject: subject, stage: stage, hinted: hinted && place > 0, size: 3, place: place,
                         outcome: outcome, firstRight: outcome == .answered && (clean || place != 1))
     }
 }
 
 /// As the log has them, each pass a group.
-private func fold(_ passes: [[PassNote]]) -> FadeStages {
+private func fold(_ passes: [[FadeStages.Note]]) -> FadeStages {
     FadeStages(log: passes.enumerated().flatMap { number, notes in notes.map { (group: number, note: $0) } })
 }
 
-private func stage(after passes: [PassNote]...) -> FadeStage { fold(passes).stage(of: eShape) }
+private func stage(after passes: [FadeStages.Note]...) -> FadeStage { fold(passes).stage(of: eShape) }
 
 @Suite("Fade stages from the log")
 struct FadeStagesTests {
@@ -232,7 +232,7 @@ struct PassFadeTests {
         var drill = started(at: .shown)
         playPass(from: 4, &drill)
         let notes = drill.attemptsToLog.compactMap { attempt in
-            PassNote(attempt, in: drill.fretboard.tuning).map { (group: attempt.group?.number, note: $0) }
+            FadeStages.Note(attempt, in: drill.fretboard.tuning).map { (group: attempt.group?.number, note: $0) }
         }
         #expect(notes.count == 23)
         #expect(FadeStages(log: notes).stage(of: gShape) == .faded)
@@ -251,6 +251,69 @@ struct PassFadeTests {
         #expect(player.display?.markers.allSatisfy { $0.isFaint } == true)
         player.handle(.hint(isShown: true, at: s(29)))
         #expect(player.display?.markers.contains { $0.isFaint } == false)
+    }
+}
+
+@Suite("Fading read again from the log")
+struct FadeReadAgainTests {
+    @Test func resumingFollowsWhatWasReachedMeanwhile() {
+        var drill = started(at: .shown)
+        play(46, at: 4, &drill)
+        drill.handle(.pause(at: s(5)))
+        drill.handle(.fadeStages(reached(.hidden)))
+        drill.handle(.resume(at: s(6)))
+        #expect(isAllFaint(drill, count: 3))
+    }
+
+    @Test func anOverrideIsKept() {
+        var drill = started(setup(reached(.shown), override: .faded))
+        drill.handle(.pause(at: s(1)))
+        drill.handle(.fadeStages(reached(.hidden)))
+        drill.handle(.resume(at: s(2)))
+        #expect(isAllFaint(drill, count: 12))
+    }
+
+    private func session() -> SessionPlayer {
+        let block = SessionBlock(kind: .upAndDown, length: s(180))
+        var player = SessionPlayer(blocks: [block, block], setup: setup())
+        player.handle(.start(at: s(0)))
+        player.handle(.next(at: s(0)))
+        for (index, midi) in wholePass.enumerated() {
+            player.handle(.played(Pitch(midi), onset: s(4 + Double(index)), at: s(4 + Double(index))))
+        }
+        player.handle(.pause(at: s(27)))
+        return player
+    }
+
+    private func faintCount(_ player: SessionPlayer) -> Int? { player.display?.markers.filter(\.isFaint).count }
+
+    @Test func inASession() {
+        var player = session()
+        player.handle(.fadeStages(reached(.hidden)))
+        player.handle(.resume(at: s(28)))
+        #expect(faintCount(player) == 3)
+    }
+
+    /// What is read counts the session's own pass, which took it to Faded; another took it back.
+    @Test func aSessionsPassesArentCountedTwice() {
+        var player = session()
+        player.handle(.fadeStages(reached(.shown)))
+        player.handle(.resume(at: s(28)))
+        #expect(faintCount(player) == 0)
+        player.handle(.next(at: s(29)))
+        player.handle(.next(at: s(30)))
+        #expect(faintCount(player) == 0)
+    }
+
+    @Test func onAReadyCard() {
+        let block = SessionBlock(kind: .upAndDown, length: s(180))
+        var player = SessionPlayer(blocks: [block], setup: setup())
+        player.handle(.start(at: s(0)))
+        player.handle(.pause(at: s(1)))
+        player.handle(.fadeStages(reached(.faded)))
+        player.handle(.resume(at: s(2)))
+        player.handle(.next(at: s(3)))
+        #expect(faintCount(player) == 12)
     }
 }
 

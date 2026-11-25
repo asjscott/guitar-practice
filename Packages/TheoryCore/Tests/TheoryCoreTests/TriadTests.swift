@@ -68,6 +68,40 @@ struct VoicingsInRangeTests {
         #expect(frets(0...22) == [[5, 5, 5], [17, 17, 17]])
         #expect(fretboard.voicings(of: c, inversion: .root, on: .dGB, frets: 0...9).isEmpty)
     }
+
+    /// Frets as they come, with the inversion of each.
+    @Test func everyInversionUpTheNeck() {
+        let voicings = Fretboard(tuning: .standard).voicings(of: Triad(.major, root: .c), on: .dGB, frets: 0...12)
+        #expect(voicings.map(\.inversion) == [.first, .second, .root])
+        #expect(voicings.map { $0.locations.map(\.fret) } == [[2, 0, 1], [5, 5, 5], [10, 9, 8]])
+    }
+}
+
+@Suite("Voicings in a fret range in any tuning")
+struct VoicingsInRangeInvariantTests {
+    @Test(arguments: TriadVoicingInvariantTests.fretboards, [0...12, 3...9, 5...22])
+    func thoseOfTheWholeNeckThatAreInTheRange(fretboard: Fretboard, range: ClosedRange<Int>) {
+        for triad in TriadVoicingInvariantTests.triads {
+            for set in fretboard.stringSets {
+                for inversion in Triad.Inversion.allCases {
+                    let inRange = fretboard.voicings(of: triad, inversion: inversion, on: set, frets: range)
+                    for voicing in inRange {
+                        #expect(voicing.locations.map(\.string) == Array(set.strings))
+                        #expect(voicing.frets.count <= 4)
+                        #expect(voicing.locations.allSatisfy { fretboard.isPlayable($0) && range.contains($0.fret) })
+                        #expect(Set(voicing.locations.map { fretboard.pitch(at: $0).pitchClass }) == Set(triad.pitchClasses))
+                    }
+                    let outside = fretboard.voicings(of: triad, inversion: inversion, on: set).filter { !inRange.contains($0) }
+                    #expect(outside.allSatisfy { $0.locations.contains { !range.contains($0.fret) } })
+                }
+                let all = fretboard.voicings(of: triad, on: set, frets: range)
+                #expect(all.map(\.frets.lowerBound) == all.map(\.frets.lowerBound).sorted())
+                #expect(Set(all) == Set(Triad.Inversion.allCases.flatMap {
+                    fretboard.voicings(of: triad, inversion: $0, on: set, frets: range)
+                }))
+            }
+        }
+    }
 }
 
 @Suite("String sets")
@@ -76,5 +110,10 @@ struct StringSetTests {
         #expect(StringSet.allCases.map(\.name) == ["E-A-D", "A-D-G", "D-G-B", "G-B-E"])
         #expect(StringSet.allCases.map(\.strings) == [0...2, 1...3, 2...4, 3...5])
         #expect(StringSet.dGB.lowestString == 2)
+    }
+
+    @Test func theStringOfEachNoteOfAVoicingLowestFirst() {
+        #expect((0..<3).map(StringSet.dGB.string(ofNote:)) == [2, 3, 4])
+        #expect((0..<3).map(StringSet.eAD.string(ofNote:)) == [0, 1, 2])
     }
 }

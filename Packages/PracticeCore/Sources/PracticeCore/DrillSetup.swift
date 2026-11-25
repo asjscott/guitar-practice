@@ -96,6 +96,16 @@ public struct DrillSetup: Hashable, Sendable {
         self.seed = seed
     }
 
+    /// What drills built on a key use: the setup's, or the options' where it has none.
+    var chosenKey: Key { key ?? options.key }
+
+    /// With that key for its own.
+    func spelledInChosenKey() -> DrillSetup {
+        var setup = self
+        setup.key = chosenKey
+        return setup
+    }
+
     /// Every location in range: included strings, fret range, at or above the capo.
     public var locationsInRange: [FretboardLocation] {
         fretboard.strings

@@ -38,16 +38,13 @@ public struct FromADegreeRules: PassRules {
     }
 
     public init(setup: DrillSetup) {
-        var setup = setup
-        let fretboard = setup.fretboard
+        self.setup = setup.spelledInScale()
         turns = setup.passPositions.compactMap { position in
             let passes = position.scale.kind.degrees.filter { $0 != Scale.Degree(1) }
-                .compactMap { Pass(through: position, from: $0, on: fretboard) }
+                .compactMap { Pass(through: position, from: $0, on: setup.fretboard) }
             return passes.isEmpty ? nil : Turn(passes: passes)
         }
         random = SplitMix64(seed: setup.seed)
-        if let scale = turns.first?.passes.first?.scale { setup.key = scale.key }
-        self.setup = setup
     }
 
     public var nothingToPromptReason: String? { turns.isEmpty ? DrillSetup.noPositionReason : nil }
@@ -66,8 +63,6 @@ public struct FromADegreeRules: PassRules {
     public func subline(of pass: Pass) -> String { "\(pass.scale.name) · \(pass.position.name)" }
 
     public func headline(of pass: Pass) -> String {
-        let degree = pass.startDegree
-        let note = pass.scale.spell(pass.scale.tonic.pitchClass + degree.interval)
-        return "Start on \(degree.name) (\(note))"
+        "Start on \(pass.startDegree.name) (\(pass.scale.note(at: pass.startDegree)))"
     }
 }

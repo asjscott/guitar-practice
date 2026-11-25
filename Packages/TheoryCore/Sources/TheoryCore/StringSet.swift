@@ -14,6 +14,9 @@ public enum StringSet: String, Hashable, Sendable, Codable, CaseIterable {
     /// The set's string indices, lowest string first.
     public var strings: ClosedRange<Int> { lowestString...(lowestString + 2) }
 
+    /// The string a voicing's note is on (0 = its lowest).
+    public func string(ofNote index: Int) -> Int { Array(strings)[index] }
+
     /// For example "E-A-D": the strings' open notes in standard tuning.
     public var name: String {
         switch self {

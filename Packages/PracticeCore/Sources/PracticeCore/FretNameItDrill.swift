@@ -3,7 +3,7 @@ import TheoryCore
 extension DrillKind {
     public static let fretNameIt = DrillKind(
         id: "fretNameIt", module: .notes, title: "Fret → name it", instructions: "A fret lights up. Type its name, then Return.",
-        symbol: "keyboard", usesKeyboard: true, hidesNote: true, rules: FretNameItRules.self)
+        symbol: "keyboard", traits: [.usesKeyboard, .hidesNote], rules: FretNameItRules.self)
 }
 
 /// Fret → name it: a fretboard location lights up, and any enharmonic name for its note, typed, is right.

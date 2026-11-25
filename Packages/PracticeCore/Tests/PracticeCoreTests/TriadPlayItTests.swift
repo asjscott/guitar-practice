@@ -41,7 +41,6 @@ struct TriadPlayItTests {
         #expect(DrillKind.all.contains(.triadPlayIt))
         #expect(DrillKind.triadPlayIt.id == "triadPlayIt")
         #expect(DrillKind.triadPlayIt.module == .triads)
-        #expect(DrillKind.triadPlayIt.isInSessions)
         #expect(DrillKind.triadPlayIt.repeatTitle == nil)
     }
 

@@ -100,10 +100,12 @@ public struct Scale: Hashable, Sendable, Codable {
 
     /// The scale notes from the tonic, spelled by the degree formula.
     public var notes: [NoteName] {
-        kind.degrees.map { degree in
-            NoteName(tonic.letter.advanced(by: degree.number - 1),
-                     spelling: tonic.pitchClass + degree.interval)
-        }
+        kind.degrees.map(note(at:))
+    }
+
+    /// The note at a degree, spelled by it, whether or not it is one of the scale's: ♭5 of A is E♭.
+    public func note(at degree: Degree) -> NoteName {
+        NoteName(tonic.letter.advanced(by: degree.number - 1), spelling: tonic.pitchClass + degree.interval)
     }
 
     public var pitchClasses: [PitchClass] { notes.map(\.pitchClass) }

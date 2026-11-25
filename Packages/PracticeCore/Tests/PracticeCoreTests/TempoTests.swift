@@ -8,7 +8,7 @@ private func result(_ times: [Double], tempo: Int = 60, wrongAt: Int? = nil, tim
     let location = FretboardLocation(string: 0, fret: 5)
     let prompt = NotePrompt(name: Key.minor(.a).tonic, string: 0, target: location)
     let facts = PassFacts(scale: Scale(.minorPentatonic, tonic: .a), position: .init(system: .caged, number: 5),
-                          startDegree: .init(1), tempo: tempo, beatsPerBar: 4, beatUnit: 4, fadeStage: .shown,
+                          startDegree: .init(1), tempo: tempo, signature: .fourFour, fadeStage: .shown,
                           hinted: hinted, clickOffset: nil)
     return PassResult.passes(in: times.enumerated().map { index, time in
         let outcome: Attempt.Outcome = index == timeoutAt ? .timedOut : index == skipAt ? .skipped : .answered
@@ -25,7 +25,7 @@ private let cutShort = result([0, 1], wrongAt: 1, size: 5)
 
 private func steps(_ results: PassResult...) -> [Int] {
     var ladder = TempoLadder()
-    return results.map { ladder.step(after: $0) }
+    return results.map { ladder.change(after: $0) }
 }
 
 @Suite("Tempo ladder")
