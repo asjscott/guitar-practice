@@ -1,0 +1,30 @@
+#!/bin/bash
+# Stops a push to main while main's last finished CI run failed: CI's Xcode can refuse what this Mac's accepts.
+# To push the fix itself:  ALLOW_RED_CI=1 git push
+set -uo pipefail
+
+to_main=""
+while read -r _ _ remote_ref _; do
+  [ "$remote_ref" != refs/heads/main ] || to_main=1
+done
+[ -n "$to_main" ] || exit 0
+
+# The newest of main's recent runs that ended in success or failure: "failure <url> <title>".
+if ! last="$(gh run list --branch main --workflow check.yml --limit 20 --json conclusion,url,displayTitle --jq \
+    '[.[] | select(.conclusion == "success" or .conclusion == "failure" or .conclusion == "timed_out")][0] // empty | "\(.conclusion) \(.url) \(.displayTitle)"')"; then
+  echo "! couldn't read main's CI result from GitHub; pushing anyway" >&2
+  exit 0
+fi
+
+case "$last" in
+  "") echo "! main has no finished CI run; pushing anyway" >&2 ;;
+  success*) echo "✓ main's last CI run passed" >&2 ;;
+  *)
+    echo "main's last CI run: $last" >&2
+    if [ -n "${ALLOW_RED_CI:-}" ]; then
+      echo "! pushing to a red main (ALLOW_RED_CI)" >&2
+    else
+      echo "✗ main is red. Read it with gh run view <id> --log-failed, fix it, then: ALLOW_RED_CI=1 git push" >&2
+      exit 1
+    fi ;;
+esac
