@@ -17,5 +17,5 @@ The numbers come from the recorded clips: plucks jump 14–22 dB above 1.5 kHz a
 - Legato is told apart by its highs and level. What can't be: a hammer-on or pull-off that jumps 3 dB (as in Phase 1), rises 2 dB at a candidate, or falls within about 60 ms of a click. Clicks over the recorded legato clip make extra notes in most phases from −30 dB up.
 - Missed: one pitch plucked again at less than 1.5 dB above its own decay (soft repeats on low strings at 120 BPM and more), and a new pitch much softer than the note before it on a low string at 160 BPM.
 - A click while a finger or pick stops the string can make one extra note of that pitch. Clicks as loud as the guitar can take an onset up to their own distance from it.
-- The thresholds rest on seven clips from one guitar and interface, and on synthetic notes shaped like them. The recorded scale clip and playing at the gate are still to confirm them.
+- The thresholds rest on seven clips from one guitar and interface, and on synthetic notes shaped like them. A picked scale recorded afterwards (33 notes at 120 BPM, no click in the sound) is heard note by note with nothing changed. Its notes are damped before the next, so notes that ring on under the next are still tested only synthetically.
 - The listener takes about 1% of one core's time in release and 7% in Debug.

@@ -66,4 +66,23 @@ struct RecordedClipTests {
             #expect(abs(note.onset - jump) <= Self.onsetTolerance)
         }
     }
+
+    /// C major, CAGED E shape (B2 to D5 and back), one note per click at 120 BPM with the click in headphones, every note
+    /// picked: each is heard once, at the right pitch. The top note is in both clips.
+    @Test("A picked scale is heard note by note", arguments: [
+        ("scale-up", [47, 48, 50, 52, 53, 55, 57, 59, 60, 62, 64, 65, 67, 69, 71, 72, 74],
+         [0.49, 1.05, 1.52, 2.0, 2.49, 3.0, 3.51, 3.995, 4.5, 5.01, 5.5,
+          5.995, 6.505, 6.98, 7.495, 8.0, 8.495]),
+        ("scale-down", [74, 72, 71, 69, 67, 65, 64, 62, 60, 59, 57, 55, 53, 52, 50, 48, 47],
+         [0.065, 0.6, 1.065, 1.555, 2.07, 2.575, 3.075, 3.57, 4.075, 4.58,
+          5.075, 5.58, 6.085, 6.565, 7.075, 7.58, 8.075]),
+    ])
+    func scale(name: String, midi: [Int], attacks: [Double]) throws {
+        let clip = try Clip(name)
+        let notes = playedNotes(clip.samples, sampleRate: clip.sampleRate)
+        #expect(notes.map(\.midiNote) == midi)
+        for (note, attack) in zip(notes, attacks) {
+            #expect(abs(note.onset - attack) <= Self.onsetTolerance, "\(note.midiNote) at \(note.onset), not \(attack)")
+        }
+    }
 }

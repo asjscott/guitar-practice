@@ -6,9 +6,11 @@ Full spec and roadmap: Claude Docs `c1631de5-f295-4bd8-a9fe-f1c1948a980d`. Befor
 
 ## Current phase
 
-**Phase 3 · Scales and triads.** Scope: scale drills in position with metronome, memory-mode fade; triad drills by string set and inversion (arpeggiated); the theme applies across notes, scales and triads blocks. Spec: #33; screens: `docs/ui.md` (P4). Tickets: #34–#48. Built on branch `phase-3-scales-and-triads` (#34, #36–#47 closed); left for a person with a guitar: the scale clip (#35), then the gate (#48).
+**Phase 4 · Backing and progressions.** Scope: MIDI backing via SoundFont (bass, keys, drums; tempo and style); progression library and Roman-numeral → key rendering; nearest voicing, stay in position and target top note drills; latency check; audio file import. Not yet specified: no spec issue or tickets.
 
-Phases 0 (spec #1), 1 (spec #11) and 2 (spec #21) are complete.
+Carried over from the Phase 3 gate (#48), to check on a guitar in Phase 4: a full Inversions climb on the theme's string set, with the triad fade.
+
+Phases 0 (spec #1), 1 (spec #11), 2 (spec #21) and 3 (spec #33) are complete.
 
 Phase order: 0 Foundations → 1 Hear the guitar → 2 Session MVP → 3 Scales and triads → 4 Backing and progressions → 5 Lick → solo → 6 Adaptive and polish. Don't start work from a later phase unless asked.
 
