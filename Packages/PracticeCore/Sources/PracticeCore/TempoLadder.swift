@@ -4,9 +4,9 @@ public struct TempoLadder: Hashable, Sendable {
     public static let step = 4
 
     /// Complete passes in a row that weren't clean, since they last took the tempo down.
-    private var notClean = 0
+    public private(set) var notClean = 0
 
-    public init() {}
+    public init(notClean: Int = 0) { self.notClean = min(max(notClean, 0), 1) }
 
     /// What a pass adds to the tempo: 4 if it was clean and kept up; 4 off after two in a row that weren't clean. One
     /// cut short counts neither way.

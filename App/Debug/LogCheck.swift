@@ -263,6 +263,7 @@ enum LogCheck {
         drill.pause()
 
         defaults.set(76, forKey: MetronomeSettings.Key.tempo(of: .upAndDown))
+        defaults.set(1, forKey: MetronomeSettings.Key.notClean(of: .upAndDown))
         var other = DrillKind.upAndDown.makeDrill(DrillSetup(fretboard: Fretboard(tuning: .standard), seed: 1))
         let run = log.run()
         other.handle(.start(at: .zero))
@@ -275,6 +276,9 @@ enum LogCheck {
         drill.resume()
         guard drill.passSettings.tempo == 76, defaults.integer(forKey: MetronomeSettings.Key.tempo(of: .upAndDown)) == 76 else {
             throw LogCheckError.freePractice("resumed at \(drill.passSettings.tempo) BPM")
+        }
+        guard drill.passSettings.ladder.notClean == 1, defaults.integer(forKey: MetronomeSettings.Key.notClean(of: .upAndDown)) == 1 else {
+            throw LogCheckError.freePractice("resumed with the old ladder count")
         }
         guard let markers = drill.snapshot.display?.markers, !markers.isEmpty, markers.allSatisfy(\.isFaint) else {
             throw LogCheckError.freePractice("resumed at the old fade stage")

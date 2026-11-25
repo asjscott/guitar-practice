@@ -186,15 +186,52 @@ struct DrillTempoTests {
         #expect(drill.display?.pass?.settings.tempo == 104)
     }
 
-    @Test func aManualChangeStartsTheCountAgain() {
+    @Test func aManualChangeLeavesTheCount() {
         var drill = started()
         playPass(&drill, wrong: true)
         change(&drill, at: s(29.5)) { $0.tempo = 80 }
         drill.handle(.repeat(at: s(30)))
         playPass(&drill, wrong: true)
-        #expect(drill.passSettings?.tempo == 80)
-        playPass(&drill, wrong: true)
         #expect(drill.passSettings?.tempo == 76)
+    }
+
+    @Test func holdLeavesTheCount() {
+        var drill = started()
+        playPass(&drill, wrong: true)
+        change(&drill, at: s(29)) { $0.holdsTempo = true }
+        playPass(&drill, wrong: true)
+        change(&drill, at: s(57)) { $0.holdsTempo = false }
+        playPass(&drill, wrong: true)
+        #expect(drill.passSettings?.tempo == 56)
+    }
+
+    @Test func theCountCarriesOnInTheNextRun() {
+        var first = started()
+        playPass(&first, wrong: true)
+        first.handle(.stop(at: s(30)))
+        var again = first
+        again.handle(.start(at: s(40)))
+        playPass(&again, wrong: true)
+        #expect(again.passSettings?.tempo == 56)
+
+        let ladder = first.passSettings?.ladder
+        var second = started { $0.ladder = ladder ?? $0.ladder }
+        playPass(&second, wrong: true)
+        #expect(second.passSettings?.tempo == 56)
+        #expect(second.passSettings?.ladder.notClean == 0)
+    }
+
+    /// As when another window's run has moved them meanwhile.
+    @Test func aCountFromElsewhereIsTakenUp() {
+        var drill = started()
+        change(&drill, at: s(1)) { $0.ladder = TempoLadder(notClean: 1) }
+        playPass(&drill, wrong: true)
+        #expect(drill.passSettings?.tempo == 56)
+    }
+
+    @Test func aCountIsNeverOutOfRange() {
+        #expect(TempoLadder(notClean: 5).notClean == 1)
+        #expect(TempoLadder(notClean: -1).notClean == 0)
     }
 
     @Test func otherSettingsLeaveItAlone() {

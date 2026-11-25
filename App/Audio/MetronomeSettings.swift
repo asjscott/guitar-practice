@@ -16,6 +16,8 @@ enum MetronomeSettings {
         static func tempo(of kind: DrillKind) -> String { "metronome.tempo.\(kind.id)" }
         /// For each scale drill.
         static func holdsTempo(of kind: DrillKind) -> String { "metronome.holdsTempo.\(kind.id)" }
+        /// The tempo ladder's count (`TempoLadder.notClean`), for each scale drill.
+        static func notClean(of kind: DrillKind) -> String { "metronome.notClean.\(kind.id)" }
 
         static let all = [signature, emphasis, volume, isSoundOn]
     }

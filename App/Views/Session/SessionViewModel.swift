@@ -411,7 +411,7 @@ final class SessionViewModel: MetronomePanelOwner {
             playClicks()
         }
         if let settings = player.passSettings, let old = before.settings, player.blockIndex == before.block,
-           settings.tempo != old.tempo || settings.holdsTempo != old.holdsTempo {
+           settings.tempo != old.tempo || settings.holdsTempo != old.holdsTempo || settings.ladder != old.ladder {
             metronome?.storeTempo(of: player.blocks[player.blockIndex].kind, from: settings)
         }
         logAttempts(of: player)

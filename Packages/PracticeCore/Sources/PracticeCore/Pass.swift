@@ -10,6 +10,7 @@ public struct PassSettings: Hashable, Sendable {
     }
     /// Turns the tempo ladder off.
     public var holdsTempo = false
+    public var ladder = TempoLadder()
     public var meter = Meter(.fourFour)
     /// Nil follows the stage reached (`DrillSetup.fadeStages`).
     public var fadeStage: FadeStage?

@@ -14,7 +14,6 @@ public struct PassDrill<Rules: PassRules>: Drill {
     /// This pass's.
     private var settings: PassSettings
     private var nextSettings: PassSettings
-    private var ladder = TempoLadder()
 
     private var pass: Pass?
     private var group = -1
@@ -112,7 +111,6 @@ public struct PassDrill<Rules: PassRules>: Drill {
         case .start(let now):
             guard !isRunning else { return }
             attempts = []
-            ladder = TempoLadder()
             rules.begin()
             beginNext(at: now)
         case .pause(let now):
@@ -209,18 +207,18 @@ public struct PassDrill<Rules: PassRules>: Drill {
         pendingClicks = [.stop(at: now)]
     }
 
-    /// A tempo that wasn't changed is left as it is now: the ladder may just have moved it.
+    /// A tempo or ladder that wasn't changed is left as it is now: a pass may just have moved it.
     private mutating func change(from old: PassSettings, to new: PassSettings) {
-        let tempo = nextSettings.tempo
+        let current = nextSettings
         nextSettings = new
-        if new.tempo == old.tempo { nextSettings.tempo = tempo }
-        if new.tempo != old.tempo || new.holdsTempo != old.holdsTempo { ladder = TempoLadder() }
+        if new.tempo == old.tempo { nextSettings.tempo = current.tempo }
+        if new.ladder == old.ladder { nextSettings.ladder = current.ladder }
     }
 
     /// A pass played at another tempo than the next one's, changed since by the player, doesn't move it.
     private mutating func followLadder() {
         guard !nextSettings.holdsTempo, settings.tempo == nextSettings.tempo else { return }
-        nextSettings.tempo += ladder.change(after: PassResult(attempts: passAttempts))
+        nextSettings.tempo += nextSettings.ladder.change(after: PassResult(attempts: passAttempts))
     }
 
     /// The last note was dealt with: the click runs to the end of the bar that note's nearest click is in.

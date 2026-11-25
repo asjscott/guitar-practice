@@ -40,15 +40,17 @@ final class Metronome {
     /// The time signature and emphasis in Settings.
     var meter: Meter { MetronomeSettings.meters(in: defaults).meter }
 
-    /// A scale drill's remembered tempo and Hold, in sessions and free practice alike, put in place of the settings' own.
+    /// A scale drill's remembered tempo, Hold and ladder, in sessions and free practice alike, put in place of the settings' own.
     func loadTempo(of kind: DrillKind, into settings: inout PassSettings) {
         settings.tempo = defaults.object(forKey: MetronomeSettings.Key.tempo(of: kind)) as? Int ?? PassSettings().tempo
         settings.holdsTempo = defaults.bool(forKey: MetronomeSettings.Key.holdsTempo(of: kind))
+        settings.ladder = TempoLadder(notClean: defaults.integer(forKey: MetronomeSettings.Key.notClean(of: kind)))
     }
 
     func storeTempo(of kind: DrillKind, from settings: PassSettings) {
         defaults.set(settings.tempo, forKey: MetronomeSettings.Key.tempo(of: kind))
         defaults.set(settings.holdsTempo, forKey: MetronomeSettings.Key.holdsTempo(of: kind))
+        defaults.set(settings.ladder.notClean, forKey: MetronomeSettings.Key.notClean(of: kind))
     }
 
     /// Does what a drill asks, and tells it when the clicks will be heard.

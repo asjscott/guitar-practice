@@ -76,7 +76,7 @@ final class DrillViewModel: MetronomePanelOwner {
     private func setPassSettings(_ new: PassSettings) {
         let old = options.pass
         options.pass = new
-        if kind.hasPasses, new.tempo != old.tempo || new.holdsTempo != old.holdsTempo {
+        if kind.hasPasses, new.tempo != old.tempo || new.holdsTempo != old.holdsTempo || new.ladder != old.ladder {
             metronome?.storeTempo(of: kind, from: new)
         }
     }
