@@ -153,7 +153,8 @@ final class AppSoundOutput {
     @MainActor
     private final class Engine {
         let device: AudioDeviceID
-        private let engine = AVAudioEngine()
+        private let runningEngine = StoppedOnRelease()
+        private var engine: AVAudioEngine { runningEngine.engine }
         private let tones = AVAudioPlayerNode()
         private let chimes = AVAudioPlayerNode()
         private var clickSlots: [ClickSlot]
@@ -251,9 +252,14 @@ final class AppSoundOutput {
                 if engine.isRunning { clickSlots[index].player.play() }
             }
         }
-
-        deinit { engine.stop() }
     }
+}
+
+/// An audio engine that stops when this is released. On no actor, so that its deinit may use the engine.
+private final class StoppedOnRelease {
+    let engine = AVAudioEngine()
+
+    deinit { engine.stop() }
 }
 
 /// A notification observer that ends when released.

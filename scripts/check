@@ -74,7 +74,10 @@ echo "✓ repo rules"
 unset $(git rev-parse --local-env-vars)
 
 for package in TheoryCore ListenCore PracticeCore; do
-  if output="$(cd "Packages/$package" && swift test 2>&1)"; then
+  # ListenCore's tests listen to minutes of audio: about 10 times as fast optimised.
+  config=debug
+  [ "$package" != ListenCore ] || config=release
+  if output="$(cd "Packages/$package" && swift test -c "$config" 2>&1)"; then
     echo "✓ $package tests"
   else
     printf '%s\n' "$output" >&2
