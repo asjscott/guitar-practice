@@ -1,6 +1,6 @@
 #!/bin/bash
 # The repo's checks. Run by .githooks/pre-commit and CI.
-#   scripts/check           repo rules + package tests (~10 s)
+#   scripts/check           repo rules + package tests (under a minute)
 #   scripts/check --rules   repo rules only
 #   scripts/check --build   also generates the Xcode project and builds the app
 set -euo pipefail
