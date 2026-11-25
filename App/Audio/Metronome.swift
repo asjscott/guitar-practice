@@ -40,6 +40,15 @@ final class Metronome {
     /// The time signature and emphasis in Settings.
     var meter: Meter { MetronomeSettings.meters(in: defaults).meter }
 
+    /// The scale drill's remembered tempo and Hold, put in place of the settings' own.
+    func loadTempo(of kind: DrillKind, into settings: inout PassSettings) {
+        MetronomeSettings.loadTempo(of: kind, into: &settings, from: defaults)
+    }
+
+    func storeTempo(of kind: DrillKind, from settings: PassSettings) {
+        MetronomeSettings.storeTempo(of: kind, from: settings, in: defaults)
+    }
+
     /// Plays a track from its start on, in place of any other clicks from then on, until stopped. Returns it as it
     /// will be heard: later than asked if its start is too soon to play. Asking in time follows on with no gap.
     @discardableResult

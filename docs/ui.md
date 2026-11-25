@@ -61,7 +61,10 @@ P4 on branch `prototype/phase3-screens`.
 - H held shows the position, in the count-in and between passes too; between passes it costs nothing unless held into the next. Pausing ends it until H goes down again; letting go, losing the window and a sheet end it.
 - Triads: the set's strings lit, and a circle per string with its note once played. The countdown ring is at the right of the header. Once the voicing is played or revealed, all of it shows. No attempt strip. At rest, the header is empty and the text is where the circles go. Inversions has a line between the neck and the circles: a dot per voicing, rising to the highest and back, over its inversion (green played, orange revealed, grey skipped), and the Inversions option is left out.
 - Beats: every beat of the bar shown, emphasised ones larger and blue, the current one orange.
-- Metronome panel: over the status-bar button ("♩ = 72 · 4/4") or on M: BPM, Hold tempo, time signature, a circle per beat to emphasise, volume, sound.
+- Metronome panel: at the button ("♩ = 72 · 4/4"; "♪ = 72 · 6/8" where an eighth note clicks), or on M: BPM, Hold tempo, time signature, a circle per beat to emphasise, volume, sound. It is drawn in the window, over the corner nearest the button, not a popover; a click elsewhere, M or Esc closes it. Closing it goes on only with a run that opening it paused, and not if sleep or losing the input or output would have paused that. While it is open the run's buttons are disabled.
+- In free practice the button is in the toolbar; Key, Scale, Position and Fade give way to it and the run's buttons during a run, when the header names them.
+- The header's BPM is the pass's that is going, the button's the next one's. A pass at another tempo than the next one's (changed since by hand) doesn't move the ladder, and changing the tempo or Hold starts its count again, as does a new run.
+- Evenness, as "evenness 18 ms", follows how the pass went, until the next count-in ends.
 - Summary: a card per block that started, as now, with the scale and triad figures.
 
 ## Settings

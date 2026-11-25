@@ -31,6 +31,7 @@ enum Snapshots {
         app.setActivationPolicy(.accessory)
         app.appearance = NSAppearance(named: environment["GP_SNAPSHOT_APPEARANCE"] == "dark" ? .darkAqua : .aqua)
         Task {
+            emptyDefaults.removePersistentDomain(forName: "GuitarPractice.snapshots")
             do {
                 try await saveAll()
                 guard savedCount > 0 else { throw SnapshotError.noScreenMatches(onlyPrefixes) }
@@ -299,6 +300,8 @@ enum Snapshots {
         scales.options.position = Position.ID(system: .caged, number: CAGEDShape.d.number)
         func run(_ rightNotes: Int = 0, then: () -> Void = {}) {
             scales.stop()
+            // As it was before any pass moved it.
+            emptyDefaults.removeObject(forKey: MetronomeSettings.Key.tempo(of: .upAndDown))
             scales.start(seed: 1)
             for _ in 0..<rightNotes { scales.playForSnapshot(right: true) }
             then()
@@ -339,6 +342,33 @@ enum Snapshots {
             scales.soundProblemChanged()
         }
         try await save("pass-no-output", DrillView(model: scales), sound: noOutput, settle: .milliseconds(1600)) { run() }
+        // The panel: on M mid-pass, which pauses; [ and ] then do nothing. Closing it goes on.
+        try await save("pass-metronome-panel", DrillView(model: scales), settle: .milliseconds(900)) {
+            run(3)
+            type("]mrs[")
+        } check: {
+            precondition(scales.isPanelOpen && scales.isPaused && scales.passSettings.tempo == 64)
+        }
+        try await save("pass-metronome-panel-closed", DrillView(model: scales), settle: .milliseconds(900)) {
+            run(3)
+            type("mm]]")
+        } check: {
+            precondition(scales.isRunning && !scales.isPaused && scales.passSettings.tempo == 68)
+        }
+        try await save("pass-metronome-panel-esc", DrillView(model: scales), settle: .milliseconds(900)) {
+            run(3)
+            type("m\u{1b}")
+        } check: {
+            precondition(scales.isRunning && !scales.isPaused && !scales.isPanelOpen)
+        }
+        try await save("pass-metronome-panel-no-resume", DrillView(model: scales), settle: .milliseconds(900)) {
+            run(3)
+            scales.isPanelOpen = true
+            scales.pause(notice: "The Mac went to sleep.")
+            scales.isPanelOpen = false
+        } check: {
+            precondition(scales.isPaused)
+        }
         try await saveFromADegree()
         // Short, with the longest headline, the longest bar and a capo.
         emptyDefaults.set("12/8", forKey: MetronomeSettings.Key.signature)
@@ -351,15 +381,28 @@ enum Snapshots {
             run(1) { scales.playForSnapshot(right: false) }
         }
         scales.stop()
+        try await save("pass-metronome-panel-short", DrillView(model: scales), size: CGSize(width: 1100, height: 400)) {
+            run()
+            scales.isPanelOpen = true
+        }
+        scales.stop()
         try await save("pass-none", DrillView(model: scales)) {
             scales.capo = 12
             scales.options.position = Position.ID(system: .caged, number: CAGEDShape.d.number)
         }
         scales.stop()
-        try await save("pass-summary", DrillView(model: scales), settle: .milliseconds(900)) {
+        try await save("pass-summary", DrillView(model: scales), settle: .milliseconds(1500)) {
             scales.capo = 0
-            run(1)
-            scales.stop()
+            scales.options.scaleKind = .major
+            scales.options.key = .major(.a)
+            run(33)
+            scales.skip()
+            scales.playForSnapshot(right: true)
+            // The view has to see it running.
+            Task {
+                try? await Task.sleep(for: .milliseconds(300))
+                scales.stop()
+            }
         }
     }
 
@@ -661,13 +704,13 @@ enum Snapshots {
         print(url.path)
     }
 
-    /// Hosts `view` in an offscreen window, lets it lay out, applies `prepare`, and writes `<name>.png`.
+    /// Hosts `view` in an offscreen window, lets it lay out, applies `prepare`, runs `check` and writes `<name>.png`.
     /// Skipped if `--only` leaves it out, so a screen must not rely on an earlier one's `prepare`; if it has to, the
     /// earlier one names it in `neededBy`.
     private static func save(_ name: String, _ view: some View, size: CGSize = screenSize, log: AttemptLog = .inMemory(),
                              sound: AppSoundOutput = AppSoundOutput(isInert: true),
                              settle: Duration = .milliseconds(400), neededBy follower: String? = nil,
-                             prepare: () -> Void = {}) async throws {
+                             prepare: () -> Void = {}, check: () -> Void = {}) async throws {
         guard isWanted(name) || follower.map(isWanted) == true else { return }
         let host = NSHostingController(rootView: view.frame(width: size.width, height: size.height).environment(audioInput)
             .environment(sound).environment(Metronome(output: sound, defaults: emptyDefaults)).environment(log).defaultAppStorage(emptyDefaults))
@@ -679,6 +722,7 @@ enum Snapshots {
         try await Task.sleep(for: .milliseconds(400))
         prepare()
         try await Task.sleep(for: settle)
+        check()
 
         // The window frame gives the title bar and toolbar. Its content can come out blank (the idle drill), so the
         // content's own layer is drawn over it.
@@ -698,6 +742,16 @@ enum Snapshots {
             context.translateBy(x: 0, y: size.height)     // the layer is flipped
             context.scaleBy(x: 1, y: -1)
             layer.render(in: context)
+        }
+        if let sheet = window.attachedSheet?.contentView?.superview,
+           let picture = sheet.bitmapImageRepForCachingDisplay(in: sheet.bounds) {
+            sheet.cacheDisplay(in: sheet.bounds, to: picture)
+            guard let image = picture.cgImage else { throw SnapshotError.couldNotRender(name) }
+            context.translateBy(x: 0, y: size.height)     // not flipped
+            context.scaleBy(x: 1, y: -1)
+            context.draw(image, in: CGRect(x: (size.width - sheet.bounds.width) / 2,
+                                                      y: (size.height - sheet.bounds.height) / 2,
+                                                      width: sheet.bounds.width, height: sheet.bounds.height))
         }
         guard let png = bitmap.representation(using: .png, properties: [:]) else {
             throw SnapshotError.couldNotRender(name)

@@ -102,6 +102,8 @@ private func setup(_ stages: FadeStages = FadeStages(), key: Key = .minor(.a), c
     options.key = key
     options.scaleKind = .minorPentatonic
     options.position = Position.ID(system: .caged, number: CAGEDShape.g.number, octave: octave)
+    // The ladder has its own tests.
+    options.pass.holdsTempo = true
     options.pass.fadeStage = override
     var setup = DrillSetup(fretboard: Fretboard(tuning: .standard, capo: capo), options: options, seed: 1)
     setup.fadeStages = stages

@@ -9,15 +9,14 @@ import TheoryCore
 /// open. Leaving it pauses the run, as do sleep and losing the input. Follows the tuning, capo, position system,
 /// time signature and emphasis in Settings.
 struct DrillView: View {
-    let model: DrillViewModel
+    @Bindable var model: DrillViewModel
     @State private var showSummary = false
     @Environment(AudioInputService.self) private var audioInput
     @Environment(AppSoundOutput.self) private var soundOutput
     @Environment(AttemptLog.self) private var log
     @Environment(Metronome.self) private var metronome
     @AppStorage(InstrumentSettings.Key.positionSystem) private var positionSystem = InstrumentSettings.defaultPositionSystem
-    @AppStorage(MetronomeSettings.Key.signature) private var storedSignature = MetronomeSettings.defaultSignature
-    @AppStorage(MetronomeSettings.Key.emphasis) private var storedEmphasis = MetronomeSettings.defaultEmphasis
+    private let meters = StoredMeters()
 
     var body: some View {
         Group {
@@ -34,7 +33,8 @@ struct DrillView: View {
                 DrillOptionsBar(model: model).disabled(model.isRunning)
             }
             ToolbarItemGroup(placement: .primaryAction) {
-                DrillRunButtons(model: model)
+                if model.kind.usesMetronome { MetronomeButton(settings: model.passSettings, isOpen: $model.isPanelOpen) }
+                DrillRunButtons(model: model).disabled(model.isPanelOpen)
             }
         }
         .typesNoteNames(isActive: model.takesNoteNames) { model.press($0) }
@@ -53,7 +53,7 @@ struct DrillView: View {
             model.capo = capo
         }
         .onChange(of: positionSystem, initial: true) { model.positionSystem = positionSystem }
-        .onChange(of: meter, initial: true) { model.passSettings.meter = meter }
+        .onChange(of: meters.meter, initial: true) { model.passSettings.meter = meters.meter }
         .onChange(of: model.isRunning) {
             if !model.isRunning, !model.snapshot.attempts.isEmpty { showSummary = true }
         }
@@ -66,8 +66,6 @@ struct DrillView: View {
             .frame(width: 520)
         }
     }
-
-    private var meter: Meter { MeterMemory(signature: storedSignature, emphasis: storedEmphasis).meter }
 
     private var drill: some View {
         VStack(spacing: 0) {
@@ -94,6 +92,7 @@ struct DrillView: View {
             }
             .sessionStatusBar()
         }
+        .metronomePanel(isOpen: $model.isPanelOpen, isAvailable: model.kind.usesMetronome, settings: $model.passSettings)
     }
 
     @ViewBuilder private var notes: some View {
@@ -159,7 +158,8 @@ private struct DrillOptionsBar: View {
         DrillPicker(kind: $model.kind)
         switch model.kind.module {
         case .notes: NoteOptions(model: model)
-        case .scales: ScaleOptions(setup: model.setup, options: $model.options)
+        // Gone during a run, when the header names them: its buttons need the room.
+        case .scales: if !model.isRunning { ScaleOptions(setup: model.setup, options: $model.options) }
         case .triads: TriadOptions(kind: model.kind, options: $model.options)
         }
     }
