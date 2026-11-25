@@ -53,6 +53,8 @@ P4 on branch `prototype/phase3-screens`.
 
 - Setup: as Session, with the string set beside the position.
 - Playing: no target card. A header line (what to play, feedback, beats and BPM), a tall zoomed neck, then the pass as a line that rises and falls with pitch and fills in as it is played. The drills bar moves below that. The count-in is a big number over the neck.
+- Scales at rest: the header has only the beats and BPM; the neck shows the position before Start, and is bare while paused; the text is where the line goes, with how to play the drill. A revealed note is ringed as if played, orange on the line. Between passes the header says how the pass went. The count-in number is the beat of the bar. Resume restarts the pass, or gives the next if it was over. The status bar counts complete and clean passes.
+- Losing the output pauses a scale drill; Resume, and Start, then go on by the beats shown.
 - The zoomed neck keeps the wood, inlays, string names and fret numbers, stays still during a pass, and has a thin bar showing which part of the neck it is. Scales: the position and two frets either side. Triads: the whole practised range, since a tighter zoom would give the voicing away (so none with Whole neck).
 - Only the last note played is lit, ringed in yellow; never the next, and not the earlier ones, which would give the shape away.
 - Fade stages: Shown has dots and names, Faded faint dots without names, Hidden faint roots only.

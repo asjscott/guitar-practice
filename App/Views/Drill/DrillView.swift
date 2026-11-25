@@ -2,17 +2,22 @@ import PracticeCore
 import SwiftUI
 import TheoryCore
 
-/// The Drill screen (free practice), D4 (or P4 for triads): a drill picker and options in the toolbar with Start (↩), Pause/Resume (P),
+/// The Drill screen (free practice), D4 (or P4 for scales and triads): a drill picker and options in the toolbar with Start (↩), Pause/Resume (P),
 /// Skip (S) and Stop (Esc), plus Repeat (R) where the drill has one; the neck card with the target string lit; under
 /// it the target card with its countdown ring, a feedback line and a strip of recent attempts; a status bar with
 /// running stats and the input meter; a summary sheet on Stop. A listening screen: audio input runs while it is
-/// open. Leaving it pauses the run, as do sleep and losing the input. Follows the tuning and capo in Settings.
+/// open. Leaving it pauses the run, as do sleep and losing the input. Follows the tuning, capo, position system,
+/// time signature and emphasis in Settings.
 struct DrillView: View {
     let model: DrillViewModel
     @State private var showSummary = false
     @Environment(AudioInputService.self) private var audioInput
     @Environment(AppSoundOutput.self) private var soundOutput
     @Environment(AttemptLog.self) private var log
+    @Environment(Metronome.self) private var metronome
+    @AppStorage(InstrumentSettings.Key.positionSystem) private var positionSystem = InstrumentSettings.defaultPositionSystem
+    @AppStorage(MetronomeSettings.Key.signature) private var storedSignature = MetronomeSettings.defaultSignature
+    @AppStorage(MetronomeSettings.Key.emphasis) private var storedEmphasis = MetronomeSettings.defaultEmphasis
 
     var body: some View {
         Group {
@@ -38,6 +43,7 @@ struct DrillView: View {
         .onAppear {
             model.log = log
             model.soundOutput = soundOutput
+            model.metronome = metronome
         }
         .onChange(of: soundOutput.problem) { model.soundProblemChanged() }
         .onDisappear { model.leave() }
@@ -45,6 +51,8 @@ struct DrillView: View {
             model.tuning = tuning
             model.capo = capo
         }
+        .onChange(of: positionSystem, initial: true) { model.positionSystem = positionSystem }
+        .onChange(of: meter, initial: true) { model.passSettings.meter = meter }
         .onChange(of: model.isRunning) {
             if !model.isRunning, !model.snapshot.attempts.isEmpty { showSummary = true }
         }
@@ -58,17 +66,25 @@ struct DrillView: View {
         }
     }
 
+    private var meter: Meter { MeterMemory(signature: storedSignature, emphasis: storedEmphasis).meter }
+
     private var drill: some View {
         VStack(spacing: 0) {
             switch model.kind.module {
-            case .notes, .scales: notes
+            case .notes: notes
+            case .scales: scales
             case .triads: triads
             }
             Divider()
             HStack(spacing: 18) {
-                Text("\(model.stats.prompts) \(model.stats.prompts == 1 ? "prompt" : "prompts")")
-                Text("first-try \(model.stats.firstTryText)")
-                Text("median \(model.stats.medianText)")
+                if model.kind.usesMetronome {
+                    Text("\(model.completePasses) \(model.completePasses == 1 ? "pass" : "passes")")
+                    Text("\(model.cleanPasses) clean")
+                } else {
+                    Text("\(model.stats.prompts) \(model.stats.prompts == 1 ? "prompt" : "prompts")")
+                    Text("first-try \(model.stats.firstTryText)")
+                    Text("median \(model.stats.medianText)")
+                }
                 if model.stats.skips > 0 { Text("\(model.stats.skips) skipped") }
                 Spacer()
                 AttemptLogNotice()
@@ -91,6 +107,13 @@ struct DrillView: View {
         }
         DrillAttemptStrip(model: model).padding(.top, 10)
         Spacer(minLength: 12)
+    }
+
+    private var scales: some View {
+        PassPrompt(display: model.snapshot.display, position: model.position, restingMarkers: model.restingMarkers,
+                   settings: model.passSettings, fretboard: model.fretboard) {
+            DrillRestingText(model: model)
+        }
     }
 
     private var triads: some View {
@@ -135,7 +158,7 @@ private struct DrillOptionsBar: View {
         DrillPicker(kind: $model.kind)
         switch model.kind.module {
         case .notes: NoteOptions(model: model)
-        case .scales: EmptyView()
+        case .scales: ScaleOptions(setup: model.setup, options: $model.options)
         case .triads: TriadOptions(kind: model.kind, options: $model.options)
         }
     }
@@ -278,7 +301,7 @@ private struct DrillRestingText: View {
             if let reason = model.inputProblem?.text ?? model.soundProblem ?? model.pauseNotice {
                 Text(reason).font(.title3).foregroundStyle(.orange)
             } else {
-                Text(model.resumesSamePrompt ? "Resume (P) to carry on" : "Resume (P) for a new prompt").font(.title3).foregroundStyle(.secondary)
+                Text(resumeText).font(.title3).foregroundStyle(.secondary)
             }
         } else {
             Text(model.kind.title).font(.title.weight(.semibold))
@@ -286,8 +309,14 @@ private struct DrillRestingText: View {
                 Text(reason).font(.title3).foregroundStyle(.orange)
             } else {
                 Text("Press Start (↩)").font(.title3).foregroundStyle(.secondary)
+                if model.kind.usesMetronome { Text(model.kind.instructions).foregroundStyle(.secondary) }
             }
         }
+    }
+
+    private var resumeText: String {
+        if model.kind.usesMetronome { return model.resumesSamePrompt ? "Resume (P) to restart the pass" : "Resume (P) for the next pass" }
+        return model.resumesSamePrompt ? "Resume (P) to carry on" : "Resume (P) for a new prompt"
     }
 }
 
@@ -335,16 +364,21 @@ private struct DrillRunSummary: View {
         VStack(alignment: .leading, spacing: 10) {
             Text(model.isCheckRun ? "Check run" : "Run summary").font(.headline)
             HStack(spacing: 28) {
-                stat("Prompts", "\(stats.prompts)")
-                stat("First-try right", stats.firstTryText)
-                stat("Median time", stats.medianText)
+                if model.kind.usesMetronome {
+                    stat("Passes", "\(model.completePasses)")
+                    stat("Clean", "\(model.cleanPasses)")
+                } else {
+                    stat("Prompts", "\(stats.prompts)")
+                    stat("First-try right", stats.firstTryText)
+                    stat("Median time", stats.medianText)
+                }
                 stat("Timed out", "\(stats.timeouts)")
                 stat("Skipped", "\(stats.skips)")
             }
             if model.isCheckRun {
                 list("Misses", stats.misses, emptyText: "None: every location was right first time.")
                 list("Slowest onsets", stats.slowest(5).filter { $0.outcome == .answered })
-            } else {
+            } else if !model.kind.usesMetronome {
                 list("Slowest", stats.slowest(3))
                 if !model.sweeps.isEmpty { lines("Sweeps", model.sweeps.suffix(6).map(\.summaryLine)) }
             }
@@ -388,15 +422,11 @@ private struct DrillRunSummary: View {
     }
 }
 
-private extension String {
-    /// "String 3 (G)" from "string 3 (G)".
-    var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
-}
-
 #Preview {
     DrillView(model: DrillViewModel())
         .environment(AudioInputService())
         .environment(AppSoundOutput(isInert: true))
+        .environment(Metronome(output: AppSoundOutput(isInert: true)))
         .environment(AttemptLog.inMemory())
         .frame(width: 1100, height: 600)
 }

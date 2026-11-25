@@ -126,7 +126,7 @@ private struct ClimbLine: View {
     }
 }
 
-private extension DrillDisplay.Chip.State {
+extension DrillDisplay.Chip.State {
     /// Stronger than `fill`, for a dot.
     var dotFill: Color {
         switch self {

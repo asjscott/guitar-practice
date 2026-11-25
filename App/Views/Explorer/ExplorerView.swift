@@ -114,11 +114,6 @@ struct ExplorerView: View {
     }
 }
 
-private extension String {
-    /// "natural minor" → "Natural minor", for picker labels.
-    var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
-}
-
 #Preview {
     ExplorerView(model: ExplorerViewModel())
         .frame(width: 900, height: 420)

@@ -35,6 +35,10 @@ public enum DrillEvent: Hashable, Sendable {
     /// Answers can't be heard until then: the prompt that is up, and any that follows, isn't timed before it.
     /// For drills that can be held (`canHold`); pausing drops it.
     case hold(until: Duration)
+    /// The clicks just asked for, as they will be heard.
+    case clicksStarted(ClickTrack)
+    /// What passes are played at, from the next one on.
+    case passSettings(PassSettings, at: Duration)
     /// The clock moved on; timeouts and the next prompt happen on ticks.
     case tick(at: Duration)
 }
@@ -59,6 +63,15 @@ public struct DrillSoundRequest: Hashable, Sendable {
         self.tones = tones
         self.at = at
     }
+}
+
+/// What a drill wants of the metronome.
+public enum ClickRequest: Hashable, Sendable {
+    /// These clicks from their start on, in place of any others. Answered at once with `DrillEvent.clicksStarted`;
+    /// without an answer they are taken to be heard as asked.
+    case start(ClickTrack)
+    /// None at or after a time.
+    case stop(at: Duration)
 }
 
 /// The one interface to every drill: a pure state machine driven by events and a clock.
@@ -102,9 +115,14 @@ public protocol Drill: Sendable {
     /// The sounds asked for since the last call: call it after every event. A new prompt, pausing and stopping
     /// drop any not yet taken; the caller also stops what is playing then.
     mutating func takeSounds() -> [DrillSoundRequest]
+
+    /// The clicks asked for since the last call, to be done in order: call it after every event.
+    mutating func takeClicks() -> [ClickRequest]
 }
 
 extension Drill {
+    public mutating func takeClicks() -> [ClickRequest] { [] }
+
     /// True from Start until Stop (or the end of an "In order (check)" run), paused included.
     public var isRunning: Bool { phase != .idle }
 

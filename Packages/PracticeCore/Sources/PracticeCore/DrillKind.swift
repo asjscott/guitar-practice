@@ -1,6 +1,6 @@
 /// A drill the app offers. The Drill screen's picker and the session planner read `all`.
 ///
-/// To add a drill: write its `DrillRules` in its own file, with a `static let` for its kind in an extension
+/// To add a drill: write its `DrillRules` (a scale drill's `PassRules`) in its own file, with a `static let` for its kind in an extension
 /// of `DrillKind`, and add that kind to `all`.
 public struct DrillKind: Identifiable, Sendable {
     /// Every drill, in the picker's order.
@@ -9,6 +9,7 @@ public struct DrillKind: Identifiable, Sendable {
         .allInstances,
         .hearFindIt,
         .fretNameIt,
+        .upAndDown,
         .triadPlayIt,
         .inversions,
     ]
@@ -45,6 +46,9 @@ public struct DrillKind: Identifiable, Sendable {
     /// Whether the player chooses its inversions.
     public let offersInversions: Bool
 
+    /// Played to the metronome.
+    public let usesMetronome: Bool
+
     /// What R does, as a button title ("Replay"); nil = nothing.
     public let repeatTitle: String?
 
@@ -54,6 +58,24 @@ public struct DrillKind: Identifiable, Sendable {
                                    usesKeyboard: Bool = false, needsSound: Bool = false, hidesNote: Bool = false,
                                    isInSessions: Bool = true, offersOrder: Bool = false,
                                    offersInversions: Bool = false, repeatTitle: String? = nil, rules: Rules.Type) {
+        self.init(id: id, module: module, title: title, instructions: instructions, symbol: symbol,
+                  usesKeyboard: usesKeyboard, needsSound: needsSound, hidesNote: hidesNote, isInSessions: isInSessions,
+                  offersOrder: offersOrder, offersInversions: offersInversions, usesMetronome: false,
+                  repeatTitle: repeatTitle) { PromptDrill<Rules>(setup: $0) }
+    }
+
+    /// A scale drill.
+    public init<Rules: PassRules>(id: String, title: String, instructions: String, symbol: String,
+                                  isInSessions: Bool = true, rules: Rules.Type) {
+        self.init(id: id, module: .scales, title: title, instructions: instructions, symbol: symbol, usesKeyboard: false,
+                  needsSound: false, hidesNote: false, isInSessions: isInSessions, offersOrder: false,
+                  offersInversions: false, usesMetronome: true, repeatTitle: "Restart") { PassDrill<Rules>(setup: $0) }
+    }
+
+    private init(id: String, module: DrillModule, title: String, instructions: String, symbol: String,
+                 usesKeyboard: Bool, needsSound: Bool, hidesNote: Bool, isInSessions: Bool, offersOrder: Bool,
+                 offersInversions: Bool, usesMetronome: Bool, repeatTitle: String?,
+                 make: @escaping @Sendable (DrillSetup) -> any Drill) {
         self.id = id
         self.module = module
         self.title = title
@@ -66,7 +88,8 @@ public struct DrillKind: Identifiable, Sendable {
         self.offersOrder = offersOrder
         self.offersInversions = offersInversions
         self.repeatTitle = repeatTitle
-        make = { PromptDrill<Rules>(setup: $0) }
+        self.usesMetronome = usesMetronome
+        self.make = make
     }
 
     /// A new drill of this kind, idle. Order is dropped from the options where the kind doesn't offer it.

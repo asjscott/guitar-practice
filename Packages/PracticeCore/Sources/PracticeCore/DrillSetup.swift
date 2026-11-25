@@ -40,6 +40,18 @@ public struct DrillOptions: Hashable, Sendable {
     /// Triads only.
     public var inversions = Set(Triad.Inversion.allCases)
 
+    /// Scales only. The key moves to its mode.
+    public var scaleKind: Scale.Kind = .major
+
+    /// Scales only: which positions there are to choose from.
+    public var positionSystem: Position.System = .caged
+
+    /// Scales only. One that isn't there falls back (`DrillSetup.position`).
+    public var position = Position.ID(system: .caged, number: CAGEDShape.e.number)
+
+    /// Scales only: what passes are played at, at first.
+    public var pass = PassSettings()
+
     public init() {}
 }
 
