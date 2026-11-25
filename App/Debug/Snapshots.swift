@@ -271,6 +271,8 @@ enum Snapshots {
             climb.capo = 12
         }
 
+        try await savePasses()
+
         try await save("drill-not-saving", DrillView(model: DrillViewModel()), log: .inMemory(problem: "The file couldn’t be opened."))
 
         // A menu can't be drawn offscreen, so its items are laid out inline.
@@ -287,6 +289,60 @@ enum Snapshots {
                        size: CGSize(width: 520, height: 700))
         try await save("settings-audio", AudioSettingsView(), size: CGSize(width: 520, height: 480))
         try await saveMetronome()
+    }
+
+    private static func savePasses() async throws {
+        let noOutput = AppSoundOutput(isInert: true, problem: "There’s no sound output device.")
+        let scales = DrillViewModel()
+        scales.kind = .upAndDown
+        scales.options.key = .major(.a)
+        scales.options.position = Position.ID(system: .caged, number: CAGEDShape.d.number)
+        func run(_ rightNotes: Int = 0, then: () -> Void = {}) {
+            scales.stop()
+            scales.start(seed: 1)
+            for _ in 0..<rightNotes { scales.playForSnapshot(right: true) }
+            then()
+        }
+        try await save("pass-idle", DrillView(model: scales))
+        try await save("pass-count-in", DrillView(model: scales), settle: .milliseconds(1600)) { run() }
+        try await save("pass-playing", DrillView(model: scales)) { run(11) }
+        try await save("pass-wrong", DrillView(model: scales)) {
+            run(11) { scales.playForSnapshot(right: false) }
+        }
+        try await save("pass-revealed", DrillView(model: scales)) {
+            run(11) { scales.timeOutForSnapshot() }
+        }
+        try await save("pass-clean", DrillView(model: scales), settle: .milliseconds(150)) { run(33) }
+        try await save("pass-paused", DrillView(model: scales)) {
+            run(3) { scales.togglePause() }
+        }
+        try await save("pass-output-lost", DrillView(model: scales)) {
+            run()
+            scales.soundOutput = noOutput
+            scales.soundProblemChanged()
+        }
+        try await save("pass-no-output", DrillView(model: scales), sound: noOutput, settle: .milliseconds(1600)) { run() }
+        // Short, with the longest headline, the longest bar and a capo.
+        emptyDefaults.set("12/8", forKey: MetronomeSettings.Key.signature)
+        defer { emptyDefaults.removeObject(forKey: MetronomeSettings.Key.signature) }
+        scales.stop()
+        try await save("pass-short", DrillView(model: scales), size: CGSize(width: 1100, height: 440)) {
+            scales.capo = 2
+            scales.options.key = .minor(.bFlat)
+            scales.options.scaleKind = .minorPentatonic
+            run(1) { scales.playForSnapshot(right: false) }
+        }
+        scales.stop()
+        try await save("pass-none", DrillView(model: scales)) {
+            scales.capo = 12
+            scales.options.position = Position.ID(system: .caged, number: CAGEDShape.d.number)
+        }
+        scales.stop()
+        try await save("pass-summary", DrillView(model: scales), settle: .milliseconds(900)) {
+            scales.capo = 0
+            run(1)
+            scales.stop()
+        }
     }
 
     private static func saveMetronome() async throws {

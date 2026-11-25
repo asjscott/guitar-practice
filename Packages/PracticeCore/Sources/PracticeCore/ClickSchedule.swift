@@ -36,6 +36,18 @@ public struct ClickTrack: Hashable, Sendable {
         while self.time(ofClick: index) < time { index += 1 }
         return index
     }
+
+    /// The last click at or before a time; 0 before the first.
+    func lastClick(by time: Duration) -> Int {
+        let next = firstClick(from: time)
+        return self.time(ofClick: next) > time ? max(0, next - 1) : next
+    }
+
+    /// A time halfway between two goes to the later.
+    func nearestClick(to time: Duration) -> Int {
+        let last = lastClick(by: time)
+        return time - self.time(ofClick: last) < self.time(ofClick: last + 1) - time ? last : last + 1
+    }
 }
 
 /// The clicks to be heard: one track after another.
@@ -90,7 +102,6 @@ public struct ClickSchedule: Hashable, Sendable {
     /// The last click heard by a time; nil before the first, and once they have stopped.
     public func current(at time: Duration) -> ScheduledClick? {
         guard let part = parts.last(where: { $0.track.start <= time }), part.end.map({ time < $0 }) ?? true else { return nil }
-        let next = part.track.firstClick(from: time)
-        return part.track.click(part.track.time(ofClick: next) == time ? next : next - 1)
+        return part.track.click(part.track.lastClick(by: time))
     }
 }

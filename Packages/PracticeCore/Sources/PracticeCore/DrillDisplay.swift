@@ -86,8 +86,20 @@ public struct DrillDisplay: Hashable, Sendable {
     /// A climb's voicings, up and back; empty in other drills.
     public var voicings: [Chip] = []
 
+    /// The pass, in scale drills.
+    public var pass: PassProgress?
+
     /// Waiting for a typed name: what is typed so far replaces the headline.
     public var acceptsTypedName = false
+
+    init(headline: String, subline: String, feedback: String, result: Result, markers: [Marker]) {
+        self.headline = headline
+        self.subline = subline
+        self.feedback = feedback
+        self.result = result
+        self.markers = markers
+        highlightedStrings = []
+    }
 
     /// The display most drills start from, and change what differs.
     public init(standard moment: DrillMoment, in setup: DrillSetup) {
