@@ -14,7 +14,8 @@ extension FretboardDiagram {
         capo = fretboard.capo
         labelMode = .shown
         markers = (display?.markers ?? []).map {
-            Marker(location: $0.location, label: $0.label, role: $0.isAnswer ? .root : .tone, isLastPlayed: $0.isLastPlayed)
+            Marker(location: $0.location, label: $0.label, role: $0.isAnswer ? .root : .tone, isFaint: $0.isFaint,
+                   isLastPlayed: $0.isLastPlayed)
         }
         highlightedStrings = display?.highlightedStrings ?? []
     }

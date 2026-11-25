@@ -79,6 +79,9 @@ public struct DrillSetup: Hashable, Sendable {
     /// Notes to ask for more often; nil = all alike.
     public var weighting: NoteWeighting?
 
+    /// Scales only: the fade stages reached before the run.
+    public var fadeStages = FadeStages()
+
     public var seed: UInt64
 
     public init(fretboard: Fretboard, options: DrillOptions = .init(), key: Key? = nil,

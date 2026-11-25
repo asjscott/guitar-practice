@@ -57,7 +57,8 @@ P4 on branch `prototype/phase3-screens`.
 - Losing the output pauses a scale drill; Resume, and Start, then go on by the beats shown.
 - The zoomed neck keeps the wood, inlays, string names and fret numbers, stays still during a pass, and has a thin bar showing which part of the neck it is. Scales: the position and two frets either side. Triads: the whole practised range, since a tighter zoom would give the voicing away (so none with Whole neck).
 - Only the last note played is lit, ringed in yellow; never the next, and not the earlier ones, which would give the shape away.
-- Fade stages: Shown has dots and names, Faded faint dots without names, Hidden faint roots only.
+- Fade stages: Shown has dots and names, Faded faint dots without names, Hidden faint roots only; the last note played keeps its name. The toolbar's Fade is Follow (the stage reached), Shown, Faded or Hidden.
+- H held shows the position, in the count-in and between passes too; between passes it costs nothing unless held into the next. Pausing ends it until H goes down again; letting go, losing the window and a sheet end it.
 - Triads: the set's strings lit, and a circle per string with its note once played. The countdown ring is at the right of the header. Once the voicing is played or revealed, all of it shows. No attempt strip. At rest, the header is empty and the text is where the circles go. Inversions has a line between the neck and the circles: a dot per voicing, rising to the highest and back, over its inversion (green played, orange revealed, grey skipped), and the Inversions option is left out.
 - Beats: every beat of the bar shown, emphasised ones larger and blue, the current one orange.
 - Metronome panel: over the status-bar button ("♩ = 72 · 4/4") or on M: BPM, Hold tempo, time signature, a circle per beat to emphasise, volume, sound.

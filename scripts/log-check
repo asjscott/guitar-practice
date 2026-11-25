@@ -14,7 +14,8 @@ trap 'rm -rf "$folder"' EXIT
 export GP_LOG_CHECK="$folder/Check.store"
 GP_LOG_CHECK_STEP=write "$app"
 found="$(GP_LOG_CHECK_STEP=read "$app")"
-expected='attempt notePlayIt freePractice answered tuning [38, 45, 50, 55, 59, 64] capo 2 target E string 3 fret 9 pitch 64 group none first false wrong [65] timed session none facts []
+expected='fade hidden, in Drop D shown
+attempt notePlayIt freePractice answered tuning [38, 45, 50, 55, 59, 64] capo 2 target E string 3 fret 9 pitch 64 group none first false wrong [65] timed session none facts []
 attempt notePlayIt freePractice skipped tuning [38, 45, 50, 55, 59, 64] capo 2 target C string 2 fret -1 pitch -1 group none first false wrong [] no time session none facts []
 attempt notePlayIt freePractice timedOut tuning [38, 45, 50, 55, 59, 64] capo 2 target D string 4 fret -1 pitch -1 group none first false wrong [] no time session none facts []
 attempt notePlayIt session skipped tuning [40, 45, 50, 55, 59, 64] capo 0 target B string 3 fret -1 pitch -1 group none first false wrong [] no time session 2026-07-25 block 1 facts []

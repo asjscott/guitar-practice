@@ -114,15 +114,17 @@ final class DrillViewModel {
     /// What a run would be made from, but for its seed.
     var setup: DrillSetup { DrillSetup(fretboard: fretboard, options: options, seed: 0) }
 
-    private func newDrill(seed: UInt64) -> any Drill {
+    private func newDrill(seed: UInt64, fadeStages: FadeStages = FadeStages()) -> any Drill {
         var setup = setup
         setup.seed = seed
+        setup.fadeStages = fadeStages
         return kind.makeDrill(setup)
     }
 
     func start(seed: UInt64 = .random(in: .min ... .max)) {
         guard !isRunning, inputProblem == nil, nothingToPromptReason == nil, prepareSound() else { return }
-        drill = newDrill(seed: seed)
+        let positions = kind.module == .scales ? [position?.id].compactMap { $0 } : []
+        drill = newDrill(seed: seed, fadeStages: log?.fadeStages(in: positions) ?? FadeStages())
         runLog = log?.run()
         send(.start(at: clockNow()))
         startTicking()
@@ -151,6 +153,12 @@ final class DrillViewModel {
 
     /// R: what it does is up to the drill.
     func repeatPrompt() { send(.repeat(at: clockNow())) }
+
+    /// Whether H is the drill's: while paused too, so that it doesn't do something else.
+    var takesHint: Bool { isRunning && kind.module == .scales }
+
+    /// H held or let go.
+    func hint(isShown: Bool) { send(.hint(isShown: isShown, at: clockNow())) }
 
     func stop() {
         guard isRunning else { return }
