@@ -21,7 +21,7 @@ open GuitarPractice.xcodeproj           # then Run (⌘R)
 Checks (repo rules and package tests), also run by the pre-commit hook and CI:
 
 ```bash
-git config core.hooksPath .githooks     # once per clone: turns the pre-commit hook on
+git config core.hooksPath .githooks     # once per clone: turns the hooks on
 scripts/check                           # add --build to build the app too
 ```
 

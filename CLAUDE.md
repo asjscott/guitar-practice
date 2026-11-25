@@ -2,7 +2,7 @@
 
 Native macOS app for a daily, varied guitar practice routine: fretboard notes, scales in position, triads, triads over progressions, and building licks into solos. The guitar comes in through an audio interface; the app listens with pitch detection, plays backing, and adapts to weak spots.
 
-Full spec and roadmap: Claude Docs `c1631de5-f295-4bd8-a9fe-f1c1948a980d`. Before starting a phase, read that phase's section with the docs connector (not the Artifact tool): read body node `32106882-4615` (engine `prose`) with `{"projection":"outline"}` (~8 KB; the whole doc is over 50 KB), then each table or list you need with `{"kind":"view","parentId":"<id>"}`. Give node ids in full (`ms84a902bdp.13168`, not `.13168`). The link for people: https://claude.ai/artifact/Qt4EnpkCLa34Z3Fa5icthA
+Full spec and roadmap: Claude Docs `c1631de5-f295-4bd8-a9fe-f1c1948a980d`. Before starting a phase, read that phase's section with the docs connector (not the Artifact tool): read body node `32106882-4615` (engine `prose`) with `{"projection":"outline"}` (~8 KB; the whole doc is over 50 KB), then each table or list you need with `{"kind":"view","parentId":"<id>"}`. Reading needs no docs guide; call `guide` only before writing. Give node ids in full (`ms84a902bdp.13168`, not `.13168`). The link for people: https://claude.ai/artifact/Qt4EnpkCLa34Z3Fa5icthA
 
 ## Current phase
 
@@ -70,6 +70,8 @@ Use the terms in `GLOSSARY.md`. Phase 0 decisions are recorded there and in `doc
 
 ## How to work
 
+- Start with `git status`. If it shows changes you didn't make, or a branch another session is using, work in a git worktree.
+- After pushing main, wait for its CI run (`gh run watch`) and report the result: CI's Xcode can be older than this Mac's.
 - For anything non-trivial, outline the plan first and wait for approval.
 - In TheoryCore, write the tests first, then the implementation.
 - When a change affects the spec (a decision or behaviour change), say so, so the spec doc can be updated.
@@ -86,4 +88,4 @@ Default vocabulary: needs-triage, needs-info, ready-for-agent, ready-for-human, 
 
 ### Domain docs
 
-Single-context: root `GLOSSARY.md` + `docs/adr/`. See `docs/agents/domain.md`.
+Single-context: root `GLOSSARY.md` + `docs/adr/`. Read `docs/agents/domain.md` before exploring the domain and before `/to-spec`.
