@@ -28,7 +28,7 @@ struct CAGEDInvariantTests {
     static let scales: [Scale] = Key.appMajorKeys.flatMap { key in Scale.Kind.allCases.map { Scale($0, in: key) } }
 
     @Test(arguments: setups)
-    func everyPositionHoldsTheScaleTwoPentatonicNotesPerStringInsideTheFrets(preset: TuningPreset, capo: Int) {
+    func everyPositionHoldsTheScaleWithTwoPentatonicNotesPerString(preset: TuningPreset, capo: Int) {
         let fretboard = Fretboard(tuning: preset.tuning, capo: capo)
         for scale in Self.scales {
             let pentatonic = Set(Scale(.majorPentatonic, tonic: scale.key.relativeMajor.tonic).pitchClasses)
@@ -39,9 +39,24 @@ struct CAGEDInvariantTests {
                 for string in fretboard.strings {
                     let onString = position.locations.filter { $0.string == string }
                     let pentatonicCount = onString.filter { pentatonic.contains(fretboard.pitch(at: $0).pitchClass) }.count
-                    #expect(pentatonicCount == 2, "\(scale) \(position.name) string \(string)")
+                    // Other tunings can need a third, or a scale note below the shape's first would skip it.
+                    let isRight = preset.tuning.hasStandardIntervals ? pentatonicCount == 2 : (2...3).contains(pentatonicCount)
+                    #expect(isRight, "\(scale) \(position.name) string \(string)")
                     #expect(onString.allSatisfy { position.frets.contains($0.fret) })
                 }
+            }
+        }
+    }
+
+    @Test(arguments: setups)
+    func noScaleNoteIsSkippedBetweenTheLowestAndTheHighest(preset: TuningPreset, capo: Int) throws {
+        let fretboard = Fretboard(tuning: preset.tuning, capo: capo)
+        for scale in Self.scales {
+            for position in fretboard.cagedPositions(of: scale) {
+                let pitches = Set(position.locations.map { fretboard.pitch(at: $0).midi })
+                let low = try #require(pitches.min()), high = try #require(pitches.max())
+                let skipped = (low...high).filter { scale.contains(Pitch($0).pitchClass) && !pitches.contains($0) }
+                #expect(skipped.isEmpty, "\(scale) \(position.name) octave \(position.octave): \(skipped)")
             }
         }
     }
@@ -58,11 +73,18 @@ struct CAGEDInvariantTests {
                 #expect(lowest.octave == 0)
                 // An octave lower would cross the capo (or the nut).
                 #expect(lowest.frets.lowerBound - 12 < capo, "\(scale) \(lowest.name)")
-                let upFits = lowest.frets.upperBound + 12 <= 22
-                #expect((copies.count == 2) == upFits, "\(scale) \(lowest.name)")
+                // A stretch can go on another string in either placement; the pentatonic notes can't.
+                let pentatonic = Set(Scale(.majorPentatonic, tonic: scale.key.relativeMajor.tonic).pitchClasses)
+                func core(_ position: Position) -> [FretboardLocation] {
+                    position.locations.filter { pentatonic.contains(fretboard.pitch(at: $0).pitchClass) }
+                }
+                if lowest.frets.upperBound + 12 <= 22 { #expect(copies.count == 2, "\(scale) \(lowest.name)") }
+                if core(lowest).contains(where: { $0.fret + 12 > 22 }) { #expect(copies.count == 1, "\(scale) \(lowest.name)") }
                 if copies.count == 2 {
                     #expect(copies[1].octave == 1)
-                    #expect(copies[1].locations.map(\.fret) == lowest.locations.map { $0.fret + 12 })
+                    #expect(core(copies[1]).map(\.fret) == core(lowest).map { $0.fret + 12 }, "\(scale) \(lowest.name)")
+                    let pitches = Set(lowest.locations.map { fretboard.pitch(at: $0).midi + 12 })
+                    #expect(Set(copies[1].locations.map { fretboard.pitch(at: $0).midi }) == pitches, "\(scale) \(lowest.name)")
                 }
             }
             if capo == 0 {

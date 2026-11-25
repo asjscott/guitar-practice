@@ -6,16 +6,23 @@ import Foundation
 extension Fretboard {
     /// The placements of a position given in relative frets: the lowest that fits, then the
     /// octave-up copy if it fits. Empty when it fits nowhere (a high capo).
-    func placements(of relativeLocations: [FretboardLocation]) -> [[FretboardLocation]] {
-        guard let low = relativeLocations.map(\.fret).min(), let high = relativeLocations.map(\.fret).max()
-        else { return [] }
+    ///
+    /// A position can also have notes with a choice of locations, the best first: each placement takes the first that
+    /// fits there, and fits only if they all have one.
+    func placements(of relativeLocations: [FretboardLocation],
+                    choices: [[FretboardLocation]] = []) -> [[FretboardLocation]] {
+        guard let low = relativeLocations.map(\.fret).min() else { return [] }
         // The smallest octave shift that lifts the lowest fret to the capo or above.
         let lowest = Int((Double(playableFrets.lowerBound - low) / 12).rounded(.up))
-        return [lowest, lowest + 1]
-            .filter { high + 12 * $0 <= playableFrets.upperBound }
-            .map { shift in
-                relativeLocations.map { FretboardLocation(string: $0.string, fret: $0.fret + 12 * shift) }
+        return [lowest, lowest + 1].compactMap { shift in
+            func placed(_ location: FretboardLocation) -> FretboardLocation? {
+                let fret = location.fret + 12 * shift
+                return playableFrets.contains(fret) ? FretboardLocation(string: location.string, fret: fret) : nil
             }
+            let fixed = relativeLocations.compactMap(placed)
+            let chosen = choices.compactMap { $0.lazy.compactMap(placed).first }
+            return fixed.count == relativeLocations.count && chosen.count == choices.count ? fixed + chosen : nil
+        }
     }
 
     /// `notesPerString` scale notes per string from string 6 up, starting on `notes[start]`,

@@ -26,7 +26,7 @@ struct CAGEDDropDTests {
         let dropD = Fretboard(tuning: TuningPreset.dropD.tuning, capo: capo)
         for scale in Self.scales {
             let standardShapes = standard.cagedPositions(of: scale)
-            for shape in dropD.cagedPositions(of: scale) {
+            for shape in dropD.cagedPositions(of: scale) where !isStretchOffTheNeck(shape, of: scale) {
                 let upper = Set(shape.locations.filter { $0.string > 0 })
                 // The same shape in standard tuning, at any placement (the low string can
                 // move where it fits), shifted by whole octaves.
@@ -40,6 +40,12 @@ struct CAGEDDropDTests {
             }
         }
     }
+}
+
+/// G blues' high E shape stretches to fret 21 on string 6, which in Drop D is fret 23, past the neck: the note is on
+/// string 5 instead.
+private func isStretchOffTheNeck(_ shape: Position, of scale: Scale) -> Bool {
+    scale.kind == .blues && scale.tonic == .g && shape.cagedShape == .e && shape.octave == 1
 }
 
 /// A dropped low string plays the standard shape's string-6 notes: the same pitches as standard
@@ -56,13 +62,20 @@ struct CAGEDDropDLowStringTests {
         #expect(dropD.locations.filter { $0.string == 0 }.map(\.fret) == [12, 14, 15])     // D E F
     }
 
+    @Test func aStretchPastTheNeckGoesOnTheOtherString() throws {
+        let shape = try #require(Fretboard(tuning: TuningPreset.dropD.tuning).cagedPositions(of: Scale(.blues, tonic: .g))
+            .first { $0.cagedShape == .e && $0.octave == 1 })
+        #expect(shape.locations.filter { $0.string == 0 }.map(\.fret) == [20, 22])     // B♭ C
+        #expect(shape.locations.filter { $0.string == 1 }.map(\.fret) == [16, 17, 20]) // D♭ D F
+    }
+
     @Test(arguments: [0, 2])
     func everyShapePlaysTheStandardShapesPitches(capo: Int) {
         let standard = Fretboard(tuning: .standard, capo: capo)
         let dropD = Fretboard(tuning: TuningPreset.dropD.tuning, capo: capo)
         for scale in CAGEDDropDTests.scales {
             let standardShapes = standard.cagedPositions(of: scale)
-            for shape in dropD.cagedPositions(of: scale) {
+            for shape in dropD.cagedPositions(of: scale) where !isStretchOffTheNeck(shape, of: scale) {
                 let pitches = shape.locations.map { [$0.string, dropD.pitch(at: $0).midi] }
                 // The same shape in standard tuning, at any placement, by whole octaves: every
                 // string, string 6 included, sounds the same pitches.

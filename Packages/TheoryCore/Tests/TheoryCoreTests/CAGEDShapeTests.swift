@@ -83,13 +83,35 @@ struct CAGEDStandardTuningTests {
         #expect(minor.allSatisfy { $0.scale == eMinorPentatonic })
     }
 
-    @Test func bluesAddsItsBlueNoteInsideTheWindow() throws {
+    @Test func eMajorAShapeStretchesForItsFourth() throws {
+        // Window 6–9. The A between G♯ (string 2, fret 9) and B (string 1, fret 7) is one fret over it.
+        let a = try #require(position(.a, of: Scale(.major, tonic: .e)))
+        #expect(fretsPerString(a) == [[7, 9], [6, 7, 9], [6, 7, 9], [6, 8, 9], [7, 9, 10], [7, 9]])
+        #expect(a.frets == 6...10)
+    }
+
+    @Test func eMajorGShapeStretchesForItsSeventh() throws {
+        // Window 9–12. The D♯ between C♯ (string 4, fret 11) and E (string 3, fret 9) is one fret under it.
+        let g = try #require(position(.g, of: Scale(.major, tonic: .e)))
+        #expect(fretsPerString(g) == [[9, 11, 12], [9, 11, 12], [9, 11], [8, 9, 11], [9, 10, 12], [9, 11, 12]])
+        #expect(g.frets == 8...12)
+    }
+
+    @Test func atTheNutTheStretchGoesOnTheOtherString() throws {
+        // F♯ would be a fret below the nut on string 3: it is on string 4, fret 4.
+        let nut = try #require(position(.g, of: Scale(.naturalMinor, tonic: .e)))
+        #expect(fretsPerString(nut) == [[0, 2, 3], [0, 2, 3], [0, 2, 4], [0, 2], [0, 1, 3], [0, 2, 3]])
+        let up = try #require(position(.g, octave: 1, of: Scale(.naturalMinor, tonic: .e)))
+        #expect(fretsPerString(up) == [[12, 14, 15], [12, 14, 15], [12, 14], [11, 12, 14], [12, 13, 15], [12, 14, 15]])
+    }
+
+    @Test func bluesAddsItsBlueNotesInsideTheWindowAndWhereOneIsSkipped() throws {
         // E blues uses G major's E-shape window, 2–5. Its B♭ (♭5) falls inside it only on
-        // string 3 (G), fret 3; elsewhere it is at frets 1, 6, 8 or 11.
+        // string 3 (G), fret 3. The low one, between A and B, is one fret over it on string 6.
         let e = try #require(position(.e, of: Scale(.blues, tonic: .e)))
         let blueNotes = e.locations.filter { fretboard.pitch(at: $0).pitchClass == PitchClass(10) }
-        #expect(blueNotes == [FretboardLocation(string: 3, fret: 3)])
-        #expect(e.frets == 2...5)
+        #expect(blueNotes == [FretboardLocation(string: 0, fret: 6), FretboardLocation(string: 3, fret: 3)])
+        #expect(e.frets == 2...6)
     }
 }
 
