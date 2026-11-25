@@ -10,6 +10,7 @@ public struct DrillKind: Identifiable, Sendable {
         .hearFindIt,
         .fretNameIt,
         .upAndDown,
+        .fromADegree,
         .triadPlayIt,
         .inversions,
     ]

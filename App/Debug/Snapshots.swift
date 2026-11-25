@@ -352,6 +352,7 @@ enum Snapshots {
         } check: {
             precondition(scales.isPaused)
         }
+        try await saveFromADegree()
         // Short, with the longest headline, the longest bar and a capo.
         emptyDefaults.set("12/8", forKey: MetronomeSettings.Key.signature)
         defer { emptyDefaults.removeObject(forKey: MetronomeSettings.Key.signature) }
@@ -386,6 +387,20 @@ enum Snapshots {
                 scales.stop()
             }
         }
+    }
+
+    private static func saveFromADegree() async throws {
+        let model = DrillViewModel()
+        model.kind = .fromADegree
+        model.options.key = .minor(.a)
+        model.options.scaleKind = .blues
+        model.options.position = Position.ID(system: .caged, number: CAGEDShape.g.number)
+        try await save("pass-from-a-degree-idle", DrillView(model: model))
+        try await save("pass-from-a-degree", DrillView(model: model)) {
+            model.start(seed: 1)
+            for _ in 0..<4 { model.playForSnapshot(right: true) }
+        }
+        model.stop()
     }
 
     private static func saveMetronome() async throws {
