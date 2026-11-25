@@ -25,8 +25,8 @@ attempt allInstances freePractice skipped tuning [40, 45, 50, 55, 59, 64] capo 0
 attempt allInstances freePractice skipped tuning [40, 45, 50, 55, 59, 64] capo 0 target G string 0 fret 3 pitch 43 group 2 first false wrong [] no time session none facts []
 attempt notePlayIt freePractice skipped tuning [40, 45, 50, 55, 59, 64] capo 0 target F string 2 fret 3 pitch 53 group 3 first false wrong [] no time session none facts [size 3, place 0, scale blues, tonic 9, system caged, number 4, octave 1, degree 5, alteration -1, tempo 72, beats 7, unit 8, fade faded, hinted true, offset -0.125]
 attempt notePlayIt freePractice skipped tuning [40, 45, 50, 55, 59, 64] capo 0 target F string 2 fret 3 pitch 53 group 4 first false wrong [] no time session none facts [size 3, place 1, root B♭, rootClass 10, quality minor, inversion second, set dGB]
-session 2026-07-25 endedEarly theme B♭ major set eAD blocks [450.0, 450.0] attempts 1
-theme 2026-07-25 B♭ major position caged 3 rerolls 2 set gBE'
+session 2026-07-25 endedEarly theme B♭ major set E-A-D blocks [450.0, 450.0] attempts 1
+theme 2026-07-25 B♭ major position caged 3 rerolls 2 set G-B-E'
 diff <(printf '%s\n' "$expected") <(printf '%s\n' "$found") || { echo "✗ log check" >&2; exit 1; }
 
 export GP_LOG_CHECK="$folder/V1.store"

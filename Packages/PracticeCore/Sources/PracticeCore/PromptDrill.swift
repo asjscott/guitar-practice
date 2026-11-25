@@ -69,6 +69,8 @@ public struct PromptDrill<Rules: DrillRules>: Drill {
         }
     }
 
+    public var isPartWay: Bool { isAnswerable && rules.isPartWay }
+
     /// The location to light on a right answer.
     public var litLocation: FretboardLocation? {
         if case .correct(let location) = phase { location } else { nil }

@@ -52,7 +52,7 @@ struct SessionView: View {
         case .idle:
             SessionSetupView(minutes: $minutes, naturalsOnly: $naturalsOnly, range: $range, theme: model.theme,
                              reroll: model.canReroll ? { model.reroll() } : nil, blocks: model.plan(), problem: model.problem,
-                             noSoundNotice: model.noSoundNotice,
+                             noSoundNotice: model.noSoundNotice, noTriadsNotice: model.noTriadsNotice,
                              start: { model.start() })
         case .ready, .playing, .paused:
             SessionPlayingView(model: model)

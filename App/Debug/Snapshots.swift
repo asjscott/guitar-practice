@@ -500,16 +500,23 @@ enum Snapshots {
         for (name, problem) in problems {
             try await save("session-setup-no-\(name)", SessionSetupView(
                 minutes: .constant(10), naturalsOnly: .constant(false), range: .constant(.wholeNeck),
-                theme: SessionTheme(Theme(key: .minor(.dSharp), position: Position.ID(system: .threeNotesPerString, number: 2)),
+                theme: SessionTheme(Theme(key: .minor(.dSharp), position: Position.ID(system: .threeNotesPerString, number: 2), stringSet: .gBE),
                                     on: Fretboard(tuning: .standard)),
                 reroll: nil, blocks: SessionViewModel().plan(), problem: problem, start: {}))
         }
         // A neck that the theme has no position on.
         try await save("session-setup-no-position", SessionSetupView(
             minutes: .constant(10), naturalsOnly: .constant(false), range: .constant(.wholeNeck),
-            theme: SessionTheme(Theme(key: .major(.c), position: Position.ID(system: .caged, number: CAGEDShape.d.number)),
+            theme: SessionTheme(Theme(key: .major(.c), position: Position.ID(system: .caged, number: CAGEDShape.d.number), stringSet: .eAD),
                                 on: Fretboard(tuning: .standard, capo: 12)),
             reroll: {}, blocks: SessionViewModel().plan(), problem: nil, start: {}))
+        try await save("session-setup-no-triads", SessionSetupView(
+            minutes: .constant(15), naturalsOnly: .constant(true), range: .constant(.first12),
+            theme: SessionTheme(Theme(key: .major(.c), position: Position.ID(system: .caged, number: 3), stringSet: .eAD),
+                                on: Fretboard(tuning: .standard)),
+            reroll: nil, blocks: SessionPlanner.plan(DrillKind.all.filter { $0.module != .triads }, budget: .seconds(900), day: 1),
+            problem: nil, noTriadsNotice: "Triads are left out: no voicing of the key’s chords on E-A-D fits these frets.",
+            start: {}))
         let session = SessionViewModel()
         try await save("session-setup", SessionView(model: session))
         try await save("session-setup-short", SessionView(model: session), size: CGSize(width: 1100, height: 480))
@@ -517,7 +524,7 @@ enum Snapshots {
         for minutes in [10, 60] {
             try await save("session-setup-modules-\(minutes)", SessionSetupView(
                 minutes: .constant(minutes), naturalsOnly: .constant(true), range: .constant(.first12),
-                theme: SessionTheme(Theme(key: .major(.bFlat), position: Position.ID(system: .caged, number: 3)),
+                theme: SessionTheme(Theme(key: .major(.bFlat), position: Position.ID(system: .caged, number: 3), stringSet: .dGB),
                                     on: Fretboard(tuning: .standard)),
                 reroll: {}, blocks: SessionPlanner.plan(DrillKind.all, budget: .seconds(minutes * 60), day: 1),
                 problem: nil, start: {}), size: CGSize(width: 920, height: 620))
@@ -564,6 +571,14 @@ enum Snapshots {
                 session.answerForSnapshot(right: true)
             }
         }
+        /// Answers a prompt: the rest of a pass, or a whole voicing.
+        func playPrompt() {
+            for _ in 0..<(session.blockKind?.module == .triads ? 3 : 1) { session.answerForSnapshot(right: true) }
+            playNotes()
+        }
+        // In 60 minutes every drill has a block.
+        emptyDefaults.set(60, forKey: "session.minutes")
+        session.setup = SessionSetup(minutes: 60)
         try await save("session-waiting", SessionView(model: session)) { play(.notePlayIt) }
         try await save("session-wrong", SessionView(model: session)) {
             play(.notePlayIt)
@@ -607,24 +622,18 @@ enum Snapshots {
             session.passTimeForSnapshot(firstLength(session) + 72)
             session.next()
         }
-        // In 60 minutes every drill has a block.
         try await save("session-summary-60", SessionView(model: session), size: CGSize(width: 920, height: 620)) {
             play(.notePlayIt)
             session.end()
             session.done()
-            emptyDefaults.set(60, forKey: "session.minutes")
-            session.setup = SessionSetup(minutes: 60)
             session.start(seed: 1)
             while session.isActive {
                 session.passTimeForSnapshot(2)
                 session.next()
-                session.answerForSnapshot(right: true)
-                playNotes()
+                playPrompt()
                 session.next()
             }
-            emptyDefaults.removeObject(forKey: "session.minutes")
         }
-        session.setup = SessionSetup()
 
         try await save("session-scale-ready", SessionView(model: session)) { ready(.upAndDown) }
         try await save("session-scale-count-in", SessionView(model: session), settle: .milliseconds(1600)) { play(.upAndDown) }
@@ -699,6 +708,26 @@ enum Snapshots {
             play(.upAndDown)
         }
 
+        for (name, kind) in [("triad", DrillKind.triadPlayIt), ("climb", .inversions)] {
+            try await save("session-\(name)-waiting", SessionView(model: session)) { play(kind) }
+            try await save("session-\(name)-wrong", SessionView(model: session)) {
+                play(kind)
+                session.answerForSnapshot(right: true)
+                session.answerForSnapshot(right: false)
+            }
+            try await save("session-\(name)-right", SessionView(model: session), size: CGSize(width: 920, height: 520),
+                           settle: .milliseconds(150)) {
+                play(kind)
+                for _ in 0..<3 { session.answerForSnapshot(right: true) }
+            }
+            try await save("session-\(name)-revealed", SessionView(model: session), settle: .milliseconds(150)) {
+                play(kind)
+                session.answerForSnapshot(right: true)
+                session.timeOutForSnapshot()
+            }
+        }
+        try await save("session-triad-ready", SessionView(model: session)) { ready(.triadPlayIt) }
+
         let unheard = SessionViewModel()
         try await save("session-flash", SessionView(model: unheard), sound: silent, settle: .milliseconds(500)) {
             unheard.start(seed: 1)
@@ -747,6 +776,8 @@ enum Snapshots {
             focusSidebar()
             type("\r s\u{1b}\r")
         }
+        emptyDefaults.removeObject(forKey: "session.minutes")
+        session.setup = SessionSetup()
         try await save("session-summary", SessionView(model: session)) {
             play(.notePlayIt)
             session.end()
@@ -757,8 +788,7 @@ enum Snapshots {
                 session.next()
                 session.skip()
                 session.answerForSnapshot(right: false)
-                session.answerForSnapshot(right: true)
-                playNotes()
+                playPrompt()
                 session.next()
             }
         }

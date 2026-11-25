@@ -4,7 +4,7 @@ extension DrillKind {
     public static let triadPlayIt = DrillKind(
         id: "triadPlayIt", module: .triads, title: "Triad → play it",
         instructions: "Arpeggiate the triad on the strings shown, low to high.",
-        symbol: "triangle", hidesNote: true, isInSessions: false, offersInversions: true,
+        symbol: "triangle", hidesNote: true, offersInversions: true,
         rules: TriadPlayItRules.self)
 }
 
@@ -85,6 +85,8 @@ public struct TriadPlayItRules: DrillRules {
 
     /// The voicing picked, or the lowest in range.
     private var revealed: TriadVoicing? { possibleVoicings.first }
+
+    public var isPartWay: Bool { place > 0 }
 
     public func correctLocations(for prompt: NotePrompt) -> [FretboardLocation] { revealed?.locations ?? [] }
 

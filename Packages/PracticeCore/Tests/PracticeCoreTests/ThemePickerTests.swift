@@ -83,7 +83,7 @@ struct ThemePickerTests {
 @Suite("Theme when the instrument changes")
 struct ThemeRepickTests {
     @Test func aPositionThatStillExistsIsKept() {
-        let theme = Theme(key: .major(.f), position: caged(3))
+        let theme = Theme(key: .major(.f), position: caged(3), stringSet: .dGB)
         #expect(picker().keepingKey(of: theme, on: standard, system: .caged) == theme)
         let dadgad = Fretboard(tuning: TuningPreset.dadgad.tuning, capo: 2)
         #expect(picker().keepingKey(of: theme, on: dadgad, system: .caged) == theme)

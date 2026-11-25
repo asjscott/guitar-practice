@@ -50,6 +50,10 @@ public protocol DrillRules: Sendable {
     /// What resuming does when a prompt was waiting. Default: a new prompt.
     var resumeRule: DrillResumeRule { get }
 
+    /// Whether the current prompt goes on with what an earlier one began, such as a voicing, so that a chime would
+    /// break it up. Default: false.
+    var isPartWay: Bool { get }
+
     /// What to show. Default: the note name over its string, wrong notes as "You played G".
     func display(of moment: DrillMoment) -> DrillDisplay
 }
@@ -129,5 +133,6 @@ extension DrillRules {
     public mutating func repeated() -> DrillRepeat { .ignored }
     public func transition(after attempt: Attempt) -> DrillTransition { .standard(after: attempt) }
     public var resumeRule: DrillResumeRule { .newPrompt }
+    public var isPartWay: Bool { false }
     public func display(of moment: DrillMoment) -> DrillDisplay { DrillDisplay(standard: moment, in: setup) }
 }

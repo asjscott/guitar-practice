@@ -11,8 +11,8 @@ extension AttemptLog {
         return ((try? context.fetchCount(FetchDescriptor<PracticeSession>(predicate: #Predicate { $0.day == day }))) ?? 0) > 0
     }
 
-    /// The theme of a date's day, picked and saved the first time. One whose position is no longer on the neck gets
-    /// another, saved too.
+    /// The theme of a date's day, picked and saved the first time. One whose position or string set no longer does
+    /// on the neck, or that has no string set yet, gets another, saved too.
     func theme(on date: Date, fretboard: Fretboard, system: Position.System) -> Theme {
         // With no saved theme to be read, one is picked but not saved, so that nothing is overwritten.
         guard let saved = try? savedTheme(on: date) else {
@@ -37,7 +37,7 @@ extension AttemptLog {
     func rerollTheme(on date: Date, fretboard: Fretboard, system: Position.System) {
         guard !hasStartedSession(on: date), let record = try? savedTheme(on: date).first else { return }
         record.rerolls += 1
-        record.theme = picker(on: date, rerolls: record.rerolls).theme(on: fretboard, system: system)
+        record.theme = picker(on: date, rerolls: record.rerolls).theme(on: fretboard, system: system, replacing: record.theme)
         save()
     }
 

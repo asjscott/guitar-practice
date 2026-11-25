@@ -80,7 +80,7 @@ enum LogCheck {
         drill.stop()
 
         // A session is saved with its first attempt, and one with none isn't.
-        let theme = Theme(key: .major(.bFlat), position: Position.ID(system: .caged, number: 3))
+        let theme = Theme(key: .major(.bFlat), position: Position.ID(system: .caged, number: 3), stringSet: .eAD)
         let session = newSession()
         session.theme = theme
         // Still in progress when this process dies, so ended early when the log is next opened.
@@ -143,10 +143,9 @@ enum LogCheck {
         passes.handle(.resume(at: .seconds(400)))
         playPass(3)
 
-        let dayTheme = DayTheme(day: "2026-07-25", theme: theme, rerolls: 2)
-        dayTheme.stringSet = StringSet.gBE.rawValue
-        session.themeStringSet = StringSet.eAD.rawValue
-        log.context.insert(dayTheme)
+        var other = theme
+        other.stringSet = .gBE
+        log.context.insert(DayTheme(day: "2026-07-25", theme: other, rerolls: 2))
         log.save()
     }
 
@@ -277,6 +276,8 @@ enum LogCheck {
         session.reroll(on: evening)
         let rerolled = session.theme
         try require(rerolled?.key != first?.key && rerolled?.positionName != first?.positionName, "rerolled")
+        try require(first?.theme.stringSet != nil && rerolled?.theme.stringSet != nil
+                    && rerolled?.theme.stringSet != first?.theme.stringSet, "the string set rerolled")
 
         session = launch()
         session.showTheme(on: evening)
@@ -288,6 +289,27 @@ enum LogCheck {
         session.positionSystem = .caged
         session.showTheme(on: evening)
         try require(session.theme == rerolled, "back to the first position system")
+
+        // Saved before themes had a string set.
+        let record = try themes().first
+        record?.stringSet = nil
+        session.showTheme(on: evening)
+        let given = session.theme
+        try require(given?.key == rerolled?.key && given?.theme.position == rerolled?.theme.position, "the rest is kept")
+        try require(given?.theme.stringSet != nil && record?.theme == given?.theme, "a theme without a string set gets one")
+        // With the capo at 12 in Drop D, E-A-D has no voicing of C major's G.
+        let before = record?.theme
+        record?.theme = Theme(key: .major(.c), position: Position.ID(system: .caged, number: 3), stringSet: .eAD)
+        session.tuning = TuningPreset.dropD.tuning
+        session.capo = 12
+        session.showTheme(on: evening)
+        try require(session.theme?.key == .major(.c) && session.theme?.theme.stringSet != .eAD
+                    && record?.theme == session.theme?.theme, "a disqualified string set is picked again")
+        session.tuning = .standard
+        session.capo = 0
+        record?.theme = rerolled?.theme
+        session.showTheme(on: evening)
+        try require(before == given?.theme && session.theme == rerolled, "back to the first tuning")
 
         session.start(on: evening)
         session.next()
@@ -427,11 +449,11 @@ enum LogCheck {
                   "target \(attempt.targetName) \(target) group \(group(of: attempt)) first \(attempt.firstRight) wrong [\(wrong)] \(time) session \(session) \(newFields(of: attempt))")
         }
         for session in try log.context.fetch(FetchDescriptor<PracticeSession>()) {
-            print("session \(session.day) \(session.stateRaw) theme \(session.theme?.key.description ?? "none") set \(session.themeStringSet ?? "none")",
+            print("session \(session.day) \(session.stateRaw) theme \(session.theme?.key.description ?? "none") set \(session.theme?.stringSet?.name ?? "none")",
                   "blocks \(session.blocks.map(\.plannedSeconds)) attempts \(session.attempts.count)")
         }
         for theme in try log.context.fetch(FetchDescriptor<DayTheme>()) {
-            print("theme \(theme.day) \(theme.theme?.key.description ?? "none") position \(theme.positionSystem) \(theme.positionNumber) rerolls \(theme.rerolls) set \(theme.stringSet ?? "none")")
+            print("theme \(theme.day) \(theme.theme?.key.description ?? "none") position \(theme.positionSystem) \(theme.positionNumber) rerolls \(theme.rerolls) set \(theme.theme?.stringSet?.name ?? "none")")
         }
     }
 

@@ -18,7 +18,7 @@ struct TriadPrompt<Countdown: View, Resting: View>: View {
             header
                 .frame(height: 56)
                 .padding(.horizontal, 28)
-            FretboardView(diagram: FretboardDiagram(drill: display, on: fretboard, fretWindow: frets))
+            FretboardView(diagram: FretboardDiagram(drill: display, on: fretboard, fretWindow: frets), minHeight: 120)
                 .frame(maxHeight: .infinity)
                 .padding(16)
                 .sessionCard()

@@ -13,8 +13,15 @@ public struct SessionSummary: Hashable, Sendable {
             kind.usesMetronome ? PassStats(PassResult.passes(in: stats.attempts)) : nil
         }
 
-        /// The median response time, "1.24 s"; nil where nothing was answered.
-        public var speedText: String? { stats.medianResponseTime == nil ? nil : stats.medianText }
+        /// In triad blocks only.
+        public var medianVoicingTime: Duration? { kind.module == .triads ? stats.medianVoicingTime : nil }
+
+        /// The median response time, "1.24 s", or in triad blocks the median time per voicing, "3.10 s a voicing"; nil
+        /// where there is none.
+        public var speedText: String? {
+            if kind.module == .triads { return medianVoicingTime.map { "\(secondsText($0, decimals: 2)) s a voicing" } }
+            return stats.medianResponseTime == nil ? nil : stats.medianText
+        }
     }
 
     /// Ready cards included.

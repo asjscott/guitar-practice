@@ -4,7 +4,7 @@ extension DrillKind {
     public static let inversions = DrillKind(
         id: "inversions", module: .triads, title: "Inversions",
         instructions: "Arpeggiate every voicing of the chord up the string set and back, each low to high.",
-        symbol: "stairs", hidesNote: true, isInSessions: false, repeatTitle: "Restart", rules: InversionsRules.self)
+        symbol: "stairs", hidesNote: true, repeatTitle: "Restart", rules: InversionsRules.self)
 }
 
 extension Triad.Inversion {
@@ -137,6 +137,8 @@ public struct InversionsRules: DrillRules {
         next = .sameVoicing
         return .newPrompt
     }
+
+    public var isPartWay: Bool { place > 0 }
 
     public func correctLocations(for prompt: NotePrompt) -> [FretboardLocation] { voicing?.locations ?? [] }
 

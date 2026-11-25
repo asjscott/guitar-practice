@@ -8,7 +8,7 @@ enum SessionProblem: Equatable {
     case nothingToPrompt(String)
 }
 
-/// Before a session: the theme with its position on a neck, minutes, difficulty, the blocks they give, and Start (↩).
+/// Before a session: the theme with its string set, and its position on a neck, minutes, difficulty, the blocks they give, and Start (↩).
 struct SessionSetupView: View {
     @Binding var minutes: Int
     @Binding var naturalsOnly: Bool
@@ -21,6 +21,8 @@ struct SessionSetupView: View {
     let problem: SessionProblem?
     /// Nil with sound.
     var noSoundNotice: String?
+    /// Nil with triads.
+    var noTriadsNotice: String?
     let start: () -> Void
 
     /// What is stored could be anything.
@@ -50,7 +52,7 @@ struct SessionSetupView: View {
             VStack(spacing: 4) {
                 Text(theme?.key.description ?? " ").font(.system(size: 52, weight: .bold, design: .rounded))
                 HStack {
-                    Text(theme?.positionName ?? "").foregroundStyle(.secondary)
+                    Text(theme?.detailText ?? "").foregroundStyle(.secondary)
                     if let reroll { Button("Reroll", action: reroll) }
                 }
                 .font(.title3)
@@ -76,6 +78,9 @@ struct SessionSetupView: View {
             if let problem { SessionProblemNotice(problem: problem) }
             if let noSoundNotice {
                 Label(noSoundNotice, systemImage: "speaker.slash.fill").foregroundStyle(.orange)
+            }
+            if let noTriadsNotice {
+                Label(noTriadsNotice, systemImage: "info.circle").foregroundStyle(.secondary)
             }
             SessionBlocksByModule(blocks: blocks)
             HStack {

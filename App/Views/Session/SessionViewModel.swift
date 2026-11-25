@@ -14,8 +14,11 @@ struct SessionTheme: Equatable {
 
     var key: Key { theme.key }
 
-    /// "B♭ major · CAGED A shape".
-    var text: String { [key.description, positionName].compactMap { $0 }.joined(separator: " · ") }
+    /// "CAGED A shape · D-G-B".
+    var detailText: String { [positionName, theme.stringSet?.name].compactMap { $0 }.joined(separator: " · ") }
+
+    /// "B♭ major · CAGED A shape · D-G-B".
+    var text: String { [key.description, detailText].filter { !$0.isEmpty }.joined(separator: " · ") }
 
     init(_ theme: Theme, on fretboard: Fretboard) {
         self.theme = theme
@@ -106,6 +109,9 @@ final class SessionViewModel {
     /// The neck the session was started on.
     private(set) var fretboard = Fretboard(tuning: .standard)
 
+    /// The fret range the session was started with.
+    private(set) var frets = 0...0
+
     /// Why the session paused by itself, for the Paused screen.
     private(set) var pauseNotice: String?
     @ObservationIgnored private var isPausedForSound = false
@@ -148,6 +154,11 @@ final class SessionViewModel {
 
     /// What a session without sound does differently; nil with sound.
     var noSoundNotice: String? { hasSound ? nil : SessionPlanner.noSoundNotice(from: DrillKind.all) }
+
+    /// Why there are no triads; nil when there are, or nothing at all can be prompted.
+    var noTriadsNotice: String? {
+        nothingToPromptReason == nil ? SessionPlanner.noTriadsNotice(from: DrillKind.all, for: drillSetup(seed: 0)) : nil
+    }
 
     /// The blocks a session would have, of the drills that have something to prompt, and can be heard if they need to be.
     func plan(on date: Date = .now) -> [SessionBlock] {
@@ -214,6 +225,7 @@ final class SessionViewModel {
         var drillSetup = drillSetup(seed: seed)
         drillSetup.fadeStages = log?.fadeStages(in: drillSetup.passPositions.map(\.id)) ?? FadeStages()
         fretboard = drillSetup.fretboard
+        frets = drillSetup.options.frets
         player = SessionPlayer(blocks: blocks, setup: drillSetup, hasSound: hasSound)
         record = PracticeSession(
             day: Calendar.practiceDay(of: date), startedAt: date, budgetMinutes: setup.minutes,
@@ -542,11 +554,21 @@ final class SessionViewModel {
         let now = max(clockNow(), drill.promptStart ?? .zero)
         if blockKind?.usesKeyboard == true {
             send(.typed(right ? prompt.name : prompt.pitchClass == PitchClass(0) ? .g : .c, at: now))
-        } else if let location = prompt.target ?? fretboard.locations(of: prompt.pitchClass, onString: prompt.string,
+        } else if let location = prompt.target ?? triadLocation(for: prompt) ?? fretboard.locations(of: prompt.pitchClass, onString: prompt.string,
                                                                      frets: drill.options.frets).first {
             let pitch = fretboard.pitch(at: location)
             send(.played(right ? pitch : pitch + Interval(1), onset: now, at: now))
         }
+    }
+
+    /// Lets the current prompt's time run out.
+    func timeOutForSnapshot() {
+        guard let drill = player?.drill, let left = drill.timeRemaining(at: clockNow()) else { return }
+        passTimeForSnapshot((left + DrillTiming.detectionGrace) / .seconds(1))
+    }
+
+    private func triadLocation(for prompt: NotePrompt) -> FretboardLocation? {
+        (player?.drill as? PromptDrill<TriadPlayItRules>)?.correctLocations.first { $0.string == prompt.string }
     }
     #endif
 }

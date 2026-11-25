@@ -46,11 +46,11 @@ private func inversionAsked(_ drill: any Drill) -> String? {
 
 @Suite("Inversions")
 struct InversionsTests {
-    @Test func itIsATriadsDrillForFreePracticeOnly() {
+    @Test func itIsATriadsDrill() {
         #expect(DrillKind.all.contains(.inversions))
         #expect(DrillKind.inversions.id == "inversions")
         #expect(DrillKind.inversions.module == .triads)
-        #expect(!DrillKind.inversions.isInSessions)
+        #expect(DrillKind.inversions.isInSessions)
         #expect(DrillKind.inversions.repeatTitle == "Restart")
         #expect(!DrillKind.inversions.offersInversions)
         #expect(DrillKind.triadPlayIt.offersInversions)
