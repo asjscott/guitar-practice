@@ -56,7 +56,7 @@ struct PassPrompt<Resting: View>: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
                 Spacer(minLength: 0)
-                Label(display.feedback, systemImage: display.symbol)
+                Label([display.feedback, display.pass?.evennessText].compactMap { $0 }.joined(separator: " · "), systemImage: display.symbol)
                     .foregroundStyle(display.result.color)
                     .font(.title2.weight(.medium))
                     .lineLimit(1)

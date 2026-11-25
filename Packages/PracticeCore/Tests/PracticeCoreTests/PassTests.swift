@@ -12,6 +12,8 @@ private func setup(_ preset: TuningPreset = .standard, capo: Int = 0, change: (i
     options.key = .minor(.a)
     options.scaleKind = .minorPentatonic
     options.position = Position.ID(system: .caged, number: CAGEDShape.g.number)
+    // The ladder has its own tests.
+    options.pass.holdsTempo = true
     change(&options)
     return DrillSetup(fretboard: Fretboard(tuning: preset.tuning, capo: capo), options: options, seed: 1)
 }

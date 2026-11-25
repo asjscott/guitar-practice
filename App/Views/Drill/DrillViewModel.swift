@@ -39,7 +39,13 @@ final class DrillViewModel {
     }
 
     /// The drill to practise. The view locks it during a run.
-    var kind = DrillKind.all[0]
+    var kind = DrillKind.all[0] {
+        didSet {
+            guard kind != oldValue else { return }
+            isPanelOpen = false
+            loadTempo()
+        }
+    }
 
     /// Where attempts are saved; the view sets it before a run can start.
     @ObservationIgnored var log: AttemptLog?
@@ -47,22 +53,57 @@ final class DrillViewModel {
     /// Where the drill's sounds go; the view sets it before a run can start. None (in `LogCheck`) is silent.
     var soundOutput: AppSoundOutput?
 
-    /// What scale drills are played to; the view sets it before a run can start. None (in `LogCheck`) is silent.
-    @ObservationIgnored var metronome: Metronome?
+    /// What scale drills are played to, and where their tempos are remembered; the view sets it before a run can start.
+    /// None (in `LogCheck`) is silent.
+    @ObservationIgnored var metronome: Metronome? {
+        didSet { loadTempo() }
+    }
 
     /// The toolbar's options, shared by every drill. The view locks them during a run; a run uses the options it
     /// started with.
     var options = DrillOptions()
 
-    /// What passes are played at. A change takes effect from the next pass on.
+    /// What passes are played at; the tempo ladder moves it too. A change takes effect from the next pass on.
     var passSettings: PassSettings {
         get { options.pass }
         set {
             guard newValue != options.pass else { return }
-            options.pass = newValue
+            setPassSettings(newValue)
             if isRunning { send(.passSettings(newValue, at: clockNow())) }
         }
     }
+
+    private func setPassSettings(_ new: PassSettings) {
+        let old = options.pass
+        options.pass = new
+        if kind.usesMetronome, new.tempo != old.tempo || new.holdsTempo != old.holdsTempo {
+            metronome?.storeTempo(of: kind, from: new)
+        }
+    }
+
+    /// Takes up the drill's remembered tempo, but for a run that is going.
+    private func loadTempo() {
+        guard !isRunning, kind.usesMetronome, let metronome else { return }
+        metronome.loadTempo(of: kind, into: &options.pass)
+    }
+
+    /// The metronome panel. Opening it pauses a run, and closing it goes on with one that it paused, unless something
+    /// else would have paused it since. The view keeps the run's buttons and keys from acting while it is open.
+    var isPanelOpen = false {
+        didSet {
+            guard isPanelOpen != oldValue else { return }
+            if isPanelOpen {
+                guard isRunning, !isPaused else { return }
+                pause()
+                resumesOnPanelClose = true
+            } else if resumesOnPanelClose {
+                resumesOnPanelClose = false
+                resume()
+            }
+        }
+    }
+
+    @ObservationIgnored private var resumesOnPanelClose = false
 
     private(set) var snapshot = Snapshot()
 
@@ -121,6 +162,7 @@ final class DrillViewModel {
     }
 
     func start(seed: UInt64 = .random(in: .min ... .max)) {
+        loadTempo()
         guard !isRunning, inputProblem == nil, nothingToPromptReason == nil, prepareSound() else { return }
         drill = newDrill(seed: seed)
         runLog = log?.run()
@@ -128,9 +170,14 @@ final class DrillViewModel {
         startTicking()
     }
 
-    /// Pauses. By itself, with a notice saying why; that is dropped if it was already paused.
+    /// Pauses. By itself, with a notice saying why; that is dropped if the player had already paused it.
     func pause(notice: String? = nil) {
-        guard isRunning, !isPaused else { return }
+        guard isRunning else { return }
+        if isPaused, resumesOnPanelClose {
+            resumesOnPanelClose = false
+            pauseNotice = notice
+        }
+        guard !isPaused else { return }
         pauseNotice = notice
         send(.pause(at: clockNow()))
         ticker.stop()
@@ -154,6 +201,7 @@ final class DrillViewModel {
 
     func stop() {
         guard isRunning else { return }
+        resumesOnPanelClose = false
         send(.stop(at: clockNow()))
         ticker.stop()
     }
@@ -181,6 +229,7 @@ final class DrillViewModel {
     /// The screen is closing: a run that is going pauses, and what was being heard is forgotten.
     func leave() {
         pause()
+        isPanelOpen = false
         input = nil
         feed.reset()
     }
@@ -201,10 +250,12 @@ final class DrillViewModel {
 
     private func send(_ event: DrillEvent) {
         let oldStart = drill.promptStart
+        let wasRunning = drill.isRunning
         drill.handle(event)
         playClicks()
         playSounds(isNewPrompt: drill.promptStart != oldStart)
         runLog?.update(from: drill)
+        if wasRunning, let settings = drill.passSettings, settings != options.pass { setPassSettings(settings) }
         let new = Snapshot(phase: drill.phase, display: drill.display, attempts: drill.attempts)
         if new != snapshot { snapshot = new }
         let entry = nameEntry.following(drill)

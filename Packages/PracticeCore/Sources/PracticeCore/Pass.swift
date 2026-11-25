@@ -2,8 +2,12 @@ import TheoryCore
 
 /// What a pass is played at. Changing it takes effect from the next pass on.
 public struct PassSettings: Hashable, Sendable {
-    /// BPM, counting clicks.
-    public var tempo = 60
+    /// BPM, counting clicks; kept within `tempos`.
+    public var tempo = 60 {
+        didSet { tempo = min(max(tempo, Self.tempos.lowerBound), Self.tempos.upperBound) }
+    }
+    /// Turns the tempo ladder off.
+    public var holdsTempo = false
     public var meter = Meter(.fourFour)
     public var fadeStage = FadeStage.shown
 
@@ -137,6 +141,9 @@ public struct PassProgress: Hashable, Sendable {
 
     /// The beat of the bar being counted in; nil once the pass goes, and before the first click is heard.
     public var countIn: Int?
+
+    /// The evenness of the pass just over: until the next pass's count-in ends.
+    public var evenness: Duration?
 
     public var settings: PassSettings
 }

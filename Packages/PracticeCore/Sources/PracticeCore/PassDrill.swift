@@ -14,6 +14,7 @@ public struct PassDrill<Rules: PassRules>: Drill {
     /// This pass's.
     private var settings: PassSettings
     private var nextSettings: PassSettings
+    private var ladder = TempoLadder()
 
     private var pass: Pass?
     private var group = -1
@@ -51,6 +52,7 @@ public struct PassDrill<Rules: PassRules>: Drill {
     public var nothingToPromptReason: String? { rules.nothingToPromptReason }
     /// Between passes: the next count-in is put off.
     public var canHold: Bool { true }
+    public var passSettings: PassSettings? { nextSettings }
     public var resumesSamePrompt: Bool { phase == .paused && !isOver }
 
     /// The note that is up; once the pass is over, its last.
@@ -94,6 +96,7 @@ public struct PassDrill<Rules: PassRules>: Drill {
         case .start(let now):
             guard !isRunning else { return }
             attempts = []
+            ladder = TempoLadder()
             rules.begin()
             beginNext(at: now)
         case .pause(let now):
@@ -123,8 +126,9 @@ public struct PassDrill<Rules: PassRules>: Drill {
         case .clicksStarted(let heard):
             track = heard
         case .passSettings(let new, let now):
+            let old = nextSettings
             advance(to: now)
-            nextSettings = new
+            change(from: old, to: new)
             if isOver, phase != .paused { askForNextClicks() }
         case .hold(let end):
             if isOver, phase != .paused, end > countInStart { askForClicks(from: end) }
@@ -176,6 +180,20 @@ public struct PassDrill<Rules: PassRules>: Drill {
         pendingClicks = [.stop(at: now)]
     }
 
+    /// A tempo that wasn't changed is left as it is now: the ladder may just have moved it.
+    private mutating func change(from old: PassSettings, to new: PassSettings) {
+        let tempo = nextSettings.tempo
+        nextSettings = new
+        if new.tempo == old.tempo { nextSettings.tempo = tempo }
+        if new.tempo != old.tempo || new.holdsTempo != old.holdsTempo { ladder = TempoLadder() }
+    }
+
+    /// A pass played at another tempo than the next one's, changed since by the player, doesn't move it.
+    private mutating func followLadder() {
+        guard !nextSettings.holdsTempo, settings.tempo == nextSettings.tempo else { return }
+        nextSettings.tempo += ladder.step(after: PassResult(attempts: attempts.filter { $0.group?.number == group }))
+    }
+
     /// The last note was dealt with: the click runs to the end of the bar that note's nearest click is in.
     private mutating func end(at time: Duration) {
         isOver = true
@@ -183,6 +201,7 @@ public struct PassDrill<Rules: PassRules>: Drill {
         countInClick = (track.nearestClick(to: time) / beats + 1) * beats
         while countInStart <= now { countInClick += beats }
         barEnd = countInStart
+        followLadder()
         askForNextClicks()
     }
 
@@ -267,7 +286,8 @@ public struct PassDrill<Rules: PassRules>: Drill {
         let (result, feedback) = resultAndFeedback(after: done, in: pass)
         var display = DrillDisplay(headline: rules.headline(of: pass), subline: pass.position.name, feedback: feedback,
                                    result: result, markers: markers(of: pass, last: done.last?.prompt.target))
-        display.pass = PassProgress(notes: line(of: pass, done: done), countIn: countInBeat, settings: settings)
+        display.pass = PassProgress(notes: line(of: pass, done: done), countIn: countInBeat,
+                                    evenness: evenness, settings: settings)
         return display
     }
 
@@ -276,6 +296,10 @@ public struct PassDrill<Rules: PassRules>: Drill {
     private var countInBeat: Int? {
         guard isCountingIn, now >= countInStart else { return nil }
         return track.click(track.lastClick(by: now)).beat
+    }
+
+    private var evenness: Duration? {
+        isOver || isCountingIn ? passes.last(where: \.isComplete)?.evenness : nil
     }
 
     private func resultAndFeedback(after done: [Attempt], in pass: Pass) -> (DrillDisplay.Result, String) {

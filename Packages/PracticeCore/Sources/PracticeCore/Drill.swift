@@ -118,10 +118,15 @@ public protocol Drill: Sendable {
 
     /// The clicks asked for since the last call, to be done in order: call it after every event.
     mutating func takeClicks() -> [ClickRequest]
+
+    /// What the next pass will be played at, as the tempo ladder moves it; nil in drills without passes.
+    var passSettings: PassSettings? { get }
 }
 
 extension Drill {
     public mutating func takeClicks() -> [ClickRequest] { [] }
+
+    public var passSettings: PassSettings? { nil }
 
     /// True from Start until Stop (or the end of an "In order (check)" run), paused included.
     public var isRunning: Bool { phase != .idle }
