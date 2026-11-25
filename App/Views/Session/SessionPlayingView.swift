@@ -3,21 +3,23 @@ import SwiftUI
 import TheoryCore
 
 /// A session that is going: the drills bar stays on top through Ready cards, drills and pauses, so nothing
-/// jumps. All through a scale block it is at the bottom, so that the neck and the pass get the top.
+/// jumps. In scale and triad blocks it is at the bottom, so that the neck gets the top.
 struct SessionPlayingView: View {
     @Bindable var model: SessionViewModel
 
     private var kind: DrillKind { model.snapshot.blocks[model.snapshot.blockIndex].kind }
 
+    private var isBarOnTop: Bool { kind.module == .notes }
+
     var body: some View {
         VStack(spacing: 0) {
             VStack(spacing: 0) {
-                if !kind.usesMetronome {
+                if isBarOnTop {
                     drillsBar
                     Divider()
                 }
                 content
-                if kind.usesMetronome {
+                if !isBarOnTop {
                     Divider()
                     drillsBar
                 }
@@ -73,6 +75,13 @@ struct SessionPlayingView: View {
         } else if kind.usesMetronome {
             PassPrompt(display: snapshot.display, position: nil, restingMarkers: [], settings: passSettings.wrappedValue,
                        fretboard: model.fretboard) {}
+        } else if kind.module == .triads {
+            TriadPrompt(display: snapshot.display, hasClimbs: kind == .inversions, frets: model.frets,
+                        fretboard: model.fretboard) {
+                SessionCountdown(model: model)
+            } resting: {
+                EmptyView()
+            }
         } else {
             DrillNeck(display: snapshot.display, fretboard: model.fretboard, height: 190)
                 .padding(.horizontal, 24)
@@ -131,6 +140,13 @@ private struct SessionTarget: View {
     let display: DrillDisplay
 
     var body: some View { DrillTarget(display: display, countdown: model.countdown, typed: model.nameEntry.text) }
+}
+
+/// Likewise.
+private struct SessionCountdown: View {
+    let model: SessionViewModel
+
+    var body: some View { DrillCountdownRing(countdown: model.countdown) }
 }
 
 private struct SessionKey: View {

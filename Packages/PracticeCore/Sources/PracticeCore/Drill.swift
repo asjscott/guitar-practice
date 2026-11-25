@@ -106,6 +106,10 @@ public protocol Drill: Sendable {
     /// Whether `hold` does anything: the prompt that is up is kept, as it is when resuming.
     var canHold: Bool { get }
 
+    /// Whether the prompt that is up goes on with what an earlier one began, such as a voicing: a chime waits for its
+    /// end.
+    var isPartWay: Bool { get }
+
     /// What to show for the current prompt; nil when idle or paused.
     var display: DrillDisplay? { get }
 
@@ -131,6 +135,8 @@ public protocol Drill: Sendable {
 
 extension Drill {
     public mutating func takeClicks() -> [ClickRequest] { [] }
+
+    public var isPartWay: Bool { false }
 
     public var passEnd: Duration? { nil }
 

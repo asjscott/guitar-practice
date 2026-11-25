@@ -129,7 +129,7 @@ struct SessionPlannerDrillsTests {
 
     @Test func withoutSoundHearFindItIsLeftOutAndTheRestShareTheTime() {
         let kinds = SessionPlanner.drills(from: DrillKind.all, for: setup, hasSound: false)
-        #expect(kinds == [.notePlayIt, .allInstances, .fretNameIt, .upAndDown, .fromADegree])
+        #expect(kinds == [.notePlayIt, .allInstances, .fretNameIt, .upAndDown, .fromADegree, .triadPlayIt, .inversions])
         #expect(plan(15, day: 1, kinds: kinds.filter { $0.module == .notes }).map(\.length) == [s(300), s(300), s(300)])
         #expect(SessionPlanner.noSoundNotice(from: DrillKind.all)
                 == "No sound: Hear → find it is left out, and chimes flash.")
@@ -154,11 +154,26 @@ struct SessionPlannerDrillsTests {
         #expect(SessionPlanner.drills(from: DrillKind.all, for: setup, hasSound: true) == DrillKind.all.filter(\.isInSessions))
     }
 
+    @Test func triadsWithNoVoicingInRangeAreLeftOutAndSetupSaysWhy() {
+        var setup = setup
+        #expect(SessionPlanner.noTriadsNotice(from: DrillKind.all, for: setup) == nil)
+        setup.follow(Theme(key: .major(.c), position: .init(system: .caged, number: 1), stringSet: .dGB))
+        #expect(SessionPlanner.noTriadsNotice(from: DrillKind.all, for: setup) == nil)
+        setup.options.frets = 1...1
+        #expect(SessionPlanner.noTriadsNotice(from: DrillKind.all, for: setup)
+                == "Triads are left out: no voicing of the key’s chords on D-G-B fits these frets.")
+        #expect(SessionPlanner.noTriadsNotice(from: [.notePlayIt], for: setup) == nil)
+        let kinds = SessionPlanner.drills(from: DrillKind.all, for: setup, hasSound: true)
+        #expect(!kinds.contains { $0.module == .triads })
+        let total = SessionPlanner.plan(kinds, budget: s(900), day: 1).map { $0.length / .seconds(1) }.reduce(0, +)
+        #expect(abs(total - 900) < 0.1)
+    }
+
     @Test func aDrillWithNothingToPromptIsLeftOut() {
         var setup = setup
         setup.options.frets = 0...0     // no target above the open string for Hear → find it
         #expect(SessionPlanner.drills(from: DrillKind.all, for: setup, hasSound: true)
-                == [.notePlayIt, .allInstances, .fretNameIt, .upAndDown, .fromADegree])
+                == [.notePlayIt, .allInstances, .fretNameIt, .upAndDown, .fromADegree, .triadPlayIt])      // open strings make triads, but no climb
     }
 }
 

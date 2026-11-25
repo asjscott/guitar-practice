@@ -37,11 +37,11 @@ private func play(_ midi: Int, at time: Double, _ drill: inout any Drill) {
 
 @Suite("Triad → play it")
 struct TriadPlayItTests {
-    @Test func itIsATriadsDrillForFreePracticeOnly() {
+    @Test func itIsATriadsDrill() {
         #expect(DrillKind.all.contains(.triadPlayIt))
         #expect(DrillKind.triadPlayIt.id == "triadPlayIt")
         #expect(DrillKind.triadPlayIt.module == .triads)
-        #expect(!DrillKind.triadPlayIt.isInSessions)
+        #expect(DrillKind.triadPlayIt.isInSessions)
         #expect(DrillKind.triadPlayIt.repeatTitle == nil)
     }
 

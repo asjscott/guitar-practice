@@ -52,7 +52,7 @@ public enum SessionEvent: Hashable, Sendable {
 ///
 /// A block ends only when the player moves on. The open prompt is then dropped, unrecorded.
 ///
-/// Chimes mark 30 s left and the planned end. Each waits for a gap between prompts, and the next prompt then waits for
+/// Chimes mark 30 s left and the planned end. Each waits for a gap between prompts (in triad drills, voicings), and the next prompt then waits for
 /// it to end, since a note played over it wouldn't count. Between passes, a chime also waits for the bar to end.
 public struct SessionPlayer: Sendable {
     /// How long a Ready card waits before its block starts by itself.
@@ -339,7 +339,7 @@ public struct SessionPlayer: Sendable {
         case .correct, .timedOut, .paused, .idle:
             break
         case .waiting, .wrong:
-            guard afterAttempt else { return }
+            guard afterAttempt, !drill.isPartWay else { return }
             if hasSound, !drill.canHold { send(.pause(at: lastEvent)) }
         }
         releaseChime()

@@ -32,6 +32,27 @@ public struct RunStats: Hashable, Sendable {
         median(of: attempts.compactMap(\.responseTime))
     }
 
+    /// The median time from a voicing's prompt to its last note's onset, of the voicings played whole; nil if none.
+    public var medianVoicingTime: Duration? {
+        var times: [Duration] = []
+        var current: (group: Int, place: Int, time: Duration)?
+        for attempt in attempts {
+            guard case .triad(let facts) = attempt.facts, let group = attempt.group, let place = group.place,
+                  let time = attempt.responseTime else {
+                current = nil
+                continue
+            }
+            // A climb has several voicings. One that Resume started again repeats its places, and is timed from there.
+            if place.isMultiple(of: facts.noteCount) {
+                current = (group.number, place, time)
+            } else if let before = current, before.group == group.number, before.place + 1 == place {
+                current = (group.number, place, before.time + time)
+                if (place + 1).isMultiple(of: facts.noteCount) { times.append(before.time + time) }
+            }
+        }
+        return median(of: times)
+    }
+
     /// Attempts that timed out.
     public var timeouts: Int { attempts.filter(\.timedOut).count }
 

@@ -23,6 +23,14 @@ public enum SessionPlanner {
         return "No sound: \(leftOut.joined(separator: ", ")) \(leftOut.count == 1 ? "is" : "are") left out, and chimes flash."
     }
 
+    /// Why a session has no triads, when no voicing is in range; nil when it has some.
+    public static func noTriadsNotice(from kinds: [DrillKind], for setup: DrillSetup) -> String? {
+        let triads = kinds.filter { $0.isInSessions && $0.module == .triads }
+        guard !triads.isEmpty, drills(from: triads, for: setup, hasSound: true).isEmpty else { return nil }
+        let sets = setup.fretboard.stringSets.filter(setup.options.stringSets.contains).map(\.name)
+        return "Triads are left out: no voicing of the key’s chords on \(sets.joined(separator: ", ")) fits these frets."
+    }
+
     /// Why a session can't prompt anything; nil when one of its drills can.
     public static func nothingToPromptReason(from kinds: [DrillKind], for setup: DrillSetup, hasSound: Bool) -> String? {
         let reasons = kinds.filter { canUse($0, hasSound: hasSound) }.map { $0.makeDrill(setup).nothingToPromptReason }

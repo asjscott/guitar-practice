@@ -2,7 +2,7 @@ import PracticeCore
 import SwiftUI
 import TheoryCore
 
-/// After a session: its total time, a card per block that started, and the slowest prompts.
+/// After a session: its total time, a card per block that started (narrowing to fit the window), and the slowest prompts.
 struct SessionSummaryView: View {
     let summary: SessionSummary
     let tuning: Tuning
@@ -13,7 +13,7 @@ struct SessionSummaryView: View {
     var body: some View {
         VStack(spacing: 24) {
             Text(clockText(summary.totalTime)).font(.system(size: 84, weight: .bold, design: .rounded)).monospacedDigit()
-            HStack(spacing: 16) {
+            HStack(spacing: summary.blocks.count > 5 ? 8 : 16) {
                 ForEach(Array(summary.blocks.enumerated()), id: \.offset) { _, block in card(block) }
             }
             if summary.hasNoAttempts {
@@ -56,8 +56,8 @@ struct SessionSummaryView: View {
         }
         .lineLimit(1)
         .minimumScaleFactor(0.6)
-        .padding(.horizontal, 8)
-        .frame(minWidth: 100, maxWidth: 190)
+        .padding(.horizontal, 6)
+        .frame(minWidth: 84, maxWidth: 190)
         .frame(height: 180)
         .sessionCard()
         .accessibilityElement(children: .combine)

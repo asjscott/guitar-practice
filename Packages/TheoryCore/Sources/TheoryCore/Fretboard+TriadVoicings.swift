@@ -59,6 +59,13 @@ extension Fretboard {
         }
     }
 
+    /// How many of a key's chords have a voicing on a string set, anywhere on the neck.
+    public func chordCount(of key: Key, on stringSet: StringSet) -> Int {
+        key.chords.filter { chord in
+            Triad.Inversion.allCases.contains { !voicings(of: chord, inversion: $0, on: stringSet).isEmpty }
+        }.count
+    }
+
     /// The voicings wholly within a fret range, ordered up the neck.
     public func voicings(of triad: Triad, inversion: Triad.Inversion, on stringSet: StringSet,
                          frets: ClosedRange<Int>) -> [TriadVoicing] {
