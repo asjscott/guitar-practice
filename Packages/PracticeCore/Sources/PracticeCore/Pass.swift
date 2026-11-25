@@ -113,15 +113,15 @@ extension Key.Mode {
     }
 }
 
-/// How one note of a pass went.
-struct PassNoteResult: Hashable, Sendable {
+/// How one note of a pass or a voicing went.
+struct NoteResult: Hashable, Sendable {
     let outcome: Attempt.Outcome
     let firstRight: Bool
-    /// Whether a hint had been used in the pass by then.
+    /// Whether a hint had been used in it by then.
     let hinted: Bool
 }
 
-extension [PassNoteResult] {
+extension [NoteResult] {
     /// Every note of a pass of that many was played or revealed.
     func isComplete(size: Int?) -> Bool { count == size && !contains { $0.outcome == .skipped } }
 
@@ -144,10 +144,10 @@ public struct PassResult: Hashable, Sendable {
 
     private var size: Int? { attempts.first?.group?.size }
 
-    private var noteResults: [PassNoteResult] {
+    private var noteResults: [NoteResult] {
         attempts.map { attempt in
             let hinted = if case .pass(let facts) = attempt.facts { facts.hinted } else { false }
-            return PassNoteResult(outcome: attempt.outcome, firstRight: attempt.firstRight, hinted: hinted)
+            return NoteResult(outcome: attempt.outcome, firstRight: attempt.firstRight, hinted: hinted)
         }
     }
 

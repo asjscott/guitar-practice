@@ -7,6 +7,7 @@ private func at(_ string: Int, _ fret: Int) -> FretboardLocation { FretboardLoca
 private func setup(_ preset: TuningPreset = .standard, capo: Int = 0, seed: UInt64 = 1,
                    _ change: (inout DrillOptions) -> Void = { _ in }) -> DrillSetup {
     var options = DrillOptions()
+    options.triadFade = .hidden
     options.frets = 0...22
     change(&options)
     return DrillSetup(fretboard: Fretboard(tuning: preset.tuning, capo: capo), options: options, seed: seed)
@@ -135,7 +136,8 @@ struct TriadPlayItTests {
         for (index, pitch) in [52, 57, 60].enumerated() { play(pitch, at: Double(index + 1), &drill) }
         drill.handle(.tick(at: s(4)))
         drill.handle(.skip(at: s(5)))
-        let facts = TriadFacts(triad: Triad(.minor, root: .a), inversion: .second, stringSet: .dGB)
+        var facts = TriadFacts(triad: Triad(.minor, root: .a), inversion: .second, stringSet: .dGB)
+        facts.fadeStage = .hidden
         #expect(drill.attempts.prefix(3).map(\.facts) == Array(repeating: .triad(facts), count: 3))
         #expect(drill.attempts.map { $0.group?.place } == [0, 1, 2, 0])
         #expect(drill.attempts.allSatisfy { $0.group?.size == 3 })

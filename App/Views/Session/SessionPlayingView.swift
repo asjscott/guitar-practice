@@ -103,7 +103,7 @@ struct SessionPlayingView: View {
         if stage == .playing {
             SessionKey(key: "S", action: "skip")
             SessionKey(key: "+", action: "2 min")
-            if kind.hasPasses { SessionKey(key: "H", action: "show") }
+            if kind.fades { SessionKey(key: "H", action: "show") }
             if let repeatTitle = kind.repeatTitle { SessionKey(key: "R", action: repeatTitle.lowercased()) }
         }
         if stage == .paused {

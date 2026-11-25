@@ -153,7 +153,7 @@ private struct DrillOptionsBar: View {
         case .notes: NoteOptions(model: model)
         // Gone during a run, when the header names them: its buttons need the room.
         case .scales: if !model.isRunning { ScaleOptions(setup: model.setup, options: $model.options) }
-        case .triads: TriadOptions(kind: model.kind, options: $model.options)
+        case .triads: if !model.isRunning { TriadOptions(kind: model.kind, options: $model.options) }
         }
     }
 }
@@ -303,11 +303,16 @@ private struct DrillRestingText: View {
                 Text(reason).font(.title3).foregroundStyle(.orange)
             } else {
                 Text("Press Start (↩)").font(.title3).foregroundStyle(.secondary)
-                if model.kind.hasPasses {
-                    Text(model.kind.instructions + " Hold H to see the position: the pass then isn’t clean.").foregroundStyle(.secondary)
+                if model.kind.fades {
+                    Text(model.kind.instructions + hintText).foregroundStyle(.secondary)
                 }
             }
         }
+    }
+
+    private var hintText: String {
+        let (shown, unclean) = model.kind.hasPasses ? ("position", "pass") : ("notes", "voicing")
+        return " Hold H to see the \(shown): the \(unclean) then isn’t clean."
     }
 
     private var resumeText: String {

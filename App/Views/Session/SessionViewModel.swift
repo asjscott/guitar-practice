@@ -116,6 +116,8 @@ final class SessionViewModel: MetronomePanelOwner {
 
     /// The positions its passes go through.
     @ObservationIgnored private var passPositions: [Position.ID] = []
+    /// The string sets triads are on.
+    @ObservationIgnored private var stringSets: Set<StringSet> = []
 
     /// Why the session paused by itself, for the Paused screen.
     private(set) var pauseNotice: String?
@@ -229,7 +231,8 @@ final class SessionViewModel: MetronomePanelOwner {
         let blocks = plan(on: date)
         var drillSetup = drillSetup(seed: seed)
         passPositions = drillSetup.passPositions.map(\.id)
-        drillSetup.fadeStages = log?.fadeStages(in: passPositions) ?? FadeStages()
+        stringSets = drillSetup.options.stringSets
+        drillSetup.fadeStages = log?.fadeStages(in: passPositions, on: stringSets) ?? FadeStages()
         fretboard = drillSetup.fretboard
         frets = drillSetup.options.frets
         player = SessionPlayer(blocks: blocks, setup: drillSetup, hasSound: hasSound)
@@ -279,7 +282,7 @@ final class SessionViewModel: MetronomePanelOwner {
         asksToEnd = false
         loadPassSettings()
         // Free practice may have moved them.
-        if let log { send(.fadeStages(log.fadeStages(in: passPositions))) }
+        if let log { send(.fadeStages(log.fadeStages(in: passPositions, on: stringSets))) }
         send(.resume(at: clockNow()))
     }
 
@@ -368,7 +371,7 @@ final class SessionViewModel: MetronomePanelOwner {
     var canPause: Bool { isActive && stage != .paused }
 
     /// Whether H is the drill's: on Ready cards and while paused too, so that it doesn't do something else.
-    var takesHint: Bool { isActive && blockKind?.hasPasses == true && !isPanelOpen }
+    var takesHint: Bool { isActive && blockKind?.fades == true && !isPanelOpen }
 
     /// H held or let go.
     func hint(isShown: Bool) { send(.hint(isShown: isShown, at: clockNow())) }

@@ -63,6 +63,9 @@ public struct DrillKind: Identifiable, Sendable {
     /// A scale drill: passes, played to the metronome at a tempo of its own.
     public var hasPasses: Bool { traits.contains(.hasPasses) }
 
+    /// What it shows fades as it is learned, and H shows it.
+    public var fades: Bool { hasPasses || module == .triads }
+
     /// Its prompts are climbs.
     public var hasClimbs: Bool { traits.contains(.hasClimbs) }
 

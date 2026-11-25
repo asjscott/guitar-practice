@@ -62,6 +62,12 @@ public struct TriadFacts: Hashable, Sendable {
     public var inversion: Triad.Inversion
     public var stringSet: StringSet
 
+    /// What the voicing was played at; nil where it isn't being played.
+    public var fadeStage: FadeStage?
+
+    /// Whether a hint had been used in the voicing by the time this note was dealt with.
+    public var hinted = false
+
     public init(triad: Triad, inversion: Triad.Inversion, stringSet: StringSet) {
         self.triad = triad
         self.inversion = inversion
@@ -69,7 +75,7 @@ public struct TriadFacts: Hashable, Sendable {
     }
 }
 
-/// How much of a position is shown during a pass. The raw values are saved in the attempt log: never change them.
+/// How much of a position is shown during a pass, or of a triad's voicing. The raw values are saved in the attempt log: never change them.
 public enum FadeStage: String, Hashable, Sendable, CaseIterable {
     case shown, faded, hidden
 }

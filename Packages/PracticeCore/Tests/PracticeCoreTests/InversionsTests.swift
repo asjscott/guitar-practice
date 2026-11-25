@@ -7,6 +7,7 @@ private func at(_ string: Int, _ fret: Int) -> FretboardLocation { FretboardLoca
 private func setup(_ preset: TuningPreset = .standard, capo: Int = 0, seed: UInt64 = 1,
                    _ change: (inout DrillOptions) -> Void = { _ in }) -> DrillSetup {
     var options = DrillOptions()
+    options.triadFade = .hidden
     change(&options)
     return DrillSetup(fretboard: Fretboard(tuning: preset.tuning, capo: capo), options: options, seed: seed)
 }
@@ -127,8 +128,10 @@ struct InversionsTests {
         #expect(drill.attempts.map { $0.group?.place } == Array(0..<15))
         #expect(drill.attempts.allSatisfy { $0.group?.size == 15 })
         #expect(drill.stats.prompts == 1)
-        let facts = [Triad.Inversion.second, .root, .first, .root, .second].flatMap { inversion in
-            Array(repeating: AttemptFacts.triad(TriadFacts(triad: Triad(.minor, root: .a), inversion: inversion, stringSet: .dGB)), count: 3)
+        let facts = [Triad.Inversion.second, .root, .first, .root, .second].flatMap { inversion -> [AttemptFacts] in
+            var facts = TriadFacts(triad: Triad(.minor, root: .a), inversion: inversion, stringSet: .dGB)
+            facts.fadeStage = .hidden
+            return Array(repeating: AttemptFacts.triad(facts), count: 3)
         }
         #expect(drill.attempts.map(\.facts) == facts)
         #expect(drill.attemptsToLog.count == 15)

@@ -69,6 +69,8 @@ public struct PromptDrill<Rules: DrillRules>: Drill {
         }
     }
 
+    public var fadeStages: FadeStages? { rules.fadeStages }
+
     public var isPartWay: Bool { isAnswerable && rules.isPartWay }
 
     /// The location to light on a right answer.
@@ -87,7 +89,7 @@ public struct PromptDrill<Rules: DrillRules>: Drill {
     }
 
     public func timeRemaining(at now: Duration) -> Duration? {
-        guard isAnswerable, heldUntil == nil, let timerStart else { return nil }
+        guard isAnswerable, rules.isTimed, heldUntil == nil, let timerStart else { return nil }
         return min(timeLimit, max(.zero, timeLimit - (now - timerStart)))
     }
 
@@ -127,7 +129,12 @@ public struct PromptDrill<Rules: DrillRules>: Drill {
             soundStarted(at: start, latency: latency)
         case .hold(let end):
             if canHold, isAnswerable { heldUntil = end }
-        case .clicksStarted, .hint, .passSettings, .fadeStages:
+        case .hint(let isShown, let now):
+            advance(to: now)
+            if isRunning, phase != .paused { rules.hint(isShown: isShown) }
+        case .fadeStages(let stages):
+            rules.fadeStages = stages
+        case .clicksStarted, .passSettings:
             break
         case .tick(let now):
             advance(to: now)
@@ -153,6 +160,7 @@ public struct PromptDrill<Rules: DrillRules>: Drill {
         guard isRunning, phase != .paused else { return }
         wasAnswerableBeforePause = isAnswerable
         phase = .paused
+        rules.hint(isShown: false)
         heldUntil = nil
         pendingSounds = []
     }
@@ -172,6 +180,7 @@ public struct PromptDrill<Rules: DrillRules>: Drill {
 
     private mutating func stop() {
         phase = .idle
+        rules.hint(isShown: false)
         heldUntil = nil
         current = nil
         timerStart = nil
@@ -253,7 +262,7 @@ public struct PromptDrill<Rules: DrillRules>: Drill {
             heldUntil = nil
             if let start = timerStart, isAnswerable { timerStart = max(start, end) }
         }
-        if isAnswerable, heldUntil == nil, let current, let timerStart, now - timerStart >= timeLimit + grace {
+        if isAnswerable, rules.isTimed, heldUntil == nil, let current, let timerStart, now - timerStart >= timeLimit + grace {
             let attempt = record(.timedOut, of: current)
             phase = .timedOut
             let transition = rules.transition(after: attempt)

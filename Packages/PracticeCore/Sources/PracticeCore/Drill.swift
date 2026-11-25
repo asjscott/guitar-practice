@@ -37,11 +37,11 @@ public enum DrillEvent: Hashable, Sendable {
     case hold(until: Duration)
     /// The clicks just asked for, as they will be heard.
     case clicksStarted(ClickTrack)
-    /// H held or let go: the position is shown meanwhile, and the pass is hinted. Pausing lets go.
+    /// H held or let go: the position or voicing is shown meanwhile, and the pass or voicing is hinted. Pausing lets go.
     case hint(isShown: Bool, at: Duration)
     /// What passes are played at, from the next one on.
     case passSettings(PassSettings, at: Duration)
-    /// The fade stages reached by now, read again from the log, which has this run's passes too: from the next pass on.
+    /// The fade stages reached by now, read again from the log, which has this run's too: from the next pass or voicing on.
     case fadeStages(FadeStages)
     /// The clock moved on; timeouts and the next prompt happen on ticks.
     case tick(at: Duration)
@@ -134,7 +134,7 @@ public protocol Drill: Sendable {
     /// What the next pass will be played at, as the tempo ladder moves it; nil in drills without passes.
     var passSettings: PassSettings? { get }
 
-    /// The fade stages reached, this run's passes included; nil in drills without passes.
+    /// The fade stages reached, this run's included; nil in drills that don't fade.
     var fadeStages: FadeStages? { get }
 }
 

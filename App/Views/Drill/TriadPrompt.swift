@@ -119,7 +119,7 @@ extension DrillDisplay.Chip.State {
     }
 }
 
-/// Key, String sets, Inversions (where the drill offers them) and Frets.
+/// Key, String sets, Inversions (where the drill offers them), Frets and Fade.
 struct TriadOptions: View {
     let kind: DrillKind
     @Binding var options: DrillOptions
@@ -144,6 +144,7 @@ struct TriadOptions: View {
             .help("Inversions")
         }
         FretsPicker(frets: $options.frets)
+        FadePicker(stage: $options.triadFade, unit: "voicings")
     }
 
     /// "Sets: all", or the only one, or how many.

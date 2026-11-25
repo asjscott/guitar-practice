@@ -88,9 +88,11 @@ final class DrillViewModel: MetronomePanelOwner {
         if isRunning { send(.passSettings(options.pass, at: clockNow())) }
     }
 
-    /// Those reached by now in the positions passes go through, a session's passes included.
+    /// Those reached by now in what the drill goes through, a session's included.
     private func loggedFadeStages() -> FadeStages? {
-        kind.hasPasses ? log?.fadeStages(in: setup.passPositions.map(\.id)) : nil
+        guard kind.fades else { return nil }
+        return kind.hasPasses ? log?.fadeStages(in: setup.passPositions.map(\.id), on: [])
+            : log?.fadeStages(in: [], on: options.stringSets)
     }
 
     /// The metronome panel. The view keeps the run's buttons and keys from acting while it is open.
@@ -199,7 +201,7 @@ final class DrillViewModel: MetronomePanelOwner {
     func repeatPrompt() { send(.repeat(at: clockNow())) }
 
     /// Whether H is the drill's: while paused too, so that it doesn't do something else.
-    var takesHint: Bool { isRunning && kind.hasPasses }
+    var takesHint: Bool { isRunning && kind.fades }
 
     /// H held or let go.
     func hint(isShown: Bool) { send(.hint(isShown: isShown, at: clockNow())) }

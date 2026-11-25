@@ -3,7 +3,7 @@ import SwiftUI
 import TheoryCore
 
 /// The Session screen, S4: setup, then for each block a Ready card and the drill under a bar of the session's drills,
-/// then a summary. Return starts and leaves the summary; Space goes on; S skips; + extends; R is up to the drill; in a scale block H shows the position and M opens the metronome panel; P pauses and
+/// then a summary. Return starts and leaves the summary; Space goes on; S skips; + extends; R is up to the drill; in a scale or triad block H shows what has faded, and in a scale block M opens the metronome panel; P pauses and
 /// resumes; Esc pauses and asks before ending. A listening screen; leaving it pauses the session, as do sleep and losing
 /// the input. Follows the tuning, capo and position system in Settings.
 struct SessionView: View {

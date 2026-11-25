@@ -181,6 +181,19 @@ enum Snapshots {
             triads.playForSnapshot(right: true)
         }
         triads.stop()
+        for stage in [FadeStage.faded, .hidden] {
+            try await save("triad-\(stage.rawValue)", DrillView(model: triads)) {
+                triads.options.triadFade = stage
+                triads.start(seed: 1)
+                triads.playForSnapshot(right: true)
+            }
+            triads.stop()
+        }
+        try await save("triad-hint", DrillView(model: triads)) {
+            triads.start(seed: 1)
+            triads.hint(isShown: true)
+        }
+        triads.stop()
         try await save("triad-wrong", DrillView(model: triads)) {
             triads.start(seed: 1)
             triads.playForSnapshot(right: true)
@@ -225,6 +238,9 @@ enum Snapshots {
         func playVoicing() { for _ in 0..<3 { climb.playForSnapshot(right: true) } }
         try await save("inversions-idle", DrillView(model: climb))
         climb.stop()
+        try await save("inversions-shown", DrillView(model: climb)) { climb.start(seed: 1) }
+        climb.stop()
+        climb.options.triadFade = .hidden
         try await save("inversions-waiting", DrillView(model: climb)) { climb.start(seed: 1) }
         climb.stop()
         try await save("inversions-climbing", DrillView(model: climb)) {
@@ -719,11 +735,6 @@ enum Snapshots {
                            settle: .milliseconds(150)) {
                 play(kind)
                 for _ in 0..<3 { session.answerForSnapshot(right: true) }
-            }
-            try await save("session-\(name)-revealed", SessionView(model: session), settle: .milliseconds(150)) {
-                play(kind)
-                session.answerForSnapshot(right: true)
-                session.timeOutForSnapshot()
             }
         }
         try await save("session-triad-ready", SessionView(model: session)) { ready(.triadPlayIt) }

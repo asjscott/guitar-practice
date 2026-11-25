@@ -121,6 +121,8 @@ extension LoggedAttempt {
         chordQuality = facts.triad.quality.rawValue
         inversion = facts.inversion.rawValue
         stringSet = facts.stringSet.rawValue
+        fadeStageRaw = facts.fadeStage?.rawValue
+        hinted = facts.fadeStage.map { _ in facts.hinted }
     }
 
     var source: AttemptSource? { AttemptSource(rawValue: sourceRaw) }

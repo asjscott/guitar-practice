@@ -55,12 +55,14 @@ public struct InversionsRules: DrillRules {
     /// How the climb's voicings went, so far.
     private var results: [DrillDisplay.Chip.State] = []
     private var next = Next.climb
+    private var fade: VoicingFade
 
     public init(setup: DrillSetup) {
         let setup = setup.spelledInChosenKey()
         self.setup = setup
         choices = setup.climbableVoicings.map { Climb(up: $0) }
         chooser = PromptChooser(setup: setup)
+        fade = VoicingFade(setup: setup)
     }
 
     public var nothingToPromptReason: String? {
@@ -72,6 +74,7 @@ public struct InversionsRules: DrillRules {
     }
 
     public mutating func nextPrompt(after previous: NotePrompt?) -> NotePrompt? {
+        let isNewVoicing = next != .note
         switch next {
         case .climb:
             guard let chosen = chooser.choose(from: choices, avoiding: climb, note: \.triad.root.pitchClass) else { return nil }
@@ -84,6 +87,7 @@ public struct InversionsRules: DrillRules {
         case .note:
             break
         }
+        if isNewVoicing, let facts { fade.start(facts) }
         // Unless this prompt is dealt with first: then a pause dropped it.
         next = .sameVoicing
         return voicing.map {
@@ -114,6 +118,7 @@ public struct InversionsRules: DrillRules {
     }
 
     public mutating func dealtWith(_ attempt: Attempt) {
+        fade.dealtWith(attempt)
         guard let climb, let voicing else { return }
         switch attempt.outcome {
         case .answered:
@@ -140,6 +145,15 @@ public struct InversionsRules: DrillRules {
 
     public var isPartWay: Bool { noteIndex > 0 }
 
+    public var isTimed: Bool { fade.isTimed }
+
+    public mutating func hint(isShown: Bool) { fade.hint(isShown: isShown) }
+
+    public var fadeStages: FadeStages? {
+        get { fade.reached }
+        set { if let newValue { fade.reached = newValue } }
+    }
+
     public func correctLocations(for prompt: NotePrompt) -> [FretboardLocation] { voicing?.locations ?? [] }
 
     public func group(for prompt: NotePrompt) -> AttemptGroup? {
@@ -148,7 +162,7 @@ public struct InversionsRules: DrillRules {
         return AttemptGroup(number: group, size: climb.voicings.count * noteCount, place: voicingIndex * noteCount + noteIndex)
     }
 
-    public func facts(for prompt: NotePrompt) -> AttemptFacts? { facts.map { .triad($0) } }
+    public func facts(for prompt: NotePrompt) -> AttemptFacts? { facts.map { .triad(fade.logged($0)) } }
 
     /// Straight on within a voicing.
     public func transition(after attempt: Attempt) -> DrillTransition {
@@ -159,7 +173,7 @@ public struct InversionsRules: DrillRules {
 
     public func display(of moment: DrillMoment) -> DrillDisplay {
         guard let climb, let voicing, let facts else { return DrillDisplay(standard: moment, in: setup) }
-        var display = DrillDisplay(triad: facts, at: voicing.locations, played: played, moment: moment, in: setup)
+        var display = DrillDisplay(triad: facts, at: voicing.locations, played: played, showing: fade.shown, moment: moment, in: setup)
         display.voicings = climb.voicings.enumerated().map { index, voicing in
             let state: DrillDisplay.Chip.State = if index < results.count { results[index] } else { index == voicingIndex ? .current : .waiting }
             return DrillDisplay.Chip(title: voicing.inversion.shortName, spokenTitle: "voicing \(index + 1) of \(climb.voicings.count)",

@@ -40,6 +40,9 @@ public struct DrillOptions: Hashable, Sendable {
     /// Triads only.
     public var inversions = Set(Triad.Inversion.allCases)
 
+    /// Triads only: what they are played at; nil follows the stage reached (`DrillSetup.fadeStages`).
+    public var triadFade: FadeStage?
+
     /// Scales only. The key moves to its mode.
     public var scaleKind: Scale.Kind = .major
 
@@ -82,7 +85,7 @@ public struct DrillSetup: Hashable, Sendable {
     /// The session's: scale drills take turns through the scales of its mode, in its position. Nil in free practice.
     public var theme: Theme?
 
-    /// Scales only: the fade stages reached before the run.
+    /// Scales and triads only: the fade stages reached before the run.
     public var fadeStages = FadeStages()
 
     public var seed: UInt64

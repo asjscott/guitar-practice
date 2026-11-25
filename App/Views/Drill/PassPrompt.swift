@@ -126,11 +126,7 @@ struct ScaleOptions: View {
             }
         }
         .help("Position")
-        Picker("Fade", selection: $options.pass.fadeStage) {
-            Text("Follow").tag(FadeStage?.none)
-            ForEach(FadeStage.allCases, id: \.self) { Text($0.rawValue.capitalizedFirst).tag(Optional($0)) }
-        }
-        .help("Fade stage (Follow: the one your clean passes have reached)")
+        FadePicker(stage: $options.pass.fadeStage, unit: "passes")
     }
 
     /// In the scale's mode.
@@ -140,5 +136,20 @@ struct ScaleOptions: View {
 
     private var position: Binding<Position.ID?> {
         Binding(get: { setup.position?.id }, set: { if let id = $0 { options.position = id } })
+    }
+}
+
+/// Follow, or a stage that overrides it.
+struct FadePicker: View {
+    @Binding var stage: FadeStage?
+    /// What moves it, "passes".
+    let unit: String
+
+    var body: some View {
+        Picker("Fade", selection: $stage) {
+            Text("Follow").tag(FadeStage?.none)
+            ForEach(FadeStage.allCases, id: \.self) { Text($0.rawValue.capitalizedFirst).tag(Optional($0)) }
+        }
+        .help("Fade stage (Follow: the one your clean \(unit) have reached)")
     }
 }

@@ -107,7 +107,7 @@ The single prompt of the Inversions drill: one chord on one string set, through 
 _Avoid_: Ladder (that is the tempo ladder), run, sweep, pass
 
 **Clean**:
-Said of a pass whose every expected note was played with no wrong note, timeout, skip or hint. Timing does not affect it.
+Said of a pass whose every expected note was played with no wrong note, timeout, skip or hint. Timing does not affect it. A triad's voicing is clean in the same way.
 _Avoid_: Perfect, correct (for a whole pass)
 
 **Count-in**:
@@ -127,11 +127,11 @@ The rule that raises a scale drill's tempo after clean passes that kept up with 
 _Avoid_: Speed trainer, auto-tempo
 
 **Fade stage**:
-How much of a position is shown during a pass: Shown (dots and names), Faded (faint dots, no names) or Hidden (only the root marked). It belongs to one scale kind in one position, whatever the key.
+How much of a position is shown during a pass: Shown (dots and names), Faded (faint dots, no names) or Hidden (only the root marked). It belongs to one scale kind in one position, whatever the key. A triad's voicing has one too: Shown, Faded or Hidden (nothing marked), belonging to its quality, inversion and string set, whatever the root.
 _Avoid_: Memory level, difficulty
 
 **Hint**:
-Showing the position during a pass, on request. The pass is then not clean.
+Showing the position during a pass, or the voicing in a triad drill, on request. The pass or voicing is then not clean.
 _Avoid_: Reveal (that follows a timeout)
 
 ## Sessions

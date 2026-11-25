@@ -4,6 +4,7 @@ import PracticeCore
 
 private func themed(_ set: StringSet = .dGB, seed: UInt64 = 1) -> DrillSetup {
     var setup = DrillSetup(fretboard: Fretboard(tuning: .standard), seed: seed)
+    setup.options.triadFade = .hidden
     setup.follow(Theme(key: .minor(.a), position: .init(system: .caged, number: 5), stringSet: set))
     return setup
 }
