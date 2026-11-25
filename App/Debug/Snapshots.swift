@@ -286,6 +286,38 @@ enum Snapshots {
         try await save("settings-instrument-locked", InstrumentSettingsView().environment(activeSessions),
                        size: CGSize(width: 520, height: 700))
         try await save("settings-audio", AudioSettingsView(), size: CGSize(width: 520, height: 480))
+        try await saveMetronome()
+    }
+
+    private static func saveMetronome() async throws {
+        let size = CGSize(width: 520, height: 600)
+        func choose(_ signature: String, _ emphasis: String) {
+            emptyDefaults.set(signature, forKey: MetronomeSettings.Key.signature)
+            emptyDefaults.set(emphasis, forKey: MetronomeSettings.Key.emphasis)
+        }
+        defer {
+            for key in MetronomeSettings.Key.all { emptyDefaults.removeObject(forKey: key) }
+        }
+        choose("4/4", "4/4:1,3")
+        try await save("settings-metronome", MetronomeSettingsView(), size: size)
+        choose("12/8", "")
+        try await save("settings-metronome-12-8", MetronomeSettingsView(), size: size)
+        choose("1/8", "1/8:")
+        try await save("settings-metronome-1-8", MetronomeSettingsView(), size: size)
+        choose("4/4", "4/4:1,3")
+        try await save("settings-metronome-no-sound", MetronomeSettingsView(), size: size,
+                       sound: AppSoundOutput(isInert: true, problem: "There’s no sound output device."))
+
+        // Listening, on beat 1 and on beat 2, which isn't emphasised.
+        let output = AppSoundOutput(isInert: true)
+        for (beat, settle) in [(1, 500), (2, 1500)] {
+            let metronome = Metronome(output: output, defaults: emptyDefaults)
+            try await save("settings-metronome-beat-\(beat)",
+                           MetronomeSettingsView().environment(metronome).environment(output),
+                           size: size, settle: .milliseconds(settle)) { metronome.listen() }
+        }
+        try await save("beats-row", BeatsRow(meter: Meter(.fourFour, emphasis: [1, 3]), current: 4).padding(),
+                       size: CGSize(width: 260, height: 80))
     }
 
     /// The neck by itself: zoomed, and at each fade stage.
@@ -550,7 +582,7 @@ enum Snapshots {
                              prepare: () -> Void = {}) async throws {
         guard isWanted(name) || follower.map(isWanted) == true else { return }
         let host = NSHostingController(rootView: view.frame(width: size.width, height: size.height).environment(audioInput)
-            .environment(sound).environment(log).defaultAppStorage(emptyDefaults))
+            .environment(sound).environment(Metronome(output: sound, defaults: emptyDefaults)).environment(log).defaultAppStorage(emptyDefaults))
         host.sceneBridgingOptions = [.title, .toolbars]
         let window = NSWindow(contentViewController: host)
         window.isReleasedWhenClosed = false
