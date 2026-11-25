@@ -51,6 +51,23 @@ extension Fretboard {
     }
 }
 
+extension Fretboard {
+    /// Where to play a scale near a position of another: the same shape or pattern, in its nearest placement, or where
+    /// the scale has none of that system, the nearest CAGED shape. Nearest by lowest fret, ties to the lower. Nil if
+    /// there is none on the neck.
+    public func position(of scale: Scale, nearest position: Position) -> Position? {
+        let candidates = position.system == .threeNotesPerString && !scale.kind.isSevenNote
+            ? cagedPositions(of: scale)
+            : positions(of: scale, system: position.system).filter { $0.number == position.number }
+        // They come up the neck, and the first of equals is kept.
+        return candidates.min { $0.distance(from: position) < $1.distance(from: position) }
+    }
+}
+
+extension Position {
+    fileprivate func distance(from other: Position) -> Int { abs(frets.lowerBound - other.frets.lowerBound) }
+}
+
 extension Array where Element == Position {
     /// Ordered up the neck: by lowest fret, then CAGED shape or 3NPS pattern number.
     func sortedUpTheNeck() -> [Position] {

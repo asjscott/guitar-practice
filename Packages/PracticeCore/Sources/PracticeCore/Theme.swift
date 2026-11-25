@@ -21,8 +21,9 @@ extension DrillSetup {
     /// How often a themed prompt is a note of the key.
     private static let keyNoteShare = 0.7
 
-    /// Prompts are spelled in the theme's key and favour its notes. The position doesn't restrict them.
+    /// Prompts are spelled in the theme's key and favour its notes. Its position is for scale drills only.
     public mutating func follow(_ theme: Theme) {
+        self.theme = theme
         key = theme.key
         weighting = NoteWeighting(preferred: Set(theme.key.notes.map(\.pitchClass)), share: Self.keyNoteShare)
     }

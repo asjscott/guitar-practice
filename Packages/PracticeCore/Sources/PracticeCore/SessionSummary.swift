@@ -8,6 +8,11 @@ public struct SessionSummary: Hashable, Sendable {
         public let time: Duration
         public let stats: RunStats
 
+        /// In scale blocks only.
+        public var passes: PassStats? {
+            kind.usesMetronome ? PassStats(PassResult.passes(in: stats.attempts)) : nil
+        }
+
         /// The median response time, "1.24 s"; nil where nothing was answered.
         public var speedText: String? { stats.medianResponseTime == nil ? nil : stats.medianText }
     }
@@ -21,9 +26,9 @@ public struct SessionSummary: Hashable, Sendable {
     /// Such a session isn't saved.
     public var hasNoAttempts: Bool { blocks.allSatisfy(\.stats.attempts.isEmpty) }
 
-    /// The slowest prompts of every block: timeouts, then the longest response times.
+    /// The slowest prompts of every block but the scale blocks: timeouts, then the longest response times.
     public func slowest(_ count: Int) -> [Attempt] {
-        RunStats(attempts: blocks.flatMap(\.stats.attempts)).slowest(count)
+        RunStats(attempts: blocks.filter { $0.passes == nil }.flatMap(\.stats.attempts)).slowest(count)
     }
 }
 

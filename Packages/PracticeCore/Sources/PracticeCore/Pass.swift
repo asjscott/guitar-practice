@@ -51,10 +51,14 @@ public protocol PassRules: Sendable {
 
     /// "A major · up and down".
     func headline(of pass: Pass) -> String
+
+    /// Next to the headline. Default: the position's name.
+    func subline(of pass: Pass) -> String
 }
 
 extension PassRules {
     public mutating func begin() {}
+    public func subline(of pass: Pass) -> String { pass.position.name }
 }
 
 extension DrillSetup {
@@ -73,7 +77,27 @@ extension DrillSetup {
             ?? positions.first { $0.system != id.system && $0.number == 1 && $0.octave == 0 }
     }
 
+    /// The positions passes take turns through, a pass each: the chosen one, or with a theme, one for each scale of its
+    /// mode, in or near its position. Empty when there are none on the neck.
+    public var passPositions: [Position] {
+        guard let theme else { return [position].compactMap { $0 } }
+        guard let position = theme.position(on: fretboard) else { return [] }
+        return theme.key.mode.practisedScales.compactMap {
+            fretboard.position(of: Scale($0, in: theme.key), nearest: position)
+        }
+    }
+
     static let noPositionReason = "The position doesn’t fit on this neck."
+}
+
+extension Key.Mode {
+    /// The scales a session goes through, in order.
+    fileprivate var practisedScales: [Scale.Kind] {
+        switch self {
+        case .major: [.major, .majorPentatonic]
+        case .minor: [.naturalMinor, .minorPentatonic, .blues]
+        }
+    }
 }
 
 /// How one pass went, from its attempts.
@@ -148,4 +172,7 @@ public struct PassProgress: Hashable, Sendable {
     public var evenness: Duration?
 
     public var settings: PassSettings
+
+    /// The frets to show.
+    public var fretWindow: ClosedRange<Int>
 }

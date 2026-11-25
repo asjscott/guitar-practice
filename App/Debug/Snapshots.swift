@@ -277,7 +277,7 @@ enum Snapshots {
         try await save("drill-not-saving", DrillView(model: DrillViewModel()), log: .inMemory(problem: "The file couldn’t be opened."))
 
         // A menu can't be drawn offscreen, so its items are laid out inline.
-        try await save("drill-picker", DrillPicker(kind: .constant(.notePlayIt), kinds: drillsOfEveryModule)
+        try await save("drill-picker", DrillPicker(kind: .constant(.notePlayIt), kinds: DrillKind.all)
             .pickerStyle(.inline).padding(), size: CGSize(width: 320, height: 360))
 
         try await saveNecks()
@@ -519,7 +519,7 @@ enum Snapshots {
                 minutes: .constant(minutes), naturalsOnly: .constant(true), range: .constant(.first12),
                 theme: SessionTheme(Theme(key: .major(.bFlat), position: Position.ID(system: .caged, number: 3)),
                                     on: Fretboard(tuning: .standard)),
-                reroll: {}, blocks: SessionPlanner.plan(drillsOfEveryModule, budget: .seconds(minutes * 60), day: 1),
+                reroll: {}, blocks: SessionPlanner.plan(DrillKind.all, budget: .seconds(minutes * 60), day: 1),
                 problem: nil, start: {}), size: CGSize(width: 920, height: 620))
         }
 
@@ -536,16 +536,32 @@ enum Snapshots {
             type("\r ")
         }
 
-        /// A new session, playing the block of a drill.
-        func play(_ kind: DrillKind) {
+        /// How long the first block is planned to be, in seconds.
+        func firstLength(_ model: SessionViewModel) -> Double { (model.plan().first?.length ?? .zero) / .seconds(1) }
+        /// A new session, on the Ready card of a drill.
+        func ready(_ kind: DrillKind) {
             session.done()
             session.end()
             session.done()
+            // As they were before any pass moved them.
+            for kind in DrillKind.all { emptyDefaults.removeObject(forKey: MetronomeSettings.Key.tempo(of: kind)) }
             session.start(seed: 1)
-            session.next()
             while session.isActive, session.blockKind != kind {
                 session.next()
                 session.next()
+            }
+        }
+        /// The same, playing its block.
+        func play(_ kind: DrillKind) {
+            ready(kind)
+            // Any sound of an earlier block is over, so that notes count.
+            session.passTimeForSnapshot(2)
+            session.next()
+        }
+        /// Plays the rest of a pass, or some of it.
+        func playNotes(_ count: Int = .max) {
+            for _ in 0..<min(count, 60) where session.snapshot.display?.pass?.notes.contains(where: { $0.state == .current }) == true {
+                session.answerForSnapshot(right: true)
             }
         }
         try await save("session-waiting", SessionView(model: session)) { play(.notePlayIt) }
@@ -573,13 +589,13 @@ enum Snapshots {
         try await save("session-hear", SessionView(model: session)) { play(.hearFindIt) }
         try await save("session-overtime", SessionView(model: session), settle: .milliseconds(1700)) {
             play(.notePlayIt)
-            session.passTimeForSnapshot(225 + 12)
+            session.passTimeForSnapshot(firstLength(session) + 12)
             session.skip()
         }
         // + and = in the drill answered by typing.
         try await save("session-extended", SessionView(model: session), settle: .milliseconds(1700)) {
             play(.fretNameIt)
-            session.passTimeForSnapshot(225 + 12)
+            session.passTimeForSnapshot(firstLength(session) + 12)
             type("+=")
         }
         try await save("session-ready-after-overtime", SessionView(model: session)) {
@@ -588,14 +604,106 @@ enum Snapshots {
             session.done()
             session.start(seed: 1)
             session.next()
-            session.passTimeForSnapshot(225 + 72)
+            session.passTimeForSnapshot(firstLength(session) + 72)
             session.next()
         }
+        // In 60 minutes every drill has a block.
+        try await save("session-summary-60", SessionView(model: session), size: CGSize(width: 920, height: 620)) {
+            play(.notePlayIt)
+            session.end()
+            session.done()
+            emptyDefaults.set(60, forKey: "session.minutes")
+            session.setup = SessionSetup(minutes: 60)
+            session.start(seed: 1)
+            while session.isActive {
+                session.passTimeForSnapshot(2)
+                session.next()
+                session.answerForSnapshot(right: true)
+                playNotes()
+                session.next()
+            }
+            emptyDefaults.removeObject(forKey: "session.minutes")
+        }
+        session.setup = SessionSetup()
+
+        try await save("session-scale-ready", SessionView(model: session)) { ready(.upAndDown) }
+        try await save("session-scale-count-in", SessionView(model: session), settle: .milliseconds(1600)) { play(.upAndDown) }
+        try await save("session-scale", SessionView(model: session)) {
+            play(.upAndDown)
+            playNotes(11)
+        }
+        try await save("session-scale-wrong", SessionView(model: session)) {
+            play(.upAndDown)
+            playNotes(11)
+            session.answerForSnapshot(right: false)
+        }
+        try await save("session-scale-hint", SessionView(model: session)) {
+            play(.upAndDown)
+            playNotes(4)
+            session.hint(isShown: true)
+        }
+        try await save("session-scale-over", SessionView(model: session), settle: .milliseconds(150)) {
+            play(.upAndDown)
+            playNotes()
+        }
+        try await save("session-scale-next", SessionView(model: session), size: CGSize(width: 920, height: 520)) {
+            play(.fromADegree)
+            session.skip()
+            playNotes(3)
+        }
+        try await save("session-scale-paused", SessionView(model: session)) {
+            play(.upAndDown)
+            session.pause()
+        }
+        try await save("session-scale-chiming", SessionView(model: session), settle: .milliseconds(150)) {
+            play(.upAndDown)
+            let length = session.plan().first { $0.kind == .upAndDown }?.length ?? .zero
+            session.passTimeForSnapshot(length / .seconds(1) - 29)
+            session.skip()
+        }
+        // M pauses; the session's keys then do nothing, and [ and ] neither. Closing goes on.
+        try await save("session-scale-panel", SessionView(model: session), settle: .milliseconds(900)) {
+            play(.upAndDown)
+            playNotes(3)
+            type("]m srp+[")
+        } check: {
+            precondition(session.isPanelOpen && session.stage == .paused && session.blockKind == .upAndDown)
+            precondition(session.passSettings?.tempo == 64)
+        }
+        try await save("session-scale-panel-esc", SessionView(model: session), settle: .milliseconds(900)) {
+            play(.upAndDown)
+            playNotes(3)
+            type("m\u{1b}")
+        } check: {
+            precondition(session.stage == .playing && !session.isPanelOpen && !session.asksToEnd)
+        }
+        try await save("session-scale-panel-ready", SessionView(model: session), size: CGSize(width: 920, height: 520),
+                       settle: .milliseconds(900)) {
+            ready(.upAndDown)
+            type("m")
+        } check: {
+            precondition(session.isPanelOpen && session.stage == .paused)
+        }
+        try await save("session-scale-panel-ready-closed", SessionView(model: session), settle: .milliseconds(900)) {
+            ready(.upAndDown)
+            type("mm")
+        } check: {
+            precondition(session.stage == .ready)
+        }
+        try await save("session-scale-output-lost", SessionView(model: session)) {
+            play(.upAndDown)
+            session.soundOutput = silent
+            session.soundChanged()
+        }
+        try await save("session-scale-no-output", SessionView(model: session), sound: silent, settle: .milliseconds(1600)) {
+            play(.upAndDown)
+        }
+
         let unheard = SessionViewModel()
         try await save("session-flash", SessionView(model: unheard), sound: silent, settle: .milliseconds(500)) {
             unheard.start(seed: 1)
             unheard.next()
-            unheard.passTimeForSnapshot(271)
+            unheard.passTimeForSnapshot(firstLength(unheard) - 29)
             unheard.skip()
         }
         // The output failing: with the block that needs sound to come, and in it.
@@ -645,10 +753,12 @@ enum Snapshots {
             session.done()
             session.start(seed: 1)
             while session.isActive {
+                session.passTimeForSnapshot(2)
                 session.next()
                 session.skip()
                 session.answerForSnapshot(right: false)
                 session.answerForSnapshot(right: true)
+                playNotes()
                 session.next()
             }
         }
@@ -656,15 +766,6 @@ enum Snapshots {
             play(.notePlayIt)
             session.end()
         }
-    }
-
-    /// Today's drills, with made-up ones for those to come.
-    private static var drillsOfEveryModule: [DrillKind] {
-        func madeUp(_ title: String, _ module: DrillModule) -> DrillKind {
-            DrillKind(id: title, module: module, title: title, instructions: "", symbol: "star", rules: NotePlayItRules.self)
-        }
-        return DrillKind.all.filter { $0.module != .scales }
-            + [madeUp("Up and down", .scales), madeUp("From a degree", .scales)]
     }
 
     private static var newestWindow: NSWindow? { NSApp.windows.last { $0.isVisible } }

@@ -40,16 +40,25 @@ struct SessionSummaryView: View {
         }
     }
 
+    private func promptsText(_ stats: RunStats) -> String {
+        "\(stats.prompts) \(stats.prompts == 1 ? "prompt" : "prompts") · \(stats.skips) skipped"
+    }
+
     private func card(_ block: SessionSummary.Block) -> some View {
         VStack(spacing: 4) {
             Image(systemName: block.kind.symbol).font(.title2).foregroundStyle(.secondary)
-            Text(block.stats.firstTryText).font(.system(size: 40, weight: .bold, design: .rounded))
-            Text(block.speedText ?? " ").font(.title3.monospacedDigit())
+            Text(block.passes?.cleanText ?? block.stats.firstTryText).font(.system(size: 40, weight: .bold, design: .rounded))
+            Text((block.passes == nil ? block.speedText : block.passes?.tempoText) ?? " ").font(.title3.monospacedDigit())
             Text(block.kind.title).font(.callout)
-            Text("\(block.stats.prompts) \(block.stats.prompts == 1 ? "prompt" : "prompts") · \(block.stats.skips) skipped")
-                .font(.caption).foregroundStyle(.secondary)
+            Text(block.passes?.detailText ?? promptsText(block.stats)).font(.caption).foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
         }
-        .frame(width: 170, height: 180)
+        .lineLimit(1)
+        .minimumScaleFactor(0.6)
+        .padding(.horizontal, 8)
+        .frame(minWidth: 100, maxWidth: 190)
+        .frame(height: 180)
         .sessionCard()
         .accessibilityElement(children: .combine)
     }

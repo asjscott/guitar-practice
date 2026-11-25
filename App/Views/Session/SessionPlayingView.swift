@@ -3,61 +3,107 @@ import SwiftUI
 import TheoryCore
 
 /// A session that is going: the drills bar stays on top through Ready cards, drills and pauses, so nothing
-/// jumps.
+/// jumps. All through a scale block it is at the bottom, so that the neck and the pass get the top.
 struct SessionPlayingView: View {
-    let model: SessionViewModel
+    @Bindable var model: SessionViewModel
+
+    private var kind: DrillKind { model.snapshot.blocks[model.snapshot.blockIndex].kind }
 
     var body: some View {
-        let snapshot = model.snapshot
-        let block = snapshot.blocks[snapshot.blockIndex]
         VStack(spacing: 0) {
-            SessionDrillsBar(blocks: snapshot.blocks, current: snapshot.blockIndex, finish: snapshot.finish)
-            Divider()
-            if snapshot.stage == .ready {
-                Spacer(minLength: 8)
-                SessionReadyCard(kind: block.kind, length: block.timeText, seconds: snapshot.readySeconds)
-                Spacer(minLength: 8)
-            } else if snapshot.stage == .paused {
-                Spacer(minLength: 8)
-                SessionPausedCard(model: model)
-                Spacer(minLength: 8)
-            } else {
-                DrillNeck(display: snapshot.display, fretboard: model.fretboard, height: 190)
-                    .padding(.horizontal, 24)
-                    .padding(.top, 14)
-                Spacer(minLength: 8)
-                if let display = snapshot.display { SessionTarget(model: model, display: display) }
-                Spacer(minLength: 8)
+            VStack(spacing: 0) {
+                if !kind.usesMetronome {
+                    drillsBar
+                    Divider()
+                }
+                content
+                if kind.usesMetronome {
+                    Divider()
+                    drillsBar
+                }
             }
+            .disabled(model.isPanelOpen)
+            .metronomePanel(isOpen: $model.isPanelOpen, isAvailable: kind.usesMetronome, settings: passSettings,
+                            alignment: .bottomTrailing)
             Divider()
-            HStack(spacing: 14) {
-                if snapshot.stage != .paused { SessionKey(key: "Space", action: spaceAction) }
-                if snapshot.stage == .playing {
-                    SessionKey(key: "S", action: "skip")
-                    SessionKey(key: "+", action: "2 min")
-                    if let repeatTitle = block.kind.repeatTitle { SessionKey(key: "R", action: repeatTitle.lowercased()) }
-                }
-                if snapshot.stage == .paused {
-                    if model.inputProblem == nil { SessionKey(key: "P", action: "resume") }
-                    if model.asksToEnd { SessionKey(key: "↩", action: "end session") }
-                    SessionKey(key: "Esc", action: model.asksToEnd ? "stay paused" : "end")
-                } else {
-                    SessionKey(key: "P", action: "pause")
-                    SessionKey(key: "Esc", action: "end")
-                }
-                Spacer()
-                if let theme = model.theme { Text(theme.text) }
-                if model.noSoundNotice != nil {
-                    Label("No sound", systemImage: "speaker.slash.fill").foregroundStyle(.orange)
-                        .help("Chimes flash.")
-                }
-                AttemptLogNotice()
-                AudioInputFallbackNotice()
-                AudioInputLine()
+            ViewThatFits(in: .horizontal) {
+                statusBar(theme: model.theme?.text)
+                statusBar(theme: nil)       // in a narrow window
             }
-            .sessionStatusBar()
         }
         .overlay { SessionFlash(chime: model.flash) }
+    }
+
+    private func statusBar(theme: String?) -> some View {
+        HStack(spacing: 14) {
+            if model.isPanelOpen {
+                SessionKey(key: "Esc", action: "close")
+            } else {
+                keys(of: model.stage)
+            }
+            Spacer(minLength: 0)
+            if let theme { Text(theme) }
+            if kind.usesMetronome { MetronomeButton(settings: passSettings.wrappedValue, isOpen: $model.isPanelOpen) }
+            if model.noSoundNotice != nil {
+                Label("No sound", systemImage: "speaker.slash.fill").foregroundStyle(.orange)
+                    .help("Chimes flash.")
+            }
+            AttemptLogNotice()
+            AudioInputFallbackNotice()
+            AudioInputLine()
+        }
+        .lineLimit(1)
+        .sessionStatusBar()
+    }
+
+    private var drillsBar: some View {
+        SessionDrillsBar(blocks: model.snapshot.blocks, current: model.snapshot.blockIndex, finish: model.snapshot.finish)
+    }
+
+    @ViewBuilder private var content: some View {
+        let snapshot = model.snapshot
+        if snapshot.stage == .ready {
+            Spacer(minLength: 8)
+            SessionReadyCard(kind: kind, length: snapshot.blocks[snapshot.blockIndex].timeText, seconds: snapshot.readySeconds)
+            Spacer(minLength: 8)
+        } else if snapshot.stage == .paused {
+            Spacer(minLength: 8)
+            SessionPausedCard(model: model)
+            Spacer(minLength: 8)
+        } else if kind.usesMetronome {
+            PassPrompt(display: snapshot.display, position: nil, restingMarkers: [], settings: passSettings.wrappedValue,
+                       fretboard: model.fretboard) {}
+        } else {
+            DrillNeck(display: snapshot.display, fretboard: model.fretboard, height: 190)
+                .padding(.horizontal, 24)
+                .padding(.top, 14)
+            Spacer(minLength: 8)
+            if let display = snapshot.display { SessionTarget(model: model, display: display) }
+            Spacer(minLength: 8)
+        }
+    }
+
+    @ViewBuilder private func keys(of stage: SessionStage) -> some View {
+        if stage != .paused { SessionKey(key: "Space", action: spaceAction) }
+        if stage == .playing {
+            SessionKey(key: "S", action: "skip")
+            SessionKey(key: "+", action: "2 min")
+            if kind.usesMetronome { SessionKey(key: "H", action: "show") }
+            if let repeatTitle = kind.repeatTitle { SessionKey(key: "R", action: repeatTitle.lowercased()) }
+        }
+        if stage == .paused {
+            if model.inputProblem == nil { SessionKey(key: "P", action: "resume") }
+            if model.asksToEnd { SessionKey(key: "↩", action: "end session") }
+            SessionKey(key: "Esc", action: model.asksToEnd ? "stay paused" : "end")
+        } else {
+            SessionKey(key: "P", action: "pause")
+            SessionKey(key: "Esc", action: "end")
+        }
+    }
+
+    /// Of a scale block.
+    private var passSettings: Binding<PassSettings> {
+        Binding(get: { model.passSettings ?? PassSettings() }, set: { model.passSettings = $0 })
     }
 
     private var spaceAction: String {

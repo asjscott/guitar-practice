@@ -29,10 +29,7 @@ public struct RunStats: Hashable, Sendable {
 
     /// The median response time of the answered attempts (timeouts and skips left out); nil if none.
     public var medianResponseTime: Duration? {
-        let times = attempts.compactMap(\.responseTime).sorted()
-        guard !times.isEmpty else { return nil }
-        let middle = times.count / 2
-        return times.count.isMultiple(of: 2) ? (times[middle - 1] + times[middle]) / 2 : times[middle]
+        median(of: attempts.compactMap(\.responseTime))
     }
 
     /// Attempts that timed out.
@@ -46,4 +43,12 @@ public struct RunStats: Hashable, Sendable {
             .sorted { ($0.responseTime ?? .zero) > ($1.responseTime ?? .zero) }
         return Array((timedOut + answered).prefix(count))
     }
+}
+
+/// Nil if there are none.
+func median(of times: [Duration]) -> Duration? {
+    let times = times.sorted()
+    guard !times.isEmpty else { return nil }
+    let middle = times.count / 2
+    return times.count.isMultiple(of: 2) ? (times[middle - 1] + times[middle]) / 2 : times[middle]
 }

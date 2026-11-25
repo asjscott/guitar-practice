@@ -7,7 +7,7 @@ import TheoryCore
 /// line, and the neck shows `restingMarkers`.
 struct PassPrompt<Resting: View>: View {
     let display: DrillDisplay?
-    /// Nil when it isn't on the neck, which is then shown whole.
+    /// What to zoom to at rest. Nil when it isn't on the neck, which is then shown whole.
     let position: Position?
     let restingMarkers: [FretboardDiagram.Marker]
     /// What the next pass is played at.
@@ -41,7 +41,7 @@ struct PassPrompt<Resting: View>: View {
     }
 
     private var diagram: FretboardDiagram {
-        var diagram = FretboardDiagram(drill: display, on: fretboard, fretWindow: position?.fretWindow)
+        var diagram = FretboardDiagram(drill: display, on: fretboard, fretWindow: display?.pass?.fretWindow ?? position?.fretWindow)
         if display == nil { diagram.markers = restingMarkers }
         return diagram
     }
