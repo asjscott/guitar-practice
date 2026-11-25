@@ -39,6 +39,7 @@ public enum SessionEvent: Hashable, Sendable {
     // For the drill: ignored unless a block is playing.
     case played(Pitch, onset: Duration, at: Duration)
     case typed(NoteName, at: Duration)
+    case hint(isShown: Bool, at: Duration)
     case skip(at: Duration)
     case `repeat`(at: Duration)
 }
@@ -236,6 +237,9 @@ public struct SessionPlayer: Sendable {
         case .typed(let name, let now):
             passTime(to: now)
             if !isHeldForChime(at: now) { send(.typed(name, at: now)) }
+        case .hint(let isShown, let now):
+            passTime(to: now)
+            send(.hint(isShown: isShown, at: now))
         case .skip(let now):
             passTime(to: now)
             send(.skip(at: now))
@@ -328,6 +332,9 @@ public struct SessionPlayer: Sendable {
         progress[blockIndex].spent = .zero
         var blockSetup = setup
         blockSetup.seed &+= UInt64(blockIndex)
+        for block in progress {
+            blockSetup.fadeStages.add(PassResult.passes(in: block.attempts), in: setup.fretboard.tuning)
+        }
         drill = blocks[blockIndex].kind.makeDrill(blockSetup)
         send(.start(at: now))
     }

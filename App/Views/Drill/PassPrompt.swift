@@ -129,7 +129,7 @@ private struct PassLine: View {
     private var doneCount: Int { notes.filter { $0.state == .found || $0.state == .timedOut }.count }
 }
 
-/// Key, Scale and Position.
+/// Key, Scale, Position and Fade.
 struct ScaleOptions: View {
     let setup: DrillSetup
     @Binding var options: DrillOptions
@@ -150,6 +150,11 @@ struct ScaleOptions: View {
             }
         }
         .help("Position")
+        Picker("Fade", selection: $options.pass.fadeStage) {
+            Text("Follow").tag(FadeStage?.none)
+            ForEach(FadeStage.allCases, id: \.self) { Text($0.rawValue.capitalizedFirst).tag(Optional($0)) }
+        }
+        .help("Fade stage (Follow: the one your clean passes have reached)")
     }
 
     /// In the scale's mode.

@@ -5,7 +5,8 @@ public struct PassSettings: Hashable, Sendable {
     /// BPM, counting clicks.
     public var tempo = 60
     public var meter = Meter(.fourFour)
-    public var fadeStage = FadeStage.shown
+    /// Nil follows the stage reached (`DrillSetup.fadeStages`).
+    public var fadeStage: FadeStage?
 
     public init() {}
 }
@@ -98,11 +99,12 @@ public struct PassResult: Hashable, Sendable {
         "Last pass: " + (isClean ? "clean" : mistakes.isEmpty ? "done" : mistakes.joined(separator: " · "))
     }
 
-    /// Notes with a wrong answer first, and notes revealed.
+    /// Notes with a wrong answer first, notes revealed, and whether a hint was used.
     private var mistakes: [String] {
         let wrong = attempts.filter { !$0.wrongAnswers.isEmpty }.count
         let revealed = attempts.filter(\.timedOut).count
         return (wrong > 0 ? ["\(wrong) wrong"] : []) + (revealed > 0 ? ["\(revealed) revealed"] : [])
+            + (attempts.contains(where: wasHinted) ? ["hint used"] : [])
     }
 
     /// The passes among a run's attempts, oldest first.

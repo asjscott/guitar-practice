@@ -122,6 +122,27 @@ enum LogCheck {
                                              blockIndex: nil))
         }
 
+        // Two clean passes and one cut short by a pause, so the next is played at Hidden.
+        var passes = DrillKind.upAndDown.makeDrill(DrillSetup(fretboard: Fretboard(tuning: .standard), seed: 1))
+        let passRun = log.run()
+        passes.handle(.start(at: .zero))
+        func playPass(_ notes: Int = .max) {
+            for _ in 0..<min(notes, passes.display?.pass?.notes.count ?? 0) {
+                guard let target = passes.prompt?.target, let start = passes.promptStart else { return }
+                let onset = start + .milliseconds(500)
+                passes.handle(.played(passes.fretboard.pitch(at: target), onset: onset, at: onset))
+                passRun.update(from: passes)
+            }
+        }
+        playPass()
+        passes.handle(.skip(at: .seconds(100)))
+        playPass()
+        passes.handle(.skip(at: .seconds(200)))
+        playPass(3)
+        passes.handle(.pause(at: .seconds(300)))
+        passes.handle(.resume(at: .seconds(400)))
+        playPass(3)
+
         let dayTheme = DayTheme(day: "2026-07-25", theme: theme, rerolls: 2)
         dayTheme.stringSet = StringSet.gBE.rawValue
         session.themeStringSet = StringSet.eAD.rawValue
@@ -385,6 +406,11 @@ enum LogCheck {
     }
 
     private static func read(_ log: AttemptLog) throws {
+        let eShape = FadeStages.Subject(tuning: .standard, scaleKind: .major, position: Position.ID(system: .caged, number: 1))
+        let stages = log.fadeStages(in: [eShape.position])
+        var dropD = eShape
+        dropD.tuning = TuningPreset.dropD.tuning
+        print("fade \(stages.stage(of: eShape)), in Drop D \(stages.stage(of: dropD))")
         var groups: [UUID] = []
         func group(of attempt: LoggedAttempt) -> String {
             guard let id = attempt.groupID else { return "none" }
@@ -392,6 +418,7 @@ enum LogCheck {
             return "\(groups.firstIndex(of: id) ?? -1)"
         }
         for attempt in try log.context.fetch(FetchDescriptor<LoggedAttempt>(sortBy: [SortDescriptor(\.date)])) {
+            if attempt.drill == DrillKind.upAndDown.id { continue }
             let wrong = attempt.wrongAnswers.map { $0.name ?? $0.pitch.map(String.init) ?? "?" }.joined(separator: ",")
             let target = "string \(attempt.targetString) fret \(attempt.targetFret ?? -1) pitch \(attempt.targetPitch ?? -1)"
             let time = attempt.responseSeconds == nil ? "no time" : "timed"

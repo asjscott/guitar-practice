@@ -29,15 +29,20 @@ public struct DrillDisplay: Hashable, Sendable {
     /// A dot on the neck. The answer, or in a triad the root, has its own colour.
     public struct Marker: Hashable, Sendable {
         public var location: FretboardLocation
+        /// Empty when faint.
         public var label: String
         public var isAnswer: Bool
+        /// Drawn faintly.
+        public var isFaint: Bool
         /// Ringed as the last note played.
         public var isLastPlayed: Bool
 
-        public init(location: FretboardLocation, label: String, isAnswer: Bool, isLastPlayed: Bool = false) {
+        public init(location: FretboardLocation, label: String, isAnswer: Bool, isFaint: Bool = false,
+                    isLastPlayed: Bool = false) {
             self.location = location
             self.label = label
             self.isAnswer = isAnswer
+            self.isFaint = isFaint
             self.isLastPlayed = isLastPlayed
         }
     }

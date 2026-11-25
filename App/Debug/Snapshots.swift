@@ -313,6 +313,23 @@ enum Snapshots {
             run(11) { scales.timeOutForSnapshot() }
         }
         try await save("pass-clean", DrillView(model: scales), settle: .milliseconds(150)) { run(33) }
+        for stage in FadeStage.allCases {
+            scales.stop()
+            scales.options.pass.fadeStage = stage
+            try await save("pass-fade-\(stage.rawValue)", DrillView(model: scales)) { run(11) }
+        }
+        try await save("pass-hint", DrillView(model: scales)) {
+            run(11) { scales.hint(isShown: true) }
+        }
+        try await save("pass-hinted", DrillView(model: scales), settle: .milliseconds(150)) {
+            run {
+                scales.hint(isShown: true)
+                scales.hint(isShown: false)
+                for _ in 0..<33 { scales.playForSnapshot(right: true) }
+            }
+        }
+        scales.stop()
+        scales.options.pass.fadeStage = nil
         try await save("pass-paused", DrillView(model: scales)) {
             run(3) { scales.togglePause() }
         }

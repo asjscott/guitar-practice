@@ -38,6 +38,7 @@ struct DrillView: View {
             }
         }
         .typesNoteNames(isActive: model.takesNoteNames) { model.press($0) }
+        .holdsHint(isActive: model.takesHint) { model.hint(isShown: $0) }
         .listensToAudioInput(model.audioConsumer)
         .noticesInterruptions(input: model.inputChanged, sleep: model.pause(notice:))
         .onAppear {
@@ -309,7 +310,9 @@ private struct DrillRestingText: View {
                 Text(reason).font(.title3).foregroundStyle(.orange)
             } else {
                 Text("Press Start (↩)").font(.title3).foregroundStyle(.secondary)
-                if model.kind.usesMetronome { Text(model.kind.instructions).foregroundStyle(.secondary) }
+                if model.kind.usesMetronome {
+                    Text(model.kind.instructions + " Hold H to see the position: the pass then isn’t clean.").foregroundStyle(.secondary)
+                }
             }
         }
     }

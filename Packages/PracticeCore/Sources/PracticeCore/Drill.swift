@@ -37,6 +37,8 @@ public enum DrillEvent: Hashable, Sendable {
     case hold(until: Duration)
     /// The clicks just asked for, as they will be heard.
     case clicksStarted(ClickTrack)
+    /// H held or let go: the position is shown meanwhile, and the pass is hinted. Pausing lets go.
+    case hint(isShown: Bool, at: Duration)
     /// What passes are played at, from the next one on.
     case passSettings(PassSettings, at: Duration)
     /// The clock moved on; timeouts and the next prompt happen on ticks.
