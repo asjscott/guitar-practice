@@ -87,7 +87,7 @@ One task inside a drill, such as "F♯ on string 3 (G)". A prompt is answered by
 _Avoid_: Question, item, challenge
 
 **Attempt**:
-The record of one prompt's outcome (answered, timed out or skipped), its response time and any wrong answers given before the right one. A sweep is recorded as one attempt per fretboard location.
+The record of one prompt's outcome (answered, timed out or skipped), its response time and any wrong answers given before the right one. A sweep is recorded as one attempt per fretboard location; a pass, a triad prompt and a climb as one per note.
 _Avoid_: Answer, try, trial
 
 **Response time**:

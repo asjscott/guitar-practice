@@ -25,7 +25,7 @@ struct SessionPlayingView: View {
                 }
             }
             .disabled(model.isPanelOpen)
-            .metronomePanel(isOpen: $model.isPanelOpen, isAvailable: kind.usesMetronome, settings: passSettings,
+            .metronomePanel(isOpen: $model.isPanelOpen, isAvailable: kind.hasPasses, settings: passSettings,
                             alignment: .bottomTrailing)
             Divider()
             ViewThatFits(in: .horizontal) {
@@ -45,7 +45,7 @@ struct SessionPlayingView: View {
             }
             Spacer(minLength: 0)
             if let theme { Text(theme) }
-            if kind.usesMetronome { MetronomeButton(settings: passSettings.wrappedValue, isOpen: $model.isPanelOpen) }
+            if kind.hasPasses { MetronomeButton(settings: passSettings.wrappedValue, isOpen: $model.isPanelOpen) }
             if model.noSoundNotice != nil {
                 Label("No sound", systemImage: "speaker.slash.fill").foregroundStyle(.orange)
                     .help("Chimes flash.")
@@ -72,23 +72,29 @@ struct SessionPlayingView: View {
             Spacer(minLength: 8)
             SessionPausedCard(model: model)
             Spacer(minLength: 8)
-        } else if kind.usesMetronome {
-            PassPrompt(display: snapshot.display, position: nil, restingMarkers: [], settings: passSettings.wrappedValue,
-                       fretboard: model.fretboard) {}
-        } else if kind.module == .triads {
-            TriadPrompt(display: snapshot.display, hasClimbs: kind == .inversions, frets: model.frets,
-                        fretboard: model.fretboard) {
-                SessionCountdown(model: model)
-            } resting: {
-                EmptyView()
-            }
         } else {
-            DrillNeck(display: snapshot.display, fretboard: model.fretboard, height: 190)
+            drill(snapshot.display)
+        }
+    }
+
+    @ViewBuilder private func drill(_ display: DrillDisplay?) -> some View {
+        switch kind.module {
+        case .notes:
+            DrillNeck(display: display, fretboard: model.fretboard, height: 190)
                 .padding(.horizontal, 24)
                 .padding(.top, 14)
             Spacer(minLength: 8)
-            if let display = snapshot.display { SessionTarget(model: model, display: display) }
+            if let display { SessionTarget(model: model, display: display) }
             Spacer(minLength: 8)
+        case .scales:
+            PassPrompt(display: display, position: nil, restingMarkers: [], settings: passSettings.wrappedValue,
+                       fretboard: model.fretboard) {}
+        case .triads:
+            TriadPrompt(display: display, hasClimbs: kind.hasClimbs, frets: model.frets, fretboard: model.fretboard) {
+                LiveCountdownRing { model.countdown }
+            } resting: {
+                EmptyView()
+            }
         }
     }
 
@@ -97,7 +103,7 @@ struct SessionPlayingView: View {
         if stage == .playing {
             SessionKey(key: "S", action: "skip")
             SessionKey(key: "+", action: "2 min")
-            if kind.usesMetronome { SessionKey(key: "H", action: "show") }
+            if kind.hasPasses { SessionKey(key: "H", action: "show") }
             if let repeatTitle = kind.repeatTitle { SessionKey(key: "R", action: repeatTitle.lowercased()) }
         }
         if stage == .paused {
@@ -140,13 +146,6 @@ private struct SessionTarget: View {
     let display: DrillDisplay
 
     var body: some View { DrillTarget(display: display, countdown: model.countdown, typed: model.nameEntry.text) }
-}
-
-/// Likewise.
-private struct SessionCountdown: View {
-    let model: SessionViewModel
-
-    var body: some View { DrillCountdownRing(countdown: model.countdown) }
 }
 
 private struct SessionKey: View {

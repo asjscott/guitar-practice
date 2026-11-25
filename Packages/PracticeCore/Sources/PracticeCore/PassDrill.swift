@@ -19,7 +19,7 @@ public struct PassDrill<Rules: PassRules>: Drill {
     private var pass: Pass?
     private var group = -1
     /// Which note is up.
-    private var place = 0
+    private var noteIndex = 0
     /// When the last note was dealt with; nil before the first is.
     private var lastDealtWith: Duration?
     private var wrongSoFar: [Pitch] = []
@@ -28,7 +28,7 @@ public struct PassDrill<Rules: PassRules>: Drill {
     /// H is held.
     private var isHintShown = false
     /// What has been reached, this run's passes included, and what this pass is played at.
-    private var fadeStages: FadeStages
+    private var reached: FadeStages
     private var fadeStage = FadeStage.shown
     /// Every note has been dealt with.
     private var isOver = false
@@ -48,7 +48,7 @@ public struct PassDrill<Rules: PassRules>: Drill {
         rules = Rules(setup: setup)
         settings = setup.options.pass
         nextSettings = settings
-        fadeStages = setup.fadeStages
+        reached = setup.fadeStages
         track = ClickTrack(meter: settings.meter, bpm: settings.tempo, start: .zero)
     }
 
@@ -61,8 +61,9 @@ public struct PassDrill<Rules: PassRules>: Drill {
     /// Between passes: the next count-in is put off.
     public var canHold: Bool { true }
     public var passSettings: PassSettings? { nextSettings }
+    public var fadeStages: FadeStages? { reached }
     public var passEnd: Duration? {
-        let isAboutToCountIn = hasNewClicks && isAnswerable && place == 0 && now <= countInStart
+        let isAboutToCountIn = hasNewClicks && isAnswerable && noteIndex == 0 && now <= countInStart
         return isRunning && phase != .paused && (isOver || isAboutToCountIn) ? barEnd : nil
     }
     public var resumesSamePrompt: Bool { phase == .paused && !isOver }
@@ -97,7 +98,7 @@ public struct PassDrill<Rules: PassRules>: Drill {
     private var passAttempts: [Attempt] { attempts.filter { $0.group?.number == group } }
 
     private var expected: FretboardLocation? {
-        pass.map { $0.locations[min(place, $0.locations.count - 1)] }
+        pass.map { $0.locations[min(noteIndex, $0.locations.count - 1)] }
     }
 
     private var countInStart: Duration { track.time(ofClick: countInClick) }
@@ -151,6 +152,8 @@ public struct PassDrill<Rules: PassRules>: Drill {
             advance(to: now)
             change(from: old, to: new)
             if isOver, phase != .paused { askForNextClicks() }
+        case .fadeStages(let new):
+            reached = new
         case .hold(let end):
             if passEnd != nil, end > countInStart { askForClicks(from: end) }
         case .tick(let now):
@@ -187,11 +190,11 @@ public struct PassDrill<Rules: PassRules>: Drill {
         self.pass = pass
         settings = nextSettings
         group += 1
-        place = 0
+        noteIndex = 0
         lastDealtWith = nil
         wrongSoFar = []
         isHinted = isHintShown
-        fadeStage = settings.fadeStage ?? fadeStages.stage(
+        fadeStage = settings.fadeStage ?? reached.stage(
             of: FadeStages.Subject(tuning: fretboard.tuning, scaleKind: pass.scale.kind, position: pass.position.id))
         isOver = false
         phase = .waiting
@@ -217,13 +220,13 @@ public struct PassDrill<Rules: PassRules>: Drill {
     /// A pass played at another tempo than the next one's, changed since by the player, doesn't move it.
     private mutating func followLadder() {
         guard !nextSettings.holdsTempo, settings.tempo == nextSettings.tempo else { return }
-        nextSettings.tempo += ladder.step(after: PassResult(attempts: attempts.filter { $0.group?.number == group }))
+        nextSettings.tempo += ladder.change(after: PassResult(attempts: passAttempts))
     }
 
     /// The last note was dealt with: the click runs to the end of the bar that note's nearest click is in.
     private mutating func end(at time: Duration) {
         isOver = true
-        fadeStages.add([PassResult(attempts: passAttempts)], in: fretboard.tuning)
+        reached.add([PassResult(attempts: passAttempts)], in: fretboard.tuning)
         let beats = track.meter.signature.beats
         countInClick = (track.nearestClick(to: time) / beats + 1) * beats
         while countInStart <= now { countInClick += beats }
@@ -267,7 +270,7 @@ public struct PassDrill<Rules: PassRules>: Drill {
     private mutating func judge(_ pitch: Pitch, onset: Duration) {
         guard isAnswerable, let location = expected else { return }
         let isRight = fretboard.pitch(at: location) == pitch
-        if place == 0, onset < beatOne {
+        if noteIndex == 0, onset < beatOne {
             let halfBeat = Duration.seconds(30) / settings.tempo
             guard isRight, onset >= beatOne - halfBeat else { return }
         } else if onset < timerStart {
@@ -284,14 +287,13 @@ public struct PassDrill<Rules: PassRules>: Drill {
 
     private mutating func record(_ outcome: Attempt.Outcome, onset: Duration? = nil, location: FretboardLocation? = nil) {
         guard let pass, let prompt else { return }
-        let signature = settings.meter.signature
         let facts = PassFacts(scale: pass.scale, position: pass.position.id, startDegree: pass.startDegree,
-                              tempo: settings.tempo, beatsPerBar: signature.beats, beatUnit: signature.unit,
+                              tempo: settings.tempo, signature: settings.meter.signature,
                               fadeStage: fadeStage, hinted: isHinted,
                               clickOffset: onset.map { $0 - track.time(ofClick: track.nearestClick(to: $0)) })
         attempts.append(Attempt(prompt: prompt, outcome: outcome, responseTime: onset.map { max(.zero, $0 - timerStart) },
                                 wrongAnswers: wrongSoFar.map { .pitch($0) }, location: location,
-                                group: AttemptGroup(number: group, size: pass.locations.count, place: place),
+                                group: AttemptGroup(number: group, size: pass.locations.count, place: noteIndex),
                                 facts: .pass(facts)))
     }
 
@@ -299,8 +301,8 @@ public struct PassDrill<Rules: PassRules>: Drill {
     private mutating func moveOn(at time: Duration, phaseAfterLast: DrillPhase) {
         lastDealtWith = time
         wrongSoFar = []
-        place += 1
-        if place == pass?.locations.count {
+        noteIndex += 1
+        if noteIndex == pass?.locations.count {
             phase = phaseAfterLast
             end(at: time)
         } else {
@@ -322,7 +324,7 @@ public struct PassDrill<Rules: PassRules>: Drill {
         return display
     }
 
-    private var isCountingIn: Bool { isAnswerable && place == 0 && now < beatOne }
+    private var isCountingIn: Bool { isAnswerable && noteIndex == 0 && now < beatOne }
 
     private var countInBeat: Int? {
         guard isCountingIn, now >= countInStart else { return nil }
@@ -363,13 +365,10 @@ public struct PassDrill<Rules: PassRules>: Drill {
     }
 
     private func line(of pass: Pass, done: [Attempt]) -> [PassProgress.Note] {
-        let pitches = pass.locations.map { fretboard.pitch(at: $0).midi }
-        let lowest = pitches.min() ?? 0
-        let range = max(1, (pitches.max() ?? 0) - lowest)
-        return pitches.enumerated().map { index, pitch in
+        pass.locations.map(fretboard.pitch).relativeHeights.enumerated().map { index, height in
             let state: DrillDisplay.Chip.State = if index < done.count { done[index].timedOut ? .timedOut : .found }
-                else { index == place ? .current : .waiting }
-            return PassProgress.Note(height: Double(pitch - lowest) / Double(range), state: state)
+                else { index == noteIndex ? .current : .waiting }
+            return PassProgress.Note(height: height, state: state)
         }
     }
 }

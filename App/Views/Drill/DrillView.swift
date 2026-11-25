@@ -33,7 +33,7 @@ struct DrillView: View {
                 DrillOptionsBar(model: model).disabled(model.isRunning)
             }
             ToolbarItemGroup(placement: .primaryAction) {
-                if model.kind.usesMetronome { MetronomeButton(settings: model.passSettings, isOpen: $model.isPanelOpen) }
+                if model.kind.hasPasses { MetronomeButton(settings: model.passSettings, isOpen: $model.isPanelOpen) }
                 DrillRunButtons(model: model).disabled(model.isPanelOpen)
             }
         }
@@ -76,7 +76,7 @@ struct DrillView: View {
             }
             Divider()
             HStack(spacing: 18) {
-                if model.kind.usesMetronome {
+                if model.kind.hasPasses {
                     Text("\(model.completePasses) \(model.completePasses == 1 ? "pass" : "passes")")
                     Text("\(model.cleanPasses) clean")
                 } else {
@@ -92,7 +92,7 @@ struct DrillView: View {
             }
             .sessionStatusBar()
         }
-        .metronomePanel(isOpen: $model.isPanelOpen, isAvailable: model.kind.usesMetronome, settings: $model.passSettings)
+        .metronomePanel(isOpen: $model.isPanelOpen, isAvailable: model.kind.hasPasses, settings: $model.passSettings)
     }
 
     @ViewBuilder private var notes: some View {
@@ -117,19 +117,12 @@ struct DrillView: View {
     }
 
     private var triads: some View {
-        TriadPrompt(display: model.snapshot.display, hasClimbs: model.kind == .inversions, frets: model.options.frets, fretboard: model.fretboard) {
-            TriadCountdown(model: model)
+        TriadPrompt(display: model.snapshot.display, hasClimbs: model.kind.hasClimbs, frets: model.options.frets, fretboard: model.fretboard) {
+            LiveCountdownRing { model.countdown }
         } resting: {
             DrillRestingText(model: model)
         }
     }
-}
-
-/// Apart, so that only it is redrawn on every tick.
-private struct TriadCountdown: View {
-    let model: DrillViewModel
-
-    var body: some View { DrillCountdownRing(countdown: model.countdown) }
 }
 
 /// Warns that attempts aren't being saved; otherwise nothing.
@@ -310,7 +303,7 @@ private struct DrillRestingText: View {
                 Text(reason).font(.title3).foregroundStyle(.orange)
             } else {
                 Text("Press Start (↩)").font(.title3).foregroundStyle(.secondary)
-                if model.kind.usesMetronome {
+                if model.kind.hasPasses {
                     Text(model.kind.instructions + " Hold H to see the position: the pass then isn’t clean.").foregroundStyle(.secondary)
                 }
             }
@@ -318,7 +311,7 @@ private struct DrillRestingText: View {
     }
 
     private var resumeText: String {
-        if model.kind.usesMetronome { return model.resumesSamePrompt ? "Resume (P) to restart the pass" : "Resume (P) for the next pass" }
+        if model.kind.hasPasses { return model.resumesSamePrompt ? "Resume (P) to restart the pass" : "Resume (P) for the next pass" }
         return model.resumesSamePrompt ? "Resume (P) to carry on" : "Resume (P) for a new prompt"
     }
 }
@@ -367,7 +360,7 @@ private struct DrillRunSummary: View {
         VStack(alignment: .leading, spacing: 10) {
             Text(model.isCheckRun ? "Check run" : "Run summary").font(.headline)
             HStack(spacing: 28) {
-                if model.kind.usesMetronome {
+                if model.kind.hasPasses {
                     stat("Passes", "\(model.completePasses)")
                     stat("Clean", "\(model.cleanPasses)")
                 } else {
@@ -381,7 +374,7 @@ private struct DrillRunSummary: View {
             if model.isCheckRun {
                 list("Misses", stats.misses, emptyText: "None: every location was right first time.")
                 list("Slowest onsets", stats.slowest(5).filter { $0.outcome == .answered })
-            } else if !model.kind.usesMetronome {
+            } else if !model.kind.hasPasses {
                 list("Slowest", stats.slowest(3))
                 if !model.sweeps.isEmpty { lines("Sweeps", model.sweeps.suffix(6).map(\.summaryLine)) }
             }

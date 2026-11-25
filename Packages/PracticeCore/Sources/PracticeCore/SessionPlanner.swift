@@ -11,21 +11,21 @@ public struct SessionBlock: Hashable, Sendable {
 
 /// Splits a session's time into blocks.
 public enum SessionPlanner {
-    /// The drills a session can use: those not kept out, with something to prompt and, without sound, that don't need it.
+    /// The drills a session can use: those with something to prompt and, without sound, that don't need it.
     public static func drills(from kinds: [DrillKind], for setup: DrillSetup, hasSound: Bool) -> [DrillKind] {
         kinds.filter { canUse($0, hasSound: hasSound) && $0.makeDrill(setup).nothingToPromptReason == nil }
     }
 
     /// What a session without sound does differently.
     public static func noSoundNotice(from kinds: [DrillKind]) -> String {
-        let leftOut = kinds.filter { $0.isInSessions && $0.needsSound }.map(\.title)
+        let leftOut = kinds.filter(\.needsSound).map(\.title)
         guard !leftOut.isEmpty else { return "No sound: chimes flash." }
         return "No sound: \(leftOut.joined(separator: ", ")) \(leftOut.count == 1 ? "is" : "are") left out, and chimes flash."
     }
 
     /// Why a session has no triads, when no voicing is in range; nil when it has some.
     public static func noTriadsNotice(from kinds: [DrillKind], for setup: DrillSetup) -> String? {
-        let triads = kinds.filter { $0.isInSessions && $0.module == .triads }
+        let triads = kinds.filter { $0.module == .triads }
         guard !triads.isEmpty, drills(from: triads, for: setup, hasSound: true).isEmpty else { return nil }
         let sets = setup.fretboard.stringSets.filter(setup.options.stringSets.contains).map(\.name)
         return "Triads are left out: no voicing of the key’s chords on \(sets.joined(separator: ", ")) fits these frets."
@@ -38,7 +38,7 @@ public enum SessionPlanner {
     }
 
     private static func canUse(_ kind: DrillKind, hasSound: Bool) -> Bool {
-        kind.isInSessions && (hasSound || !kind.needsSound)
+        hasSound || !kind.needsSound
     }
 
     /// Modules in order, with time by weight; each takes as many of its drills as fit its minimum, at least one, in

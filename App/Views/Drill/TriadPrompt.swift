@@ -15,9 +15,9 @@ struct TriadPrompt<Countdown: View, Resting: View>: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            header
-                .frame(height: 56)
-                .padding(.horizontal, 28)
+            DrillHeader(display: display) {
+                if display != nil { countdown.frame(width: 50, height: 50) }
+            }
             FretboardView(diagram: FretboardDiagram(drill: display, on: fretboard, fretWindow: frets), minHeight: 120)
                 .frame(maxHeight: .infinity)
                 .padding(16)
@@ -37,26 +37,6 @@ struct TriadPrompt<Countdown: View, Resting: View>: View {
             .frame(height: hasClimbs ? 140 : 112)
         }
         .padding(.vertical, 12)
-    }
-
-    @ViewBuilder private var header: some View {
-        HStack(spacing: 20) {
-            if let display {
-                HStack(alignment: .firstTextBaseline, spacing: 14) {
-                    Text(display.headline).font(.system(size: 34, weight: .bold, design: .rounded))
-                    Text(display.subline).font(.title2).foregroundStyle(.secondary)
-                }
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
-                Spacer(minLength: 0)
-                Label(display.feedback, systemImage: display.symbol)
-                    .foregroundStyle(display.result.color)
-                    .font(.title2.weight(.medium))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-                countdown.frame(width: 50, height: 50)
-            }
-        }
     }
 }
 

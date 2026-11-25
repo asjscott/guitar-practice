@@ -35,8 +35,7 @@ struct FromADegreeTests {
         #expect(DrillKind.all.filter { $0.module == .scales } == [.upAndDown, .fromADegree])
         #expect(DrillKind.fromADegree.id == "fromADegree")
         #expect(DrillKind.fromADegree.title == "From a degree")
-        #expect(DrillKind.fromADegree.isInSessions)
-        #expect(DrillKind.fromADegree.usesMetronome)
+        #expect(DrillKind.fromADegree.hasPasses)
         #expect(DrillKind.fromADegree.repeatTitle == "Restart")
     }
 
@@ -66,7 +65,7 @@ struct FromADegreeTests {
         var orders = Set<[String]>()
         for seed in UInt64(1)...20 {
             let asked = headlines(12, of: setup(seed: seed))
-            for round in 0..<3 { #expect(Set(asked[round * 4..<round * 4 + 4]).count == 4) }
+            for start in [0, 4, 8] { #expect(Set(asked[start..<start + 4]).count == 4) }
             #expect(zip(asked, asked.dropFirst()).allSatisfy { $0 != $1 })
             orders.insert(Array(asked.prefix(4)))
         }

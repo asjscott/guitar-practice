@@ -3,10 +3,11 @@ import TheoryCore
 import PracticeCore
 
 /// Kinds made up for these tests. Their drill plays string 6's frets in order, and can answer a typed name.
-func kind(_ id: String, module: DrillModule = .notes, usesKeyboard: Bool = false, needsSound: Bool = false,
-          isInSessions: Bool = true) -> DrillKind {
-    DrillKind(id: id, module: module, title: id, instructions: "", symbol: "", usesKeyboard: usesKeyboard,
-              needsSound: needsSound, isInSessions: isInSessions, rules: ToyRules.self)
+func kind(_ id: String, module: DrillModule = .notes, usesKeyboard: Bool = false, needsSound: Bool = false) -> DrillKind {
+    var traits: DrillKind.Traits = []
+    if usesKeyboard { traits.insert(.usesKeyboard) }
+    if needsSound { traits.insert(.needsSound) }
+    return DrillKind(id: id, module: module, title: id, instructions: "", symbol: "", traits: traits, rules: ToyRules.self)
 }
 
 private let notes = [kind("a"), kind("b"), kind("c"), kind("keys", usesKeyboard: true)]
@@ -135,23 +136,19 @@ struct SessionPlannerDrillsTests {
                 == "No sound: Hear → find it is left out, and chimes flash.")
     }
 
-    @Test func aDrillKeptOutOfSessionsIsLeftOutAndNotNamedInTheNotice() {
-        let kinds = [kind("in"), kind("out", module: .scales, needsSound: true, isInSessions: false)]
-        #expect(SessionPlanner.drills(from: kinds, for: setup, hasSound: true).map(\.id) == ["in"])
-        #expect(SessionPlanner.noSoundNotice(from: kinds) == "No sound: chimes flash.")
-        #expect(SessionPlanner.nothingToPromptReason(from: kinds, for: setup, hasSound: true) == nil)
+    @Test func withoutSoundAndNoDrillThatNeedsItOnlyChimesChange() {
+        #expect(SessionPlanner.noSoundNotice(from: [kind("in")]) == "No sound: chimes flash.")
     }
 
-    @Test func aSessionCantStartWhenNoDrillInSessionsCanPromptAnything() {
+    @Test func aSessionCantStartWhenNoDrillCanPromptAnything() {
         var setup = setup
         setup.options.frets = 0...0     // nothing for Hear → find it
-        let out = kind("out", isInSessions: false)
-        #expect(SessionPlanner.nothingToPromptReason(from: [.hearFindIt, out], for: setup, hasSound: true) != nil)
+        #expect(SessionPlanner.nothingToPromptReason(from: [.hearFindIt], for: setup, hasSound: true) != nil)
         #expect(SessionPlanner.nothingToPromptReason(from: [.hearFindIt, kind("in")], for: setup, hasSound: true) == nil)
     }
 
     @Test func withSoundEveryDrillIsIn() {
-        #expect(SessionPlanner.drills(from: DrillKind.all, for: setup, hasSound: true) == DrillKind.all.filter(\.isInSessions))
+        #expect(SessionPlanner.drills(from: DrillKind.all, for: setup, hasSound: true) == DrillKind.all)
     }
 
     @Test func triadsWithNoVoicingInRangeAreLeftOutAndSetupSaysWhy() {

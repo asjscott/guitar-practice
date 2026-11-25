@@ -18,11 +18,8 @@ public struct UpAndDownRules: PassRules {
     private var count = 0
 
     public init(setup: DrillSetup) {
-        var setup = setup
-        let fretboard = setup.fretboard
-        passes = setup.passPositions.compactMap { Pass(through: $0, from: Scale.Degree(1), on: fretboard) }
-        if let scale = passes.first?.scale { setup.key = scale.key }
-        self.setup = setup
+        self.setup = setup.spelledInScale()
+        passes = setup.passPositions.compactMap { Pass(through: $0, from: Scale.Degree(1), on: setup.fretboard) }
     }
 
     public var nothingToPromptReason: String? { passes.isEmpty ? DrillSetup.noPositionReason : nil }

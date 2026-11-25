@@ -12,6 +12,11 @@ public struct TriadVoicing: Hashable, Sendable {
 
     /// The frets the voicing covers, lowest to highest (open strings count as fret 0).
     public var frets: ClosedRange<Int> { locations.fretSpan }
+
+    /// The order up the neck.
+    fileprivate func isBelow(_ other: TriadVoicing) -> Bool {
+        (frets.lowerBound, locations[0].fret) < (other.frets.lowerBound, other.locations[0].fret)
+    }
 }
 
 extension Fretboard {
@@ -54,9 +59,7 @@ extension Fretboard {
                 }
             }
         }
-        return voicings.sorted {
-            ($0.frets.lowerBound, $0.locations[0].fret) < ($1.frets.lowerBound, $1.locations[0].fret)
-        }
+        return voicings.sorted { $0.isBelow($1) }
     }
 
     /// How many of a key's chords have a voicing on a string set, anywhere on the neck.
@@ -70,5 +73,11 @@ extension Fretboard {
     public func voicings(of triad: Triad, inversion: Triad.Inversion, on stringSet: StringSet,
                          frets: ClosedRange<Int>) -> [TriadVoicing] {
         voicings(of: triad, inversion: inversion, on: stringSet).filter { $0.locations.allSatisfy { frets.contains($0.fret) } }
+    }
+
+    /// The voicings in every inversion wholly within a fret range, ordered up the neck.
+    public func voicings(of triad: Triad, on stringSet: StringSet, frets: ClosedRange<Int>) -> [TriadVoicing] {
+        Triad.Inversion.allCases.flatMap { voicings(of: triad, inversion: $0, on: stringSet, frets: frets) }
+            .sorted { $0.isBelow($1) }
     }
 }

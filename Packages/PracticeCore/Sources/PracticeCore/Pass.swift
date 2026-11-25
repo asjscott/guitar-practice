@@ -2,6 +2,8 @@ import TheoryCore
 
 /// What a pass is played at. Changing it takes effect from the next pass on.
 public struct PassSettings: Hashable, Sendable {
+    public static let tempos = 40...160
+
     /// BPM, counting clicks; kept within `tempos`.
     public var tempo = 60 {
         didSet { tempo = min(max(tempo, Self.tempos.lowerBound), Self.tempos.upperBound) }
@@ -13,6 +15,9 @@ public struct PassSettings: Hashable, Sendable {
     public var fadeStage: FadeStage?
 
     public init() {}
+
+    /// "♩ = 72 · 4/4": the note is the one that makes a click.
+    public var text: String { "\(meter.signature.unit == 8 ? "♪" : "♩") = \(tempo) · \(meter.signature.name)" }
 }
 
 /// One scale through a position, in the order it is played.
@@ -63,7 +68,7 @@ extension PassRules {
 
 extension DrillSetup {
     /// The chosen scale on the key's tonic.
-    public var scale: Scale { Scale(options.scaleKind, in: key ?? options.key) }
+    public var scale: Scale { Scale(options.scaleKind, in: chosenKey) }
 
     /// The positions of the chosen scale, up the neck.
     public var positions: [Position] { fretboard.positions(of: scale, system: options.positionSystem) }
@@ -87,6 +92,13 @@ extension DrillSetup {
         }
     }
 
+    /// Spelled in the scale's key, which also spells the notes outside it.
+    func spelledInScale() -> DrillSetup {
+        var setup = self
+        setup.key = passPositions.first?.scale.key ?? key
+        return setup
+    }
+
     static let noPositionReason = "The position doesn’t fit on this neck."
 }
 
@@ -100,6 +112,22 @@ extension Key.Mode {
     }
 }
 
+/// How one note of a pass went.
+struct PassNoteResult: Hashable, Sendable {
+    let outcome: Attempt.Outcome
+    let firstRight: Bool
+    /// Whether a hint had been used in the pass by then.
+    let hinted: Bool
+}
+
+extension [PassNoteResult] {
+    /// Every note of a pass of that many was played or revealed.
+    func isComplete(size: Int?) -> Bool { count == size && !contains { $0.outcome == .skipped } }
+
+    /// Complete, with no wrong note, timeout or hint.
+    func isClean(size: Int?) -> Bool { isComplete(size: size) && allSatisfy { $0.firstRight && !$0.hinted } }
+}
+
 /// How one pass went, from its attempts.
 public struct PassResult: Hashable, Sendable {
     /// In order.
@@ -107,14 +135,19 @@ public struct PassResult: Hashable, Sendable {
 
     /// Every note was played or revealed.
     public var isComplete: Bool {
-        attempts.count == attempts.first?.group?.size && !attempts.contains(where: \.skipped)
+        noteResults.isComplete(size: size)
     }
 
     /// Complete, with no wrong note, timeout or hint.
-    public var isClean: Bool { isComplete && attempts.allSatisfy { $0.firstRight && !wasHinted($0) } }
+    public var isClean: Bool { noteResults.isClean(size: size) }
 
-    private func wasHinted(_ attempt: Attempt) -> Bool {
-        if case .pass(let facts) = attempt.facts { facts.hinted } else { false }
+    private var size: Int? { attempts.first?.group?.size }
+
+    private var noteResults: [PassNoteResult] {
+        attempts.map { attempt in
+            let hinted = if case .pass(let facts) = attempt.facts { facts.hinted } else { false }
+            return PassNoteResult(outcome: attempt.outcome, firstRight: attempt.firstRight, hinted: hinted)
+        }
     }
 
     /// "Clean pass", "Pass done · 2 wrong · 1 revealed".
@@ -132,7 +165,7 @@ public struct PassResult: Hashable, Sendable {
         let wrong = attempts.filter { !$0.wrongAnswers.isEmpty }.count
         let revealed = attempts.filter(\.timedOut).count
         return (wrong > 0 ? ["\(wrong) wrong"] : []) + (revealed > 0 ? ["\(revealed) revealed"] : [])
-            + (attempts.contains(where: wasHinted) ? ["hint used"] : [])
+            + (noteResults.contains(where: \.hinted) ? ["hint used"] : [])
     }
 
     /// The passes among a run's attempts, oldest first.

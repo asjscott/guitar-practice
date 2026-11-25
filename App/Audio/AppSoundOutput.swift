@@ -131,8 +131,12 @@ final class AppSoundOutput {
 
     private func outputChanged() {
         checkForOutput()
-        guard let engine else { return }
-        if engine.device != CoreAudioDevices.defaultOutputID() { restart() }
+        if let engine {
+            if engine.device != CoreAudioDevices.defaultOutputID() { restart() }
+        } else if isPrepared || hasClicks {
+            // Back after none. Clicks go on in time: the metronome schedules them whether or not they can be heard.
+            _ = startEngine()
+        }
     }
 
     /// The engine stops itself when the output's set-up changes, such as its sample rate.

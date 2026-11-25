@@ -4,7 +4,7 @@ extension DrillKind {
     public static let triadPlayIt = DrillKind(
         id: "triadPlayIt", module: .triads, title: "Triad → play it",
         instructions: "Arpeggiate the triad on the strings shown, low to high.",
-        symbol: "triangle", hidesNote: true, offersInversions: true,
+        symbol: "triangle", traits: [.hidesNote, .offersInversions],
         rules: TriadPlayItRules.self)
 }
 
@@ -27,13 +27,12 @@ public struct TriadPlayItRules: DrillRules {
     private var asked: TriadFacts?
     private var group = -1
     /// Which note of the voicing is up (0 = lowest).
-    private var place = 0
+    private var noteIndex = 0
     private var voicing: TriadVoicing?
     private var hasNextNote = false
 
     public init(setup: DrillSetup) {
-        var setup = setup
-        setup.key = setup.key ?? setup.options.key
+        let setup = setup.spelledInChosenKey()
         self.setup = setup
         choices = setup.triadsInRange
         chooser = PromptChooser(setup: setup)
@@ -50,29 +49,29 @@ public struct TriadPlayItRules: DrillRules {
     public mutating func nextPrompt(after previous: NotePrompt?) -> NotePrompt? {
         if hasNextNote {
             hasNextNote = false
-            place += 1
+            noteIndex += 1
         } else {
             guard let next = chooser.choose(from: choices, avoiding: asked, note: \.triad.root.pitchClass) else { return nil }
             asked = next
             group += 1
-            place = 0
+            noteIndex = 0
             voicing = nil
         }
         return asked.map {
-            NotePrompt(name: $0.triad.tones(in: $0.inversion)[place], string: $0.stringSet.lowestString + place,
-                       target: voicing?.locations[place])
+            NotePrompt(name: $0.triad.tones(in: $0.inversion)[noteIndex], string: $0.stringSet.string(ofNote: noteIndex),
+                       target: voicing?.locations[noteIndex])
         }
     }
 
     public func judge(_ answer: DrillAnswer, for prompt: NotePrompt) -> DrillJudgement {
         guard case .played(let pitch) = answer else { return .ignored }
-        let location = possibleVoicings.map { $0.locations[place] }.first { setup.fretboard.pitch(at: $0) == pitch }
+        let location = possibleVoicings.map { $0.locations[noteIndex] }.first { setup.fretboard.pitch(at: $0) == pitch }
         return location.map { .right($0) } ?? .wrong(.pitch(pitch))
     }
 
     public mutating func dealtWith(_ attempt: Attempt) {
         guard let location = attempt.location else { return }
-        voicing = possibleVoicings.first { $0.locations[place] == location }
+        voicing = possibleVoicings.first { $0.locations[noteIndex] == location }
         hasNextNote = !isLastNote
     }
 
@@ -81,17 +80,17 @@ public struct TriadPlayItRules: DrillRules {
         if let voicing { [voicing] } else { asked.map(setup.voicingsInRange) ?? [] }
     }
 
-    private var isLastNote: Bool { place == (asked?.noteCount ?? 0) - 1 }
+    private var isLastNote: Bool { noteIndex == (asked?.noteCount ?? 0) - 1 }
 
     /// The voicing picked, or the lowest in range.
     private var revealed: TriadVoicing? { possibleVoicings.first }
 
-    public var isPartWay: Bool { place > 0 }
+    public var isPartWay: Bool { noteIndex > 0 }
 
     public func correctLocations(for prompt: NotePrompt) -> [FretboardLocation] { revealed?.locations ?? [] }
 
     public func group(for prompt: NotePrompt) -> AttemptGroup? {
-        AttemptGroup(number: group, size: asked?.noteCount, place: place)
+        AttemptGroup(number: group, size: asked?.noteCount, place: noteIndex)
     }
 
     public func facts(for prompt: NotePrompt) -> AttemptFacts? { asked.map { .triad($0) } }
@@ -153,7 +152,7 @@ extension DrillSetup {
     var triadsInRange: [TriadFacts] {
         let sets = fretboard.stringSets.filter(options.stringSets.contains)
         let inversions = Triad.Inversion.allCases.filter(options.inversions.contains)
-        return (key ?? options.key).chords.flatMap { triad in
+        return chosenKey.chords.flatMap { triad in
             sets.flatMap { set in inversions.map { TriadFacts(triad: triad, inversion: $0, stringSet: set) } }
         }
         .filter { !voicingsInRange(of: $0).isEmpty }

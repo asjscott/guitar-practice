@@ -100,52 +100,52 @@ struct ClickListeningTests {
         return playedNotes(samples, sampleRate: clip.sampleRate).map(\.midiNote)
     }
 
-    // MARK: Runs
+    // MARK: Lines
 
-    static let lowRun = [40, 42, 43, 45, 47, 48, 50, 52]
-    static let highRun = [64, 66, 67, 69, 71, 72, 74, 76]
+    static let lowLine = [40, 42, 43, 45, 47, 48, 50, 52]
+    static let highLine = [64, 66, 67, 69, 71, 72, 74, 76]
 
     /// One note per beat, each stopped by the next, as on one string; first at 0.3 s. Each note has died away by
     /// more than 3 dB when the next is plucked, even at 160 BPM.
-    func run(_ midi: [Int], bpm: Double, decay: Double = 0.6) -> [Float] {
+    func line(_ midi: [Int], bpm: Double, decay: Double = 0.6) -> [Float] {
         Signals.silence(0.3) + midi.flatMap { Signals.pluck(frequency: Signals.hz(midi: $0), decay: decay, duration: 60 / bpm) }
     }
 
-    func expectRun(_ notes: [PlayedNote], _ midi: [Int], bpm: Double) {
+    func expectLine(_ notes: [PlayedNote], _ midi: [Int], bpm: Double) {
         #expect(notes.map(\.midiNote) == midi)
         for (index, note) in notes.enumerated() {
             #expect(abs(note.onset - (0.3 + Double(index) * 60 / bpm)) <= Self.onsetTolerance)
         }
     }
 
-    @Test("Every note of a run is heard once", arguments: [60.0, 120, 160], [lowRun, highRun])
-    func runs(bpm: Double, midi: [Int]) {
-        expectRun(playedNotes(run(midi, bpm: bpm)), midi, bpm: bpm)
+    @Test("Every note of a line is heard once", arguments: [60.0, 120, 160], [lowLine, highLine])
+    func lines(bpm: Double, midi: [Int]) {
+        expectLine(playedNotes(line(midi, bpm: bpm)), midi, bpm: bpm)
     }
 
-    @Test("Every note of a run is heard once through faint clicks", arguments: [60.0, 120, 160], [lowRun, highRun])
-    func runsWithFaintClicks(bpm: Double, midi: [Int]) {
+    @Test("Every note of a line is heard once through faint clicks", arguments: [60.0, 120, 160], [lowLine, highLine])
+    func linesWithFaintClicks(bpm: Double, midi: [Int]) {
         for delay in [0, 0.03] {
-            let samples = Self.addClicks(to: run(midi, bpm: bpm), bpm: bpm, from: 0.3 + delay, peak: 0.5 * Signals.amplitude(dBFS: Self.faint))
-            expectRun(playedNotes(samples), midi, bpm: bpm)
+            let samples = Self.addClicks(to: line(midi, bpm: bpm), bpm: bpm, from: 0.3 + delay, peak: 0.5 * Signals.amplitude(dBFS: Self.faint))
+            expectLine(playedNotes(samples), midi, bpm: bpm)
         }
     }
 
-    @Test("Every note of a run is heard once through clicks as loud, 100 ms late", arguments: [60.0, 120, 160], [lowRun, highRun])
-    func runsWithLoudClicks(bpm: Double, midi: [Int]) {
-        expectRun(playedNotes(Self.addClicks(to: run(midi, bpm: bpm), bpm: bpm, from: 0.4, peak: 0.5)), midi, bpm: bpm)
+    @Test("Every note of a line is heard once through clicks as loud, 100 ms late", arguments: [60.0, 120, 160], [lowLine, highLine])
+    func linesWithLoudClicks(bpm: Double, midi: [Int]) {
+        expectLine(playedNotes(Self.addClicks(to: line(midi, bpm: bpm), bpm: bpm, from: 0.4, peak: 0.5)), midi, bpm: bpm)
     }
 
-    @Test("Every note of a long-ringing run is heard at 160 BPM", arguments: [lowRun, highRun])
-    func longRingingRun(midi: [Int]) {
+    @Test("Every note of a long-ringing line is heard at 160 BPM", arguments: [lowLine, highLine])
+    func longRingingLine(midi: [Int]) {
         // Each pluck is only 2.7 dB over the note before it.
-        expectRun(playedNotes(run(midi, bpm: 160, decay: 1.2)), midi, bpm: 160)
+        expectLine(playedNotes(line(midi, bpm: 160, decay: 1.2)), midi, bpm: 160)
     }
 
-    // MARK: Picked runs
+    // MARK: Picked lines
 
     /// One note per beat, each up to 30 ms early or late and 2 dB louder or softer, and up to 10 cents out of tune.
-    func pickedRun(_ midi: [Int], bpm: Double, decay: Double, seed: UInt64) -> (samples: [Float], times: [Double]) {
+    func pickedLine(_ midi: [Int], bpm: Double, decay: Double, seed: UInt64) -> (samples: [Float], times: [Double]) {
         var random = Signals.Random(seed: seed)
         let times = midi.indices.map { 0.3 + Double($0) * 60 / bpm + random.next(-0.03...0.03) }
         var samples = Signals.silence(0.3 + Double(midi.count) * 60 / bpm)
@@ -161,12 +161,12 @@ struct ClickListeningTests {
     }
 
     /// Clicks are on the beat, so before some notes and after others. 10 ms is far inside the half beat that matters.
-    @Test("Every note of a picked run is heard once, with clicks and without",
+    @Test("Every note of a picked line is heard once, with clicks and without",
           arguments: [(90.0, 1.4), (120, 1.0), (160, 1.0)], [nil, -24.0, -12])
-    func pickedRuns(run: (bpm: Double, decay: Double), clicks: Double?) throws {
-        for (seed, midi) in [Self.lowRun, [64, 66, 67, 69, 67, 66, 64]].enumerated() {
-            let (dry, times) = pickedRun(midi, bpm: run.bpm, decay: run.decay, seed: UInt64(seed) + 1)
-            let samples = clicks.map { Self.addClicks(to: dry, bpm: run.bpm, from: 0.3, peak: 0.4 * Signals.amplitude(dBFS: $0)) } ?? dry
+    func pickedLines(line: (bpm: Double, decay: Double), clicks: Double?) throws {
+        for (seed, midi) in [Self.lowLine, [64, 66, 67, 69, 67, 66, 64]].enumerated() {
+            let (dry, times) = pickedLine(midi, bpm: line.bpm, decay: line.decay, seed: UInt64(seed) + 1)
+            let samples = clicks.map { Self.addClicks(to: dry, bpm: line.bpm, from: 0.3, peak: 0.4 * Signals.amplitude(dBFS: $0)) } ?? dry
             let notes = playedNotes(samples)
             #expect(notes.map(\.midiNote) == midi)
             for (note, time) in zip(notes, times) { #expect(abs(note.onset - time) <= 0.01) }
@@ -176,7 +176,7 @@ struct ClickListeningTests {
     @Test("One pitch picked again on the click is heard each time", arguments: [45, 57, 69], [nil, -24.0, -6])
     func samePitchAgain(midi: Int, clicks: Double?) {
         for seed in [UInt64(midi)] {
-            let (dry, times) = pickedRun(Array(repeating: midi, count: 6), bpm: 120, decay: 0.8, seed: seed)
+            let (dry, times) = pickedLine(Array(repeating: midi, count: 6), bpm: 120, decay: 0.8, seed: seed)
             let samples = clicks.map { Self.addClicks(to: dry, bpm: 120, from: 0.3, peak: 0.4 * Signals.amplitude(dBFS: $0)) } ?? dry
             let notes = playedNotes(samples)
             #expect(notes.map(\.midiNote) == Array(repeating: midi, count: 6))

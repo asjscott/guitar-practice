@@ -49,12 +49,11 @@ struct UpAndDownTests {
         #expect(DrillKind.all.contains(.upAndDown))
         #expect(DrillKind.upAndDown.id == "upAndDown")
         #expect(DrillKind.upAndDown.module == .scales)
-        #expect(DrillKind.upAndDown.isInSessions)
-        #expect(DrillKind.upAndDown.usesMetronome)
+        #expect(DrillKind.upAndDown.hasPasses)
         #expect(!DrillKind.upAndDown.needsSound)
         #expect(DrillKind.upAndDown.repeatTitle == "Restart")
         #expect(DrillKind.upAndDown.instructions.contains("Pick every note"))
-        #expect(DrillKind.all.filter(\.usesMetronome).allSatisfy { $0.module == .scales })
+        #expect(DrillKind.all.filter(\.hasPasses).allSatisfy { $0.module == .scales })
     }
 
     @Test func aWholePass() {
@@ -270,7 +269,7 @@ struct PassClickTests {
         #expect(facts(drill.attempts[0])?.tempo == 60)
         play(45, at: 31.1, &drill)
         #expect(facts(drill.attempts[23])?.tempo == 120)
-        #expect(facts(drill.attempts[23])?.beatsPerBar == 3)
+        #expect(facts(drill.attempts[23])?.signature == TimeSignature(beats: 3, unit: 4))
     }
 
     @Test func aHoldBetweenPassesDelaysTheCountIn() {
@@ -426,7 +425,7 @@ struct PassNoteTests {
         #expect(drill.attempts.allSatisfy { $0.group?.size == 23 && $0.group?.number == drill.attempts[0].group?.number })
         #expect(drill.attempts.allSatisfy { attempt in
             facts(attempt) == PassFacts(scale: Scale(.minorPentatonic, tonic: .a), position: .init(system: .caged, number: 5),
-                                        startDegree: .init(1), tempo: 60, beatsPerBar: 4, beatUnit: 4, fadeStage: .shown,
+                                        startDegree: .init(1), tempo: 60, signature: .fourFour, fadeStage: .shown,
                                         hinted: false, clickOffset: .milliseconds(50))
         })
     }

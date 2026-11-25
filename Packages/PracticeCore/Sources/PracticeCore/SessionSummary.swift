@@ -10,7 +10,7 @@ public struct SessionSummary: Hashable, Sendable {
 
         /// In scale blocks only.
         public var passes: PassStats? {
-            kind.usesMetronome ? PassStats(PassResult.passes(in: stats.attempts)) : nil
+            kind.hasPasses ? PassStats(PassResult.passes(in: stats.attempts)) : nil
         }
 
         /// In triad blocks only.

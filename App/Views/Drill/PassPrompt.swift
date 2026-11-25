@@ -17,9 +17,7 @@ struct PassPrompt<Resting: View>: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            header
-                .frame(height: 56)
-                .padding(.horizontal, 28)
+            DrillHeader(display: display) { PassBeats(settings: display?.pass?.settings ?? settings) }
             FretboardView(diagram: diagram, minHeight: 120)
                 .frame(maxHeight: .infinity)
                 .overlay { if let beat = display?.pass?.countIn { CountInNumber(beat: beat) } }
@@ -44,28 +42,6 @@ struct PassPrompt<Resting: View>: View {
         var diagram = FretboardDiagram(drill: display, on: fretboard, fretWindow: display?.pass?.fretWindow ?? position?.fretWindow)
         if display == nil { diagram.markers = restingMarkers }
         return diagram
-    }
-
-    private var header: some View {
-        HStack(spacing: 20) {
-            if let display {
-                HStack(alignment: .firstTextBaseline, spacing: 14) {
-                    Text(display.headline).font(.system(size: 34, weight: .bold, design: .rounded))
-                    Text(display.subline).font(.title2).foregroundStyle(.secondary)
-                }
-                .lineLimit(1)
-                .minimumScaleFactor(0.5)
-                Spacer(minLength: 0)
-                Label([display.feedback, display.pass?.evennessText].compactMap { $0 }.joined(separator: " · "), systemImage: display.symbol)
-                    .foregroundStyle(display.result.color)
-                    .font(.title2.weight(.medium))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-            } else {
-                Spacer(minLength: 0)
-            }
-            PassBeats(settings: display?.pass?.settings ?? settings)
-        }
     }
 }
 

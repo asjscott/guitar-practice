@@ -25,17 +25,6 @@ enum MetronomeSettings {
     static let defaultVolume = 0.8
     static let defaultIsSoundOn = true
 
-    /// A scale drill's tempo and Hold, in sessions and free practice alike, put in place of the settings' own.
-    static func loadTempo(of kind: DrillKind, into settings: inout PassSettings, from defaults: UserDefaults) {
-        settings.tempo = defaults.object(forKey: Key.tempo(of: kind)) as? Int ?? PassSettings().tempo
-        settings.holdsTempo = defaults.bool(forKey: Key.holdsTempo(of: kind))
-    }
-
-    static func storeTempo(of kind: DrillKind, from settings: PassSettings, in defaults: UserDefaults) {
-        defaults.set(settings.tempo, forKey: Key.tempo(of: kind))
-        defaults.set(settings.holdsTempo, forKey: Key.holdsTempo(of: kind))
-    }
-
     static func meters(in defaults: UserDefaults) -> MeterMemory {
         MeterMemory(signature: defaults.string(forKey: Key.signature) ?? defaultSignature,
                     emphasis: defaults.string(forKey: Key.emphasis) ?? defaultEmphasis)
