@@ -17,7 +17,10 @@ struct GuitarPracticeApp: App {
     @State private var audioInput = AudioInputService()
 
     /// The app's one sound output.
-    @State private var soundOutput = AppSoundOutput()
+    @State private var soundOutput: AppSoundOutput
+
+    /// The app's one metronome.
+    @State private var metronome: Metronome
 
     /// The app's one attempt log.
     @State private var log = AttemptLog.live()
@@ -25,12 +28,19 @@ struct GuitarPracticeApp: App {
     /// The sessions going, in any window.
     @State private var activeSessions = ActiveSessions()
 
+    init() {
+        let soundOutput = AppSoundOutput()
+        _soundOutput = State(initialValue: soundOutput)
+        _metronome = State(initialValue: Metronome(output: soundOutput))
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .frame(minWidth: 1100, minHeight: 400)
                 .environment(audioInput)
                 .environment(soundOutput)
+                .environment(metronome)
                 .environment(log)
                 .environment(activeSessions)
         }
@@ -45,6 +55,8 @@ struct GuitarPracticeApp: App {
         Settings {
             SettingsView()
                 .environment(audioInput)
+                .environment(soundOutput)
+                .environment(metronome)
                 .environment(activeSessions)
         }
     }
