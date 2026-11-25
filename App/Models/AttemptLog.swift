@@ -54,7 +54,7 @@ final class AttemptLog {
     }
 
     private static func makeContainer(at url: URL?) throws -> ModelContainer {
-        let schema = Schema(versionedSchema: PracticeSchemaV1.self)
+        let schema = Schema(versionedSchema: PracticeSchemaV2.self)
         let configuration = url.map { ModelConfiguration(schema: schema, url: $0, cloudKitDatabase: .none) }
             ?? ModelConfiguration(schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, migrationPlan: PracticeMigrationPlan.self, configurations: configuration)
@@ -97,7 +97,7 @@ final class RunLog {
     private let session: PracticeSession?
     private let blockIndex: Int?
     private var count = 0
-    private var sweepIDs: [Int: UUID] = [:]
+    private var groupIDs: [Int: UUID] = [:]
 
     fileprivate init(log: AttemptLog, session: PracticeSession?, blockIndex: Int?) {
         self.log = log
@@ -111,7 +111,7 @@ final class RunLog {
         guard !new.isEmpty else { return }
         for attempt in new {
             let record = LoggedAttempt(attempt, in: drill, date: .now, source: session == nil ? .freePractice : .session,
-                                       sweepID: attempt.prompt.sweep.map(sweepID), blockIndex: blockIndex)
+                                       groupID: (attempt.group?.number).map(groupID), blockIndex: blockIndex)
             log.context.insert(record)
             record.session = session
         }
@@ -119,10 +119,10 @@ final class RunLog {
         log.save()
     }
 
-    private func sweepID(_ sweep: Int) -> UUID {
-        if let id = sweepIDs[sweep] { return id }
+    private func groupID(_ group: Int) -> UUID {
+        if let id = groupIDs[group] { return id }
         let id = UUID()
-        sweepIDs[sweep] = id
+        groupIDs[group] = id
         return id
     }
 }

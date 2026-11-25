@@ -1,14 +1,17 @@
 import TheoryCore
 
-/// What a day's sessions are built around: a key and a position.
+/// What a day's sessions are built around: a key, a position and a string set.
 public struct Theme: Hashable, Sendable {
     /// One of the app's 24 keys.
     public var key: Key
     public var position: Position.ID
+    /// What triads are played on. Nil where the key's chords have no voicing on the neck, or it hasn't been picked yet.
+    public var stringSet: StringSet?
 
-    public init(key: Key, position: Position.ID) {
+    public init(key: Key, position: Position.ID, stringSet: StringSet? = nil) {
         self.key = key
         self.position = position
+        self.stringSet = stringSet
     }
 
     /// The position as it is on a neck; nil when it isn't there.
@@ -21,10 +24,13 @@ extension DrillSetup {
     /// How often a themed prompt is a note of the key.
     private static let keyNoteShare = 0.7
 
-    /// Prompts are spelled in the theme's key and favour its notes. The position doesn't restrict them.
+    /// Prompts are spelled in the theme's key and favour its notes. Its position is for scale drills only, and its
+    /// string set for triad drills.
     public mutating func follow(_ theme: Theme) {
+        self.theme = theme
         key = theme.key
         weighting = NoteWeighting(preferred: Set(theme.key.notes.map(\.pitchClass)), share: Self.keyNoteShare)
+        if let stringSet = theme.stringSet { options.stringSets = [stringSet] }
     }
 }
 
@@ -62,21 +68,48 @@ public struct ThemePicker: Sendable {
     }
 
     /// The day's theme on a neck. Its position is the lowest placement of a shape or pattern of the key's own scale.
-    public func theme(on fretboard: Fretboard, system: Position.System) -> Theme {
+    /// A reroll gives what it replaces, so that the string set is another if there is one.
+    public func theme(on fretboard: Fretboard, system: Position.System, replacing old: Theme? = nil) -> Theme {
         let recent = Set(recentDays.prefix(Self.keyDays).joined().map(\.key))
         var random = SplitMix64(seed: seed)
         let keys = random.shuffled(Key.appMajorKeys + Key.appMinorKeys).filter { !recent.contains($0) }
         let key = keys[rerolls % keys.count]
         return Theme(key: key, position: pickPosition(in: key, on: fretboard, system: system)
             // No position fits the neck: there is none to show.
-            ?? Position.ID(system: system, number: 1))
+            ?? Position.ID(system: system, number: 1),
+            stringSet: pickStringSet(in: key, on: fretboard, replacing: old?.stringSet))
     }
 
-    /// A saved theme for the neck as it is now: itself if its position is still there, or the key with another.
+    /// A saved theme for the neck as it is now: the same key, with a position and a string set picked
+    /// again where the old one won't do.
     public func keepingKey(of theme: Theme, on fretboard: Fretboard, system: Position.System) -> Theme {
-        if theme.position.system == system, theme.position(on: fretboard) != nil { return theme }
-        guard let position = pickPosition(in: theme.key, on: fretboard, system: system) else { return theme }
-        return Theme(key: theme.key, position: position)
+        var kept = theme
+        if theme.position.system != system || theme.position(on: fretboard) == nil {
+            kept.position = pickPosition(in: theme.key, on: fretboard, system: system) ?? theme.position
+        }
+        let keepsSet = theme.stringSet.map(stringSets(for: theme.key, on: fretboard).contains) ?? false
+        if !keepsSet { kept.stringSet = pickStringSet(in: theme.key, on: fretboard) }
+        return kept
+    }
+
+    /// Those that have the most of a key's chords: all of them, where possible. Empty where none has any.
+    private func stringSets(for key: Key, on fretboard: Fretboard) -> [StringSet] {
+        let counts = fretboard.stringSets.map { (set: $0, chords: fretboard.chordCount(of: key, on: $0)) }
+        let most = counts.map(\.chords).max() ?? 0
+        return most == 0 ? [] : counts.filter { $0.chords == most }.map(\.set)
+    }
+
+    /// The last practised day's is left out unless it is the only choice, and then the one to be replaced likewise.
+    private func pickStringSet(in key: Key, on fretboard: Fretboard, replacing old: StringSet? = nil) -> StringSet? {
+        let recent = Set(recentDays.first?.compactMap(\.stringSet) ?? [])
+        // Other random numbers than the key's and the position's, so that it doesn't follow them.
+        var random = SplitMix64(seed: ~seed)
+        var choices = random.shuffled(stringSets(for: key, on: fretboard))
+        for leftOut in [recent, Set([old].compactMap { $0 })] {
+            let others = choices.filter { !leftOut.contains($0) }
+            if !others.isEmpty { choices = others }
+        }
+        return choices.isEmpty ? nil : choices[rerolls % choices.count]
     }
 
     /// Recent ones are left out, unless no others exist; then the longest ago come back first.

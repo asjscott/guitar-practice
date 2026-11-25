@@ -5,7 +5,7 @@ import PracticeCore
 /// A drill made up for these tests: typed answers, sounds and its own timing. Prompts are string 6's frets in order.
 /// With a capo at fret 1 it runs like a sweep instead: continuous, resuming on the same prompt.
 struct ToyRules: DrillRules {
-    static let kind = DrillKind(id: "toy", title: "Toy", instructions: "", symbol: "star", rules: ToyRules.self)
+    static let kind = DrillKind(id: "toy", module: .notes, title: "Toy", instructions: "", symbol: "star", rules: ToyRules.self)
     static let timeout: Duration = .seconds(15)
 
     let setup: DrillSetup
@@ -227,7 +227,7 @@ struct DrillDisplayTests {
         #expect(display.subline == "on string 6 (E) · fret 0")
         #expect(display.feedback == "Listening…")
         #expect(display.result == .waiting)
-        #expect(display.highlightedString == 0)
+        #expect(display.highlightedStrings == [0])
         #expect(display.markers.isEmpty)
 
         drill.handle(.played(Pitch(43), onset: s(1), at: s(1.1)))

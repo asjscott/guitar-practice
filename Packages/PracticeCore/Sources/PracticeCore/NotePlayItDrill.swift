@@ -5,8 +5,8 @@ public typealias NotePlayItOptions = DrillOptions
 
 extension DrillKind {
     public static let notePlayIt = DrillKind(
-        id: "notePlayIt", title: "Note → play it", instructions: "Play the note on the string shown.",
-        symbol: "target", offersOrder: true, rules: NotePlayItRules.self)
+        id: "notePlayIt", module: .notes, title: "Note → play it", instructions: "Play the note on the string shown.",
+        symbol: "target", traits: .offersOrder, rules: NotePlayItRules.self)
 }
 
 /// Note → play it: a note and a string; any fret on the string that gives the note is right.

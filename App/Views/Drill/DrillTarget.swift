@@ -6,16 +6,18 @@ import TheoryCore
 // and know nothing of which drill is running.
 
 extension FretboardDiagram {
-    /// The neck for a drill: no labels except on the display's markers, its string highlighted. No display (idle,
+    /// The neck for a drill: no labels except on the display's markers, its strings highlighted. No display (idle,
     /// paused) draws the bare neck.
-    init(drill display: DrillDisplay?, on fretboard: Fretboard) {
+    init(drill display: DrillDisplay?, on fretboard: Fretboard, fretWindow: ClosedRange<Int>? = nil) {
         self.init(stringNames: fretboard.stringNames(in: nil).map(\.description))
+        self.fretWindow = fretWindow
         capo = fretboard.capo
         labelMode = .shown
         markers = (display?.markers ?? []).map {
-            Marker(location: $0.location, label: $0.label, role: $0.isAnswer ? .root : .tone)
+            Marker(location: $0.location, label: $0.label, role: $0.isAnswer ? .root : .tone, isFaint: $0.isFaint,
+                   isLastPlayed: $0.isLastPlayed)
         }
-        highlightedString = display?.highlightedString
+        highlightedStrings = display?.highlightedStrings ?? []
     }
 }
 
@@ -131,7 +133,45 @@ struct DrillCountdownRing: View {
     }
 }
 
-private extension DrillDisplay.Chip.State {
+/// The ring as time goes: apart, so that only it is redrawn on every tick.
+struct LiveCountdownRing: View {
+    let countdown: () -> DrillCountdown?
+
+    var body: some View { DrillCountdownRing(countdown: countdown()) }
+}
+
+/// The line over the neck of a scale or triad drill (P4): what to play, the feedback, then what the drill adds. With no
+/// display (idle or paused), only that.
+struct DrillHeader<Trailing: View>: View {
+    let display: DrillDisplay?
+    @ViewBuilder let trailing: Trailing
+
+    var body: some View {
+        HStack(spacing: 20) {
+            if let display {
+                HStack(alignment: .firstTextBaseline, spacing: 14) {
+                    Text(display.headline).font(.system(size: 34, weight: .bold, design: .rounded))
+                    Text(display.subline).font(.title2).foregroundStyle(.secondary)
+                }
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
+            }
+            Spacer(minLength: 0)
+            if let display {
+                Label([display.feedback, display.pass?.evennessText].compactMap { $0 }.joined(separator: " · "), systemImage: display.symbol)
+                    .foregroundStyle(display.result.color)
+                    .font(.title2.weight(.medium))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+            }
+            trailing
+        }
+        .frame(height: 56)
+        .padding(.horizontal, 28)
+    }
+}
+
+extension DrillDisplay.Chip.State {
     var fill: Color {
         switch self {
         case .waiting: .secondary.opacity(0.08)
@@ -153,11 +193,11 @@ private extension DrillDisplay.Chip.State {
     }
 }
 
-private extension DrillDisplay {
+extension DrillDisplay {
     var symbol: String { result == .waiting && acceptsTypedName ? "keyboard" : result.symbol }
 }
 
-private extension DrillDisplay.Result {
+extension DrillDisplay.Result {
     var tint: Color {
         switch self {
         case .waiting: Color(nsColor: .controlBackgroundColor)

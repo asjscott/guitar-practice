@@ -26,20 +26,29 @@ public struct DrillDisplay: Hashable, Sendable {
         case waiting, wrong, right, timedOut
     }
 
-    /// A dot on the neck. The answer has its own colour.
+    /// A dot on the neck. The answer, or in a triad the root, has its own colour.
     public struct Marker: Hashable, Sendable {
         public var location: FretboardLocation
+        /// Empty when faint.
         public var label: String
         public var isAnswer: Bool
+        /// Drawn faintly.
+        public var isFaint: Bool
+        /// Ringed as the last note played.
+        public var isLastPlayed: Bool
 
-        public init(location: FretboardLocation, label: String, isAnswer: Bool) {
+        public init(location: FretboardLocation, label: String, isAnswer: Bool, isFaint: Bool = false,
+                    isLastPlayed: Bool = false) {
             self.location = location
             self.label = label
             self.isAnswer = isAnswer
+            self.isFaint = isFaint
+            self.isLastPlayed = isLastPlayed
         }
     }
 
-    /// One part of a prompt with several, such as a location of a sweep: "6" over "fret 8".
+    /// One part of a prompt with several, such as a location of a sweep ("6" over "fret 8"), a string of a triad or
+    /// a voicing of a climb.
     public struct Chip: Hashable, Sendable {
         public enum State: Hashable, Sendable {
             case waiting, current, found, timedOut, skipped
@@ -71,23 +80,38 @@ public struct DrillDisplay: Hashable, Sendable {
     /// Tints the card.
     public var result: Result
 
-    /// A string lit along its length (internal index); nil = none.
-    public var highlightedString: Int?
+    /// Strings lit along their length (internal indices).
+    public var highlightedStrings: Set<Int>
 
     public var markers: [Marker]
 
     /// A row under the feedback; empty in most drills.
     public var chips: [Chip] = []
 
+    /// A climb's voicings, up and back; empty in other drills.
+    public var voicings: [Chip] = []
+
+    /// The pass, in scale drills.
+    public var pass: PassProgress?
+
     /// Waiting for a typed name: what is typed so far replaces the headline.
     public var acceptsTypedName = false
+
+    init(headline: String, subline: String, feedback: String, result: Result, markers: [Marker]) {
+        self.headline = headline
+        self.subline = subline
+        self.feedback = feedback
+        self.result = result
+        self.markers = markers
+        highlightedStrings = []
+    }
 
     /// The display most drills start from, and change what differs.
     public init(standard moment: DrillMoment, in setup: DrillSetup) {
         let prompt = moment.prompt
         headline = prompt.noteName
         subline = "on \(prompt.stringLabel(in: setup.fretboard.tuning))"
-        highlightedString = prompt.string
+        highlightedStrings = [prompt.string]
         markers = []
         switch moment.phase {
         case .wrong(let played):

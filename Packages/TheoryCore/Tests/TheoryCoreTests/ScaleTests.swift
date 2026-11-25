@@ -22,6 +22,17 @@ struct ScaleTests {
         #expect(names(Scale(.blues, tonic: .a)) == "A C D E♭ E G")
     }
 
+    @Test(arguments: [
+        (Scale(.blues, tonic: .a), Scale.Degree(5, -1), "E♭"),
+        (Scale(.blues, tonic: .cSharp), Scale.Degree(5, -1), "G"),
+        (Scale(.naturalMinor, tonic: .bFlat), Scale.Degree(3, -1), "D♭"),
+        (Scale(.major, tonic: .fSharp), Scale.Degree(7), "E♯"),
+        (Scale(.minorPentatonic, tonic: .a), Scale.Degree(6), "F♯"),   // not one of its own degrees
+    ])
+    func theNoteAtADegreeIsSpelledByIt(scale: Scale, degree: Scale.Degree, expected: String) {
+        #expect(scale.note(at: degree).description == expected)
+    }
+
     // Sharp tonic (E) and flat tonic (B♭): every kind is built on the key's own tonic.
     @Test(arguments: [
         (Scale.Kind.major, "E F♯ G♯ A B C♯ D♯", "B♭ C D E♭ F G A"),

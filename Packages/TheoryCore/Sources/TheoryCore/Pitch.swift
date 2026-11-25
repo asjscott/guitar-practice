@@ -25,6 +25,14 @@ extension Pitch: CustomStringConvertible {
     public var description: String { "\(pitchClass.sharpName)\(octave)" }
 }
 
+extension Collection<Pitch> {
+    /// How high each is, from the lowest (0) to the highest (1); 0 if they are all alike.
+    public var relativeHeights: [Double] {
+        guard let lowest = self.min(), let highest = self.max(), lowest < highest else { return map { _ in 0 } }
+        return map { Double(($0 - lowest).semitones) / Double((highest - lowest).semitones) }
+    }
+}
+
 /// A note name with octave ignored: 0–11, C = 0. Any `Int` wraps into that range.
 public struct PitchClass: Hashable, Sendable, Codable, CaseIterable {
     public let value: Int

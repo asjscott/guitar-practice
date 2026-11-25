@@ -68,3 +68,15 @@ struct PitchTests {
             == ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"])
     }
 }
+
+@Suite("Relative heights")
+struct RelativeHeightTests {
+    @Test func fromTheLowestToTheHighest() {
+        #expect([45, 47, 53, 49].map { Pitch($0) }.relativeHeights == [0, 0.25, 1, 0.5])
+    }
+
+    @Test func allAlikeOrNone() {
+        #expect([Pitch(45), Pitch(45)].relativeHeights == [0, 0])
+        #expect([Pitch]().relativeHeights == [])
+    }
+}

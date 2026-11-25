@@ -36,9 +36,17 @@ public enum SessionEvent: Hashable, Sendable {
     /// Whether sound can be heard. Failing pauses a block that is playing, or the Ready card of one that needs sound.
     case output(works: Bool, at: Duration)
 
-    // For the drill: ignored unless a block is playing.
+    // For the drill: ignored unless a block is playing, or as they say.
     case played(Pitch, onset: Duration, at: Duration)
     case typed(NoteName, at: Duration)
+    /// The clicks just asked for, as they will be heard.
+    case clicksStarted(ClickTrack)
+    /// What the block's passes are played at, from the next one on: on its Ready card and while paused too.
+    case passSettings(PassSettings, at: Duration)
+    /// The fade stages reached by now, read again from the log, which has this session's passes too: from the next pass
+    /// on.
+    case fadeStages(FadeStages)
+    case hint(isShown: Bool, at: Duration)
     case skip(at: Duration)
     case `repeat`(at: Duration)
 }
@@ -47,8 +55,8 @@ public enum SessionEvent: Hashable, Sendable {
 ///
 /// A block ends only when the player moves on. The open prompt is then dropped, unrecorded.
 ///
-/// Chimes mark 30 s left and the planned end. Each waits for a gap between prompts, and the next prompt then waits for
-/// it to end, since a note played over it wouldn't count.
+/// Chimes mark 30 s left and the planned end. Each waits for a gap between prompts (in triad drills, voicings), and the next prompt then waits for
+/// it to end, since a note played over it wouldn't count. Between passes, a chime also waits for the bar to end.
 public struct SessionPlayer: Sendable {
     /// How long a Ready card waits before its block starts by itself.
     public static let readyTime: Duration = .seconds(5)
@@ -88,6 +96,11 @@ public struct SessionPlayer: Sendable {
     private var dueChime: AppSound?
     /// For the app to take.
     private var chimeToPlay: AppSound?
+    /// For the app to take.
+    private var pendingClicks: [ClickRequest] = []
+    private var settingsByKind: [DrillKind: PassSettings] = [:]
+    /// What has been reached, this session's passes included.
+    private var fadeStages: FadeStages
 
     /// A block as played.
     private struct Progress: Sendable {
@@ -102,6 +115,7 @@ public struct SessionPlayer: Sendable {
         self.blocks = blocks
         self.hasSound = hasSound
         self.setup = setup
+        fadeStages = setup.fadeStages
         progress = blocks.map { _ in Progress() }
     }
 
@@ -160,6 +174,19 @@ public struct SessionPlayer: Sendable {
         return chimeToPlay
     }
 
+    /// The clicks asked for since the last call, to be done in order, each start answered with `clicksStarted`. Call it
+    /// after every event.
+    public mutating func takeClicks() -> [ClickRequest] {
+        defer { pendingClicks = [] }
+        return pendingClicks
+    }
+
+    /// What the block's next pass will be played at, from its Ready card on; nil in blocks without passes.
+    public var passSettings: PassSettings? {
+        guard stage != .idle, stage != .finished, blocks[blockIndex].kind.hasPasses else { return nil }
+        return settingsByKind[blocks[blockIndex].kind] ?? setup.options.pass
+    }
+
     // MARK: - Events
 
     public mutating func handle(_ event: SessionEvent) {
@@ -209,7 +236,7 @@ public struct SessionPlayer: Sendable {
         case .end(let now):
             guard stage == .ready || stage == .playing || stage == .paused else { return }
             passTime(to: now)
-            drill?.handle(.stop(at: now))
+            stopDrill(at: now)
             endedEarly = true
             finish()
         case .tick(let now):
@@ -236,6 +263,20 @@ public struct SessionPlayer: Sendable {
         case .typed(let name, let now):
             passTime(to: now)
             if !isHeldForChime(at: now) { send(.typed(name, at: now)) }
+        case .clicksStarted(let track):
+            send(.clicksStarted(track))
+        case .passSettings(let new, let now):
+            passTime(to: now)
+            guard passSettings != nil else { return }
+            settingsByKind[blocks[blockIndex].kind] = new
+            drill?.handle(.passSettings(new, at: now))
+            followDrill()
+        case .fadeStages(let new):
+            fadeStages = new
+            drill?.handle(.fadeStages(new))
+        case .hint(let isShown, let now):
+            passTime(to: now)
+            send(.hint(isShown: isShown, at: now))
         case .skip(let now):
             passTime(to: now)
             send(.skip(at: now))
@@ -274,7 +315,7 @@ public struct SessionPlayer: Sendable {
 
     /// Whether the drill is between prompts with a chime sounding: until it ends, only a skip or repeat moves it on.
     private func isHeldForChime(at now: Duration) -> Bool {
-        guard soundFilter.isChiming(at: now) else { return false }
+        guard soundFilter.isChiming(at: now), drill?.passEnd == nil else { return false }
         return switch drill?.phase {
         case .correct, .timedOut, .paused: true
         case .waiting, .wrong, .idle, nil: false
@@ -285,6 +326,7 @@ public struct SessionPlayer: Sendable {
     /// chime still count; another drill is paused, and the first tick after the chime resumes it.
     private mutating func holdForChime() {
         guard stage == .playing, let drill, let end = soundFilter.chimeEnd(at: lastEvent) else { return }
+        if drill.passEnd != nil { return send(.hold(until: end)) }
         switch drill.phase {
         case .waiting, .wrong: send(drill.canHold ? .hold(until: end) : .pause(at: lastEvent))
         case .correct, .timedOut, .paused, .idle: break
@@ -294,12 +336,19 @@ public struct SessionPlayer: Sendable {
     /// Sounds the due chime if this is a gap. Where the next prompt is up already (after a skip) and can't be held, it is
     /// dropped before its sounds play. A flash needs no waiting for.
     private mutating func soundDueChime(afterAttempt: Bool) {
-        guard stage == .playing, dueChime != nil, let drill else { return }
+        guard stage == .playing, let dueChime, let drill else { return }
+        if let passEnd = drill.passEnd {
+            // Planned for, so that no click of the count-in comes first.
+            if hasSound { send(.hold(until: max(passEnd, lastEvent) + dueChime.duration + AppSoundFilter.tail)) }
+            if !hasSound || lastEvent >= passEnd { releaseChime() }
+            return
+        }
+        if drill.kind.hasPasses, drill.phase != .paused { return }
         switch drill.phase {
         case .correct, .timedOut, .paused, .idle:
             break
         case .waiting, .wrong:
-            guard afterAttempt else { return }
+            guard afterAttempt, !drill.isPartWay else { return }
             if hasSound, !drill.canHold { send(.pause(at: lastEvent)) }
         }
         releaseChime()
@@ -327,13 +376,15 @@ public struct SessionPlayer: Sendable {
         readyRemaining = nil
         progress[blockIndex].spent = .zero
         var blockSetup = setup
+        if let passSettings { blockSetup.options.pass = passSettings }
         blockSetup.seed &+= UInt64(blockIndex)
+        blockSetup.fadeStages = fadeStages
         drill = blocks[blockIndex].kind.makeDrill(blockSetup)
         send(.start(at: now))
     }
 
     private mutating func endBlock(at now: Duration) {
-        drill?.handle(.stop(at: now))
+        stopDrill(at: now)
         dueChime = nil
         showReady(blockIndex + 1)
     }
@@ -347,5 +398,17 @@ public struct SessionPlayer: Sendable {
         guard stage == .playing, drill != nil else { return }
         drill?.handle(event)
         progress[blockIndex].attempts = drill?.attempts ?? []
+        followDrill()
+    }
+
+    private mutating func stopDrill(at now: Duration) {
+        drill?.handle(.stop(at: now))
+        followDrill()
+    }
+
+    private mutating func followDrill() {
+        pendingClicks += drill?.takeClicks() ?? []
+        if let settings = drill?.passSettings { settingsByKind[blocks[blockIndex].kind] = settings }
+        if let reached = drill?.fadeStages { fadeStages = reached }
     }
 }

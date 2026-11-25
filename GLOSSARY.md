@@ -87,7 +87,7 @@ One task inside a drill, such as "F♯ on string 3 (G)". A prompt is answered by
 _Avoid_: Question, item, challenge
 
 **Attempt**:
-The record of one prompt's outcome (answered, timed out or skipped), its response time and any wrong answers given before the right one. A sweep is recorded as one attempt per fretboard location.
+The record of one prompt's outcome (answered, timed out or skipped), its response time and any wrong answers given before the right one. A sweep is recorded as one attempt per fretboard location; a pass, a triad prompt and a climb as one per note.
 _Avoid_: Answer, try, trial
 
 **Response time**:
@@ -102,8 +102,12 @@ _Avoid_: Round, lap, pass
 One scale played once through a position in a set order, such as up and down from its lowest root. (All instances has sweeps instead.)
 _Avoid_: Run, sweep, lap
 
+**Climb**:
+The single prompt of the Inversions drill: one chord on one string set, through every voicing in range by fret, up and back, the highest once.
+_Avoid_: Ladder (that is the tempo ladder), run, sweep, pass
+
 **Clean**:
-Said of a pass whose every expected note was played with no wrong note, timeout, skip or hint. Timing does not affect it.
+Said of a pass whose every expected note was played with no wrong note, timeout, skip or hint. Timing does not affect it. A triad's voicing is clean in the same way.
 _Avoid_: Perfect, correct (for a whole pass)
 
 **Count-in**:
@@ -123,11 +127,11 @@ The rule that raises a scale drill's tempo after clean passes that kept up with 
 _Avoid_: Speed trainer, auto-tempo
 
 **Fade stage**:
-How much of a position is shown during a pass: Shown (dots and names), Faded (faint dots, no names) or Hidden (only the root marked). It belongs to one scale kind in one position, whatever the key.
+How much of a position is shown during a pass: Shown (dots and names), Faded (faint dots, no names) or Hidden (only the root marked). It belongs to one scale kind in one position, whatever the key. A triad's voicing has one too: Shown, Faded or Hidden (nothing marked), belonging to its quality, inversion and string set, whatever the root.
 _Avoid_: Memory level, difficulty
 
 **Hint**:
-Showing the position during a pass, on request. The pass is then not clean.
+Showing the position during a pass, or the voicing in a triad drill, on request. The pass or voicing is then not clean.
 _Avoid_: Reveal (that follows a timeout)
 
 ## Sessions

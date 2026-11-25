@@ -2,17 +2,21 @@ import PracticeCore
 import SwiftUI
 import TheoryCore
 
-/// The Drill screen (free practice), D4: a drill picker and options in the toolbar with Start (↩), Pause/Resume (P),
+/// The Drill screen (free practice), D4 (or P4 for scales and triads): a drill picker and options in the toolbar with Start (↩), Pause/Resume (P),
 /// Skip (S) and Stop (Esc), plus Repeat (R) where the drill has one; the neck card with the target string lit; under
 /// it the target card with its countdown ring, a feedback line and a strip of recent attempts; a status bar with
 /// running stats and the input meter; a summary sheet on Stop. A listening screen: audio input runs while it is
-/// open. Leaving it pauses the run, as do sleep and losing the input. Follows the tuning and capo in Settings.
+/// open. Leaving it pauses the run, as do sleep and losing the input. Follows the tuning, capo, position system,
+/// time signature and emphasis in Settings.
 struct DrillView: View {
-    let model: DrillViewModel
+    @Bindable var model: DrillViewModel
     @State private var showSummary = false
     @Environment(AudioInputService.self) private var audioInput
     @Environment(AppSoundOutput.self) private var soundOutput
     @Environment(AttemptLog.self) private var log
+    @Environment(Metronome.self) private var metronome
+    @AppStorage(InstrumentSettings.Key.positionSystem) private var positionSystem = InstrumentSettings.defaultPositionSystem
+    private let meters = StoredMeters()
 
     var body: some View {
         Group {
@@ -29,15 +33,18 @@ struct DrillView: View {
                 DrillOptionsBar(model: model).disabled(model.isRunning)
             }
             ToolbarItemGroup(placement: .primaryAction) {
-                DrillRunButtons(model: model)
+                if model.kind.hasPasses { MetronomeButton(settings: model.passSettings, isOpen: $model.isPanelOpen) }
+                DrillRunButtons(model: model).disabled(model.isPanelOpen)
             }
         }
         .typesNoteNames(isActive: model.takesNoteNames) { model.press($0) }
+        .holdsHint(isActive: model.takesHint) { model.hint(isShown: $0) }
         .listensToAudioInput(model.audioConsumer)
         .noticesInterruptions(input: model.inputChanged, sleep: model.pause(notice:))
         .onAppear {
             model.log = log
             model.soundOutput = soundOutput
+            model.metronome = metronome
         }
         .onChange(of: soundOutput.problem) { model.soundProblemChanged() }
         .onDisappear { model.leave() }
@@ -45,6 +52,8 @@ struct DrillView: View {
             model.tuning = tuning
             model.capo = capo
         }
+        .onChange(of: positionSystem, initial: true) { model.positionSystem = positionSystem }
+        .onChange(of: meters.meter, initial: true) { model.passSettings.meter = meters.meter }
         .onChange(of: model.isRunning) {
             if !model.isRunning, !model.snapshot.attempts.isEmpty { showSummary = true }
         }
@@ -60,24 +69,21 @@ struct DrillView: View {
 
     private var drill: some View {
         VStack(spacing: 0) {
-            DrillNeck(display: model.snapshot.display, fretboard: model.fretboard)
-                .padding(.horizontal, 24)
-                .padding(.top, 20)
-
-            Spacer(minLength: 12)
-            if let display = model.snapshot.display {
-                DrillTarget(display: display, countdown: model.countdown, typed: model.nameEntry.text)
-            } else {
-                DrillRestingCard(model: model)
+            switch model.kind.module {
+            case .notes: notes
+            case .scales: scales
+            case .triads: triads
             }
-            DrillAttemptStrip(model: model).padding(.top, 10)
-            Spacer(minLength: 12)
-
             Divider()
             HStack(spacing: 18) {
-                Text("\(model.stats.prompts) \(model.stats.prompts == 1 ? "prompt" : "prompts")")
-                Text("first-try \(model.stats.firstTryText)")
-                Text("median \(model.stats.medianText)")
+                if model.kind.hasPasses {
+                    Text("\(model.completePasses) \(model.completePasses == 1 ? "pass" : "passes")")
+                    Text("\(model.cleanPasses) clean")
+                } else {
+                    Text("\(model.stats.prompts) \(model.stats.prompts == 1 ? "prompt" : "prompts")")
+                    Text("first-try \(model.stats.firstTryText)")
+                    Text("median \(model.stats.medianText)")
+                }
                 if model.stats.skips > 0 { Text("\(model.stats.skips) skipped") }
                 Spacer()
                 AttemptLogNotice()
@@ -85,6 +91,36 @@ struct DrillView: View {
                 AudioInputLine()
             }
             .sessionStatusBar()
+        }
+        .metronomePanel(isOpen: $model.isPanelOpen, isAvailable: model.kind.hasPasses, settings: $model.passSettings)
+    }
+
+    @ViewBuilder private var notes: some View {
+        DrillNeck(display: model.snapshot.display, fretboard: model.fretboard)
+            .padding(.horizontal, 24)
+            .padding(.top, 20)
+        Spacer(minLength: 12)
+        if let display = model.snapshot.display {
+            DrillTarget(display: display, countdown: model.countdown, typed: model.nameEntry.text)
+        } else {
+            DrillRestingCard(model: model)
+        }
+        DrillAttemptStrip(model: model).padding(.top, 10)
+        Spacer(minLength: 12)
+    }
+
+    private var scales: some View {
+        PassPrompt(display: model.snapshot.display, position: model.position, restingMarkers: model.restingMarkers,
+                   settings: model.passSettings, fretboard: model.fretboard) {
+            DrillRestingText(model: model)
+        }
+    }
+
+    private var triads: some View {
+        TriadPrompt(display: model.snapshot.display, hasClimbs: model.kind.hasClimbs, frets: model.options.frets, fretboard: model.fretboard) {
+            LiveCountdownRing { model.countdown }
+        } resting: {
+            DrillRestingText(model: model)
         }
     }
 }
@@ -107,27 +143,33 @@ struct AttemptLogNotice: View {
 
 // MARK: - Toolbar
 
-/// The drill, then Notes, Frets, Strings and (where the drill offers it) Order. Locked (disabled) while a run goes.
+/// The drill, then the options that apply to its module. Locked (disabled) while a run goes.
 private struct DrillOptionsBar: View {
     @Bindable var model: DrillViewModel
 
     var body: some View {
-        Picker("Drill", selection: $model.kind) {
-            ForEach(DrillKind.all) { Text($0.title).tag($0) }
+        DrillPicker(kind: $model.kind)
+        switch model.kind.module {
+        case .notes: NoteOptions(model: model)
+        // Gone during a run, when the header names them: its buttons need the room.
+        case .scales: if !model.isRunning { ScaleOptions(setup: model.setup, options: $model.options) }
+        case .triads: if !model.isRunning { TriadOptions(kind: model.kind, options: $model.options) }
         }
-        .help("Drill")
+    }
+}
+
+/// Notes, Frets, Strings and (where the drill offers it) Order.
+private struct NoteOptions: View {
+    @Bindable var model: DrillViewModel
+
+    var body: some View {
         Picker("Notes", selection: $model.options.notes) {
             Text("Naturals").tag(DrillOptions.Notes.naturals)
             Text("All notes").tag(DrillOptions.Notes.all)
         }
         .help("Notes (an In order check walks every note)")
         .disabled(model.isSetToCheck)
-        Picker("Frets", selection: $model.options.frets) {
-            ForEach(DrillOptions.fretRanges, id: \.self) { range in
-                Text("\(range.lowerBound)–\(range.upperBound)").tag(range)
-            }
-        }
-        .help("Frets")
+        FretsPicker(frets: $model.options.frets)
         Menu(stringsTitle) {
             ForEach(model.tuning.strings, id: \.self) { string in
                 Toggle(isOn: included(string)) {
@@ -161,6 +203,36 @@ private struct DrillOptionsBar: View {
                 if isOn { strings.insert(string) } else if strings.count > 1 { strings.remove(string) }
                 model.options.strings = strings == all ? nil : strings
             })
+    }
+}
+
+struct FretsPicker: View {
+    @Binding var frets: ClosedRange<Int>
+
+    var body: some View {
+        Picker("Frets", selection: $frets) {
+            ForEach(DrillOptions.fretRanges, id: \.self) { range in
+                Text("\(range.lowerBound)–\(range.upperBound)").tag(range)
+            }
+        }
+        .help("Frets")
+    }
+}
+
+/// Drills by module.
+struct DrillPicker: View {
+    @Binding var kind: DrillKind
+    var kinds = DrillKind.all
+
+    var body: some View {
+        Picker("Drill", selection: $kind) {
+            ForEach(DrillModule.groups(of: kinds, by: \.module), id: \.module) { group in
+                Section(group.module.title) {
+                    ForEach(group.members) { Text($0.title).tag($0) }
+                }
+            }
+        }
+        .help("Drill")
     }
 }
 
@@ -205,20 +277,25 @@ private struct DrillRestingCard: View {
         // The same layout as DrillTarget, so nothing jumps.
         VStack(spacing: 10) {
             HStack(spacing: 24) {
-                DrillTargetCard { content }
+                DrillTargetCard { DrillRestingText(model: model) }
                 DrillCountdownRing(countdown: nil).frame(width: 64, height: 64)
             }
             Text(" ").font(.title2.weight(.medium))
         }
     }
+}
 
-    @ViewBuilder private var content: some View {
+/// The drill and how to start (or why it can't), or Paused.
+private struct DrillRestingText: View {
+    let model: DrillViewModel
+
+    var body: some View {
         if model.isPaused {
             Label("Paused", systemImage: "pause.circle").font(.title.weight(.semibold))
             if let reason = model.inputProblem?.text ?? model.soundProblem ?? model.pauseNotice {
                 Text(reason).font(.title3).foregroundStyle(.orange)
             } else {
-                Text(model.resumesSamePrompt ? "Resume (P) to carry on" : "Resume (P) for a new prompt").font(.title3).foregroundStyle(.secondary)
+                Text(resumeText).font(.title3).foregroundStyle(.secondary)
             }
         } else {
             Text(model.kind.title).font(.title.weight(.semibold))
@@ -226,8 +303,21 @@ private struct DrillRestingCard: View {
                 Text(reason).font(.title3).foregroundStyle(.orange)
             } else {
                 Text("Press Start (↩)").font(.title3).foregroundStyle(.secondary)
+                if model.kind.fades {
+                    Text(model.kind.instructions + hintText).foregroundStyle(.secondary)
+                }
             }
         }
+    }
+
+    private var hintText: String {
+        let (shown, unclean) = model.kind.hasPasses ? ("position", "pass") : ("notes", "voicing")
+        return " Hold H to see the \(shown): the \(unclean) then isn’t clean."
+    }
+
+    private var resumeText: String {
+        if model.kind.hasPasses { return model.resumesSamePrompt ? "Resume (P) to restart the pass" : "Resume (P) for the next pass" }
+        return model.resumesSamePrompt ? "Resume (P) to carry on" : "Resume (P) for a new prompt"
     }
 }
 
@@ -275,16 +365,21 @@ private struct DrillRunSummary: View {
         VStack(alignment: .leading, spacing: 10) {
             Text(model.isCheckRun ? "Check run" : "Run summary").font(.headline)
             HStack(spacing: 28) {
-                stat("Prompts", "\(stats.prompts)")
-                stat("First-try right", stats.firstTryText)
-                stat("Median time", stats.medianText)
+                if model.kind.hasPasses {
+                    stat("Passes", "\(model.completePasses)")
+                    stat("Clean", "\(model.cleanPasses)")
+                } else {
+                    stat("Prompts", "\(stats.prompts)")
+                    stat("First-try right", stats.firstTryText)
+                    stat("Median time", stats.medianText)
+                }
                 stat("Timed out", "\(stats.timeouts)")
                 stat("Skipped", "\(stats.skips)")
             }
             if model.isCheckRun {
                 list("Misses", stats.misses, emptyText: "None: every location was right first time.")
                 list("Slowest onsets", stats.slowest(5).filter { $0.outcome == .answered })
-            } else {
+            } else if !model.kind.hasPasses {
                 list("Slowest", stats.slowest(3))
                 if !model.sweeps.isEmpty { lines("Sweeps", model.sweeps.suffix(6).map(\.summaryLine)) }
             }
@@ -322,21 +417,17 @@ private struct DrillRunSummary: View {
 
     /// Check runs name the fret that was checked.
     private func line(_ attempt: Attempt) -> String {
-        let line = attempt.summaryLine(in: model.tuning)
+        let line = attempt.summaryLine(in: model.tuning, key: model.key)
         guard model.isCheckRun, let target = attempt.prompt.target else { return line }
         return "Fret \(target.fret): \(line)"
     }
-}
-
-private extension String {
-    /// "String 3 (G)" from "string 3 (G)".
-    var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
 }
 
 #Preview {
     DrillView(model: DrillViewModel())
         .environment(AudioInputService())
         .environment(AppSoundOutput(isInert: true))
+        .environment(Metronome(output: AppSoundOutput(isInert: true)))
         .environment(AttemptLog.inMemory())
         .frame(width: 1100, height: 600)
 }

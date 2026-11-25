@@ -6,16 +6,23 @@ import Foundation
 extension Fretboard {
     /// The placements of a position given in relative frets: the lowest that fits, then the
     /// octave-up copy if it fits. Empty when it fits nowhere (a high capo).
-    func placements(of relativeLocations: [FretboardLocation]) -> [[FretboardLocation]] {
-        guard let low = relativeLocations.map(\.fret).min(), let high = relativeLocations.map(\.fret).max()
-        else { return [] }
+    ///
+    /// A position can also have notes with a choice of locations, the best first: each placement takes the first that
+    /// fits there, and fits only if they all have one.
+    func placements(of relativeLocations: [FretboardLocation],
+                    choices: [[FretboardLocation]] = []) -> [[FretboardLocation]] {
+        guard let low = relativeLocations.map(\.fret).min() else { return [] }
         // The smallest octave shift that lifts the lowest fret to the capo or above.
         let lowest = Int((Double(playableFrets.lowerBound - low) / 12).rounded(.up))
-        return [lowest, lowest + 1]
-            .filter { high + 12 * $0 <= playableFrets.upperBound }
-            .map { shift in
-                relativeLocations.map { FretboardLocation(string: $0.string, fret: $0.fret + 12 * shift) }
+        return [lowest, lowest + 1].compactMap { shift in
+            func placed(_ location: FretboardLocation) -> FretboardLocation? {
+                let fret = location.fret + 12 * shift
+                return playableFrets.contains(fret) ? FretboardLocation(string: location.string, fret: fret) : nil
             }
+            let fixed = relativeLocations.compactMap(placed)
+            let chosen = choices.compactMap { $0.lazy.compactMap(placed).first }
+            return fixed.count == relativeLocations.count && chosen.count == choices.count ? fixed + chosen : nil
+        }
     }
 
     /// `notesPerString` scale notes per string from string 6 up, starting on `notes[start]`,
@@ -49,6 +56,23 @@ extension Fretboard {
         let up = (base - anchor % 12 + 24) % 12
         return up < 6 ? anchor + up : anchor + up - 12
     }
+}
+
+extension Fretboard {
+    /// Where to play a scale near a position of another: the same shape or pattern, in its nearest placement, or where
+    /// the scale has none of that system, the nearest CAGED shape. Nearest by lowest fret, ties to the lower. Nil if
+    /// there is none on the neck.
+    public func position(of scale: Scale, nearest position: Position) -> Position? {
+        let candidates = position.system == .threeNotesPerString && !scale.kind.isSevenNote
+            ? cagedPositions(of: scale)
+            : positions(of: scale, system: position.system).filter { $0.number == position.number }
+        // They come up the neck, and the first of equals is kept.
+        return candidates.min { $0.distance(from: position) < $1.distance(from: position) }
+    }
+}
+
+extension Position {
+    fileprivate func distance(from other: Position) -> Int { abs(frets.lowerBound - other.frets.lowerBound) }
 }
 
 extension Array where Element == Position {

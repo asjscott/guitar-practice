@@ -21,6 +21,8 @@ public struct Listener: Sendable {
     private var tunerReading: TunerReading?
     private var onsets = OnsetDetector(sampleRate: 48_000, gate: Listener.noiseGate)
     private var notes = NoteTracker(windowDuration: 0)
+    private var lowSound = LowSound(sampleRate: 48_000)
+    private var highs = Highs(sampleRate: 48_000)
     private var playedNotes: [PlayedNote] = []
 
     /// A listener with nothing heard yet.
@@ -38,7 +40,9 @@ public struct Listener: Sendable {
         playedNotes.removeAll()
         for (index, sample) in samples.enumerated() {
             let sampleTime = time + Double(index) / sampleRate
-            if onsets.add(sample, time: sampleTime) { notes.onsetDetected(at: sampleTime) }
+            if let candidate = onsets.add(sample, time: sampleTime) { notes.candidate(candidate) }
+            lowSound.add(sample, time: sampleTime)
+            highs.add(sample, time: sampleTime)
             window.append(sample)
             samplesSinceAnalysis += 1
             if window.count >= windowSize, samplesSinceAnalysis >= hopSize {
@@ -64,12 +68,16 @@ public struct Listener: Sendable {
         tunerReading = nil
         onsets = OnsetDetector(sampleRate: sampleRate, gate: Self.noiseGate)
         notes = NoteTracker(windowDuration: Double(windowSize) / sampleRate)
+        lowSound = LowSound(sampleRate: sampleRate)
+        highs = Highs(sampleRate: sampleRate)
     }
 
     /// Analyses one window, from `start` to `end` in stream seconds.
     private mutating func analyse(_ samples: [Float], start: Double, end: Double) {
-        guard Self.level(of: samples) >= Self.noiseGate else {
-            notes.silence()
+        let level = Self.level(of: samples)
+        notes.level(Self.taperedLevel(of: samples), start: start, end: end)
+        guard level >= Self.noiseGate else {
+            notes.silence(start: start, end: end)
             smoother = PitchSmoother()
             tunerReading = nil
             return
@@ -80,10 +88,21 @@ public struct Listener: Sendable {
             tunerReading = nil
             return
         }
-        if let note = notes.estimate(frequency: estimate.frequency, start: start, end: end) {
+        if let note = notes.estimate(frequency: estimate.frequency, start: start, end: end, sound: lowSound, highs: highs) {
             playedNotes.append(note)
         }
         tunerReading = TunerReading(frequency: smoother.add(estimate.frequency))
+    }
+
+    /// RMS level in dBFS of the window tapered (Hann), so that it hardly depends on where in its period a low note is.
+    private static func taperedLevel(of samples: [Float]) -> Double {
+        var sum = 0.0, weights = 0.0
+        for (index, sample) in samples.enumerated() {
+            let weight = 0.5 - 0.5 * cos(2 * .pi * (Double(index) + 0.5) / Double(samples.count))
+            sum += weight * Double(sample) * Double(sample)
+            weights += weight
+        }
+        return 10 * log10(max(sum / weights, 1e-12))
     }
 
     /// RMS level in dBFS.

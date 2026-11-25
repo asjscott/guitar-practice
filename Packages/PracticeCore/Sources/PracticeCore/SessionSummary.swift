@@ -8,8 +8,20 @@ public struct SessionSummary: Hashable, Sendable {
         public let time: Duration
         public let stats: RunStats
 
-        /// The median response time, "1.24 s"; nil where nothing was answered.
-        public var speedText: String? { stats.medianResponseTime == nil ? nil : stats.medianText }
+        /// In scale blocks only.
+        public var passes: PassStats? {
+            kind.hasPasses ? PassStats(PassResult.passes(in: stats.attempts)) : nil
+        }
+
+        /// In triad blocks only.
+        public var medianVoicingTime: Duration? { kind.module == .triads ? stats.medianVoicingTime : nil }
+
+        /// The median response time, "1.24 s", or in triad blocks the median time per voicing, "3.10 s a voicing"; nil
+        /// where there is none.
+        public var speedText: String? {
+            if kind.module == .triads { return medianVoicingTime.map { "\(secondsText($0, decimals: 2)) s a voicing" } }
+            return stats.medianResponseTime == nil ? nil : stats.medianText
+        }
     }
 
     /// Ready cards included.
@@ -21,9 +33,9 @@ public struct SessionSummary: Hashable, Sendable {
     /// Such a session isn't saved.
     public var hasNoAttempts: Bool { blocks.allSatisfy(\.stats.attempts.isEmpty) }
 
-    /// The slowest prompts of every block: timeouts, then the longest response times.
+    /// The slowest prompts of every block but the scale blocks: timeouts, then the longest response times.
     public func slowest(_ count: Int) -> [Attempt] {
-        RunStats(attempts: blocks.flatMap(\.stats.attempts)).slowest(count)
+        RunStats(attempts: blocks.filter { $0.passes == nil }.flatMap(\.stats.attempts)).slowest(count)
     }
 }
 

@@ -9,10 +9,11 @@ public struct RunStats: Hashable, Sendable {
     /// The attempts that count: answered or timed out.
     private var done: [Attempt] { attempts.filter { !$0.skipped } }
 
-    /// Prompts done (answered or timed out). A sweep is one, as soon as it has an attempt; everything else here is per
-    /// attempt.
+    /// Prompts done (answered or timed out). A sweep is one, as soon as it has an attempt, and a triad or a climb as
+    /// soon as one of its notes is done; everything else here is per attempt.
     public var prompts: Int {
-        Set(attempts.compactMap(\.prompt.sweep)).count + done.filter { $0.prompt.sweep == nil }.count
+        let counted = attempts.filter { !$0.skipped || $0.prompt.sweep != nil }
+        return Set(counted.compactMap(\.group?.number)).count + counted.filter { $0.group == nil }.count
     }
 
     /// Attempts skipped. They count in nothing else.
@@ -28,10 +29,28 @@ public struct RunStats: Hashable, Sendable {
 
     /// The median response time of the answered attempts (timeouts and skips left out); nil if none.
     public var medianResponseTime: Duration? {
-        let times = attempts.compactMap(\.responseTime).sorted()
-        guard !times.isEmpty else { return nil }
-        let middle = times.count / 2
-        return times.count.isMultiple(of: 2) ? (times[middle - 1] + times[middle]) / 2 : times[middle]
+        median(of: attempts.compactMap(\.responseTime))
+    }
+
+    /// The median time from a voicing's prompt to its last note's onset, of the voicings played whole; nil if none.
+    public var medianVoicingTime: Duration? {
+        var times: [Duration] = []
+        var current: (group: Int, place: Int, time: Duration)?
+        for attempt in attempts {
+            guard case .triad(let facts) = attempt.facts, let group = attempt.group, let place = group.place,
+                  let time = attempt.responseTime else {
+                current = nil
+                continue
+            }
+            // A climb has several voicings. One that Resume started again repeats its places, and is timed from there.
+            if place.isMultiple(of: facts.noteCount) {
+                current = (group.number, place, time)
+            } else if let before = current, before.group == group.number, before.place + 1 == place {
+                current = (group.number, place, before.time + time)
+                if (place + 1).isMultiple(of: facts.noteCount) { times.append(before.time + time) }
+            }
+        }
+        return median(of: times)
     }
 
     /// Attempts that timed out.
@@ -45,4 +64,12 @@ public struct RunStats: Hashable, Sendable {
             .sorted { ($0.responseTime ?? .zero) > ($1.responseTime ?? .zero) }
         return Array((timedOut + answered).prefix(count))
     }
+}
+
+/// Nil if there are none.
+func median(of times: [Duration]) -> Duration? {
+    let times = times.sorted()
+    guard !times.isEmpty else { return nil }
+    let middle = times.count / 2
+    return times.count.isMultiple(of: 2) ? (times[middle - 1] + times[middle]) / 2 : times[middle]
 }

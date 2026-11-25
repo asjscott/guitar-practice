@@ -2,8 +2,8 @@ import TheoryCore
 
 extension DrillKind {
     public static let hearFindIt = DrillKind(
-        id: "hearFindIt", title: "Hear → find it", instructions: "Hear the open string, then a pitch. Find that pitch.",
-        symbol: "ear", needsSound: true, hidesNote: true, repeatTitle: "Replay", rules: HearFindItRules.self)
+        id: "hearFindIt", module: .notes, title: "Hear → find it", instructions: "Hear the open string, then a pitch. Find that pitch.",
+        symbol: "ear", traits: [.needsSound, .hidesNote], repeatTitle: "Replay", rules: HearFindItRules.self)
 }
 
 /// Hear → find it: the open string sounds, then a target 1–12 frets above it. Only that exact pitch is right, and its

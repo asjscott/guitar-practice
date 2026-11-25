@@ -31,6 +31,30 @@ public struct DrillOptions: Hashable, Sendable {
 
     public var order: Order = .random
 
+    /// What drills built on a key use when the setup has none.
+    public var key: Key = .major(.c)
+
+    /// Triads only.
+    public var stringSets = Set(StringSet.allCases)
+
+    /// Triads only.
+    public var inversions = Set(Triad.Inversion.allCases)
+
+    /// Triads only: what they are played at; nil follows the stage reached (`DrillSetup.fadeStages`).
+    public var triadFade: FadeStage?
+
+    /// Scales only. The key moves to its mode.
+    public var scaleKind: Scale.Kind = .major
+
+    /// Scales only: which positions there are to choose from.
+    public var positionSystem: Position.System = .caged
+
+    /// Scales only. One that isn't there falls back (`DrillSetup.position`).
+    public var position = Position.ID(system: .caged, number: CAGEDShape.e.number)
+
+    /// Scales only: what passes are played at, at first.
+    public var pass = PassSettings()
+
     public init() {}
 }
 
@@ -58,6 +82,12 @@ public struct DrillSetup: Hashable, Sendable {
     /// Notes to ask for more often; nil = all alike.
     public var weighting: NoteWeighting?
 
+    /// The session's: scale drills take turns through the scales of its mode, in its position. Nil in free practice.
+    public var theme: Theme?
+
+    /// Scales and triads only: the fade stages reached before the run.
+    public var fadeStages = FadeStages()
+
     public var seed: UInt64
 
     public init(fretboard: Fretboard, options: DrillOptions = .init(), key: Key? = nil,
@@ -67,6 +97,16 @@ public struct DrillSetup: Hashable, Sendable {
         self.key = key
         self.weighting = weighting
         self.seed = seed
+    }
+
+    /// What drills built on a key use: the setup's, or the options' where it has none.
+    var chosenKey: Key { key ?? options.key }
+
+    /// With that key for its own.
+    func spelledInChosenKey() -> DrillSetup {
+        var setup = self
+        setup.key = chosenKey
+        return setup
     }
 
     /// Every location in range: included strings, fret range, at or above the capo.

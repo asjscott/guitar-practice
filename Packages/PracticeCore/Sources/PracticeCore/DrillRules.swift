@@ -20,6 +20,15 @@ public protocol DrillRules: Sendable {
 
     func judge(_ answer: DrillAnswer, for prompt: NotePrompt) -> DrillJudgement
 
+    /// The current prompt was answered, timed out or skipped. Default: nothing.
+    mutating func dealtWith(_ attempt: Attempt)
+
+    /// The group the current prompt's attempt is in. Default: its sweep, if any.
+    func group(for prompt: NotePrompt) -> AttemptGroup?
+
+    /// What else to log about the current prompt. Default: nothing.
+    func facts(for prompt: NotePrompt) -> AttemptFacts?
+
     /// Every location that answers a prompt: revealed after a timeout.
     func correctLocations(for prompt: NotePrompt) -> [FretboardLocation]
 
@@ -40,6 +49,19 @@ public protocol DrillRules: Sendable {
 
     /// What resuming does when a prompt was waiting. Default: a new prompt.
     var resumeRule: DrillResumeRule { get }
+
+    /// Whether the current prompt goes on with what an earlier one began, such as a voicing, so that a chime would
+    /// break it up. Default: false.
+    var isPartWay: Bool { get }
+
+    /// Whether the current prompt can time out. Default: true.
+    var isTimed: Bool { get }
+
+    /// H held or let go; pausing and stopping let go. Default: nothing.
+    mutating func hint(isShown: Bool)
+
+    /// The fade stages reached, read again from the log, are set; nil in drills that don't fade. Default: nil.
+    var fadeStages: FadeStages? { get set }
 
     /// What to show. Default: the note name over its string, wrong notes as "You played G".
     func display(of moment: DrillMoment) -> DrillDisplay
@@ -103,16 +125,26 @@ public enum DrillResumeRule: Hashable, Sendable {
     case newPrompt
     /// The same prompt with its timer restarted.
     case samePrompt(keepingWrongAnswers: Bool)
+    /// The rules' next prompt, which goes back to the start of what the old one was part of. To the player it is the
+    /// same prompt.
+    case samePart
 }
 
 extension DrillRules {
     public static var timeout: Duration { .seconds(10) }
     public mutating func begin() {}
+    public mutating func dealtWith(_ attempt: Attempt) {}
+    public func group(for prompt: NotePrompt) -> AttemptGroup? { nil }
+    public func facts(for prompt: NotePrompt) -> AttemptFacts? { nil }
     public var nothingToPromptReason: String? { setup.nothingToPromptReason }
     public func sounds(for prompt: NotePrompt) -> [DrillTone] { [] }
     public func timerDelay(for prompt: NotePrompt) -> Duration { .zero }
     public mutating func repeated() -> DrillRepeat { .ignored }
     public func transition(after attempt: Attempt) -> DrillTransition { .standard(after: attempt) }
     public var resumeRule: DrillResumeRule { .newPrompt }
+    public var isPartWay: Bool { false }
+    public var isTimed: Bool { true }
+    public mutating func hint(isShown: Bool) {}
+    public var fadeStages: FadeStages? { get { nil } set {} }
     public func display(of moment: DrillMoment) -> DrillDisplay { DrillDisplay(standard: moment, in: setup) }
 }

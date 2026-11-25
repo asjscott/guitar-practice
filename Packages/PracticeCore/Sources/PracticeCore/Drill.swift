@@ -35,6 +35,14 @@ public enum DrillEvent: Hashable, Sendable {
     /// Answers can't be heard until then: the prompt that is up, and any that follows, isn't timed before it.
     /// For drills that can be held (`canHold`); pausing drops it.
     case hold(until: Duration)
+    /// The clicks just asked for, as they will be heard.
+    case clicksStarted(ClickTrack)
+    /// H held or let go: the position or voicing is shown meanwhile, and the pass or voicing is hinted. Pausing lets go.
+    case hint(isShown: Bool, at: Duration)
+    /// What passes are played at, from the next one on.
+    case passSettings(PassSettings, at: Duration)
+    /// The fade stages reached by now, read again from the log, which has this run's too: from the next pass or voicing on.
+    case fadeStages(FadeStages)
     /// The clock moved on; timeouts and the next prompt happen on ticks.
     case tick(at: Duration)
 }
@@ -59,6 +67,15 @@ public struct DrillSoundRequest: Hashable, Sendable {
         self.tones = tones
         self.at = at
     }
+}
+
+/// What a drill wants of the metronome.
+public enum ClickRequest: Hashable, Sendable {
+    /// These clicks from their start on, in place of any others. Answered at once with `DrillEvent.clicksStarted`;
+    /// without an answer they are taken to be heard as asked.
+    case start(ClickTrack)
+    /// None at or after a time.
+    case stop(at: Duration)
 }
 
 /// The one interface to every drill: a pure state machine driven by events and a clock.
@@ -91,6 +108,10 @@ public protocol Drill: Sendable {
     /// Whether `hold` does anything: the prompt that is up is kept, as it is when resuming.
     var canHold: Bool { get }
 
+    /// Whether the prompt that is up goes on with what an earlier one began, such as a voicing: a chime waits for its
+    /// end.
+    var isPartWay: Bool { get }
+
     /// What to show for the current prompt; nil when idle or paused.
     var display: DrillDisplay? { get }
 
@@ -102,9 +123,32 @@ public protocol Drill: Sendable {
     /// The sounds asked for since the last call: call it after every event. A new prompt, pausing and stopping
     /// drop any not yet taken; the caller also stops what is playing then.
     mutating func takeSounds() -> [DrillSoundRequest]
+
+    /// The clicks asked for since the last call, to be done in order: call it after every event.
+    mutating func takeClicks() -> [ClickRequest]
+
+    /// Between passes, when the last one's last bar ends: a chime waits for that. Nil during a pass, while paused, and in
+    /// drills without passes.
+    var passEnd: Duration? { get }
+
+    /// What the next pass will be played at, as the tempo ladder moves it; nil in drills without passes.
+    var passSettings: PassSettings? { get }
+
+    /// The fade stages reached, this run's included; nil in drills that don't fade.
+    var fadeStages: FadeStages? { get }
 }
 
 extension Drill {
+    public mutating func takeClicks() -> [ClickRequest] { [] }
+
+    public var isPartWay: Bool { false }
+
+    public var passEnd: Duration? { nil }
+
+    public var passSettings: PassSettings? { nil }
+
+    public var fadeStages: FadeStages? { nil }
+
     /// True from Start until Stop (or the end of an "In order (check)" run), paused included.
     public var isRunning: Bool { phase != .idle }
 

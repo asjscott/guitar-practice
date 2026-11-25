@@ -55,4 +55,37 @@ struct LoggingTests {
         #expect(check.attempts.count == 1)
         #expect(check.attemptsToLog.isEmpty)
     }
+
+    @Test func aSweepsAttemptsAreAGroup() {
+        var run = DrillKind.allInstances.makeDrill(DrillSetup(fretboard: Fretboard(tuning: .standard), seed: 1))
+        run.handle(.start(at: s(0)))
+        run.handle(.skip(at: s(1)))
+        run.handle(.skip(at: s(2)))
+        run.handle(.repeat(at: s(3)))   // a new sweep
+        run.handle(.skip(at: s(4)))
+        #expect(run.attemptsToLog.map(\.group) == [0, 0, 1].map { AttemptGroup(number: $0) })
+        #expect(run.attemptsToLog.allSatisfy { $0.facts == nil })
+    }
+
+    @Test func otherDrillsAttemptsAreInNoGroup() {
+        var run = drill()
+        run.handle(.start(at: s(0)))
+        run.handle(.skip(at: s(1)))
+        #expect(run.attemptsToLog.map(\.group) == [nil])
+        #expect(run.attemptsToLog.map(\.facts) == [nil])
+    }
+
+    @Test func anAttemptCarriesItsGroupAndFacts() {
+        let prompt = NotePrompt(name: .bFlat, string: 1)
+        let group = AttemptGroup(number: 4, size: 3, place: 1)
+        let facts = AttemptFacts.triad(TriadFacts(triad: Triad(.minor, root: .g), inversion: .first, stringSet: .aDG))
+        let attempt = Attempt(prompt: prompt, outcome: .skipped, group: group, facts: facts)
+        #expect(attempt.group == group)
+        #expect(attempt.facts == facts)
+        #expect(attempt != Attempt(prompt: prompt, outcome: .skipped))
+    }
+
+    @Test func savedFadeStagesKeepTheirNames() {
+        #expect(FadeStage.allCases.map(\.rawValue) == ["shown", "faded", "hidden"])
+    }
 }

@@ -108,6 +108,7 @@ enum Screen: String, CaseIterable, Identifiable {
     ContentView()
         .environment(AudioInputService(isInert: true))
         .environment(AppSoundOutput(isInert: true))
+        .environment(Metronome(output: AppSoundOutput(isInert: true)))
         .environment(AttemptLog.inMemory())
         .frame(width: 1100, height: 420)
 }

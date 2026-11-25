@@ -6,9 +6,11 @@ Full spec and roadmap: Claude Docs `c1631de5-f295-4bd8-a9fe-f1c1948a980d`. Befor
 
 ## Current phase
 
-**Phase 3 · Scales and triads.** Scope: scale drills in position with metronome, memory-mode fade; triad drills by string set and inversion (arpeggiated); the theme applies across notes, scales and triads blocks. Spec: #33; screens: `docs/ui.md` (P4). Tickets: #34–#48.
+**Phase 4 · Backing and progressions.** Scope: MIDI backing via SoundFont (bass, keys, drums; tempo and style); progression library and Roman-numeral → key rendering; nearest voicing, stay in position and target top note drills; latency check; audio file import. Not yet specified: no spec issue or tickets.
 
-Phases 0 (spec #1), 1 (spec #11) and 2 (spec #21) are complete.
+Carried over from the Phase 3 gate (#48), to check on a guitar in Phase 4: a full Inversions climb on the theme's string set, with the triad fade.
+
+Phases 0 (spec #1), 1 (spec #11), 2 (spec #21) and 3 (spec #33) are complete.
 
 Phase order: 0 Foundations → 1 Hear the guitar → 2 Session MVP → 3 Scales and triads → 4 Backing and progressions → 5 Lick → solo → 6 Adaptive and polish. Don't start work from a later phase unless asked.
 
@@ -16,7 +18,7 @@ Phase order: 0 Foundations → 1 Hear the guitar → 2 Session MVP → 3 Scales 
 
 - Swift 6 (strict concurrency), SwiftUI, macOS 14+, Apple silicon
 - SwiftData for persistence (app target only)
-- An input-only Core Audio unit for audio input (ADR 0004), with our own pitch detector in ListenCore (ADR 0002); AudioKit for backing from Phase 4
+- An input-only Core Audio unit for audio input (ADR 0004), with our own pitch detector in ListenCore (ADR 0002; onsets, ADR 0005); the metronome is made in code and scheduled on the app's output, and its clicks bypass the app-sound filter (ADR 0005); AudioKit for backing from Phase 4
 - XcodeGen: `project.yml` is the source of truth for the Xcode project
 - Personal use, run from Xcode; public GitHub repo (MIT licence)
 
@@ -24,7 +26,7 @@ Phase order: 0 Foundations → 1 Hear the guitar → 2 Session MVP → 3 Scales 
 
 ```bash
 git config core.hooksPath .githooks   # once per clone: the pre-commit hook runs scripts/check
-scripts/check                         # repo rules + all package tests, ~10 s
+scripts/check                         # repo rules + all package tests, under a minute
 scripts/check --build                 # the same, then generates the project and builds the app
 scripts/snapshot                      # renders each screen to build/snapshots/*.png; --only <prefix>, --sheet
 scripts/log-check                     # logs practice, relaunches and compares, in a throwaway store
@@ -36,12 +38,12 @@ To see a UI change, run `scripts/snapshot --only <prefix> --sheet` and read the 
 
 ## Architecture rules
 
-- **ListenCore and PracticeCore are pure too** (`scripts/check` enforces each package's imports). ListenCore: samples in, tuner readings and played notes out, and the audio input decisions (which device, when to restart); the input unit and Core Audio device code live in the app. PracticeCore: drill engines driven by played notes (a `Pitch` and an onset time) and a clock. The app connects them.
+- **ListenCore and PracticeCore are pure too** (`scripts/check` enforces each package's imports). ListenCore: samples in, tuner readings and played notes out, the metronome click's samples, and the audio input decisions (which device, when to restart); the input unit and Core Audio device code live in the app. PracticeCore: drill engines driven by played notes (a `Pitch` and an onset time), clicks as heard and a clock. The app connects them.
 - **TheoryCore is pure.** Value types, no side effects. Every public function has tests. Exercises ask TheoryCore what is correct; they never do note or fret maths themselves.
 - **Layers:** Views → Session engine / Exercise modules / Progress engine → TheoryCore + Audio engine → SwiftData. Lower layers never import higher ones.
 - Before changing the fretboard, explorer or Settings, read `docs/ui.md`.
 - Use `@Observable` for view state; keep views thin.
-- SwiftData models live in `App/Models` only. Run `scripts/log-check` after changing them. The player's store is opened only by `AttemptLog.live()`; snapshots and previews use `.inMemory()`.
+- SwiftData models live in `App/Models` only. Run `scripts/log-check` after changing them. The schema is V2: never edit a released version; copy it and add a migration stage (V1 → V2 is the example). The player's store is opened only by `AttemptLog.live()`; snapshots and previews use `.inMemory()`.
 - No new dependencies without asking first.
 
 ## Music conventions (TheoryCore)
@@ -57,6 +59,7 @@ Use the terms in `GLOSSARY.md`. Phase 0 decisions are recorded there and in `doc
 - Frets 0–22. A fretboard location = `(string, fret)` — don't call it a "position" (that word means a scale position, see glossary).
 - Scales: major, natural minor, major/minor pentatonic, blues.
 - Positions: CAGED shapes (5, generated for any tuning; named C A G E D only in standard-interval tunings, else Position 1–5) and 3NPS patterns (7, seven-note scales only). Generation and placement rules: `docs/adr/0001-caged-shapes-generated-for-any-tuning.md`.
+- Passes: `Fretboard.passOrder`, by pitch, each pitch once.
 - Triads: major, minor (later diminished, augmented); root, 1st, 2nd inversion; string sets of three adjacent strings; a triad voicing spans at most 4 frets.
 - Everything must work in any tuning. Tests: exact expected answers in standard tuning; invariants (notes in scale, notes per string, span ≤ 4, within capo–22) in Drop D, DADGAD, Open G and with a capo.
 

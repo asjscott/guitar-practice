@@ -83,7 +83,7 @@ struct ThemePickerTests {
 @Suite("Theme when the instrument changes")
 struct ThemeRepickTests {
     @Test func aPositionThatStillExistsIsKept() {
-        let theme = Theme(key: .major(.f), position: caged(3))
+        let theme = Theme(key: .major(.f), position: caged(3), stringSet: .dGB)
         #expect(picker().keepingKey(of: theme, on: standard, system: .caged) == theme)
         let dadgad = Fretboard(tuning: TuningPreset.dadgad.tuning, capo: 2)
         #expect(picker().keepingKey(of: theme, on: dadgad, system: .caged) == theme)
@@ -158,7 +158,7 @@ struct ThemedDrillTests {
         return (Double(names.filter(keyNotes.contains).count) / 1000, Set(names))
     }
 
-    @Test(arguments: DrillKind.all)
+    @Test(arguments: DrillKind.all.filter { $0.module == .notes })
     func spelledInTheKeyWithSeventyPercentKeyNotes(kind: DrillKind) {
         let all = prompts(kind, notes: .all)
         #expect((0.65...0.75).contains(all.keyShare))

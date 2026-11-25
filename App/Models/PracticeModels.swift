@@ -4,22 +4,25 @@ import SwiftData
 import TheoryCore
 
 // The current version's models. `LoggedAttempt` is the saved record; PracticeCore's `Attempt` is the drill's.
-typealias PracticeSession = PracticeSchemaV1.Session
-typealias LoggedAttempt = PracticeSchemaV1.Attempt
-typealias DayTheme = PracticeSchemaV1.DayTheme
+typealias PracticeSession = PracticeSchemaV2.Session
+typealias LoggedAttempt = PracticeSchemaV2.Attempt
+typealias DayTheme = PracticeSchemaV2.DayTheme
 
 enum PracticeMigrationPlan: SchemaMigrationPlan {
-    static var schemas: [any VersionedSchema.Type] { [PracticeSchemaV1.self] }
-    static var stages: [MigrationStage] { [] }
+    static var schemas: [any VersionedSchema.Type] { [PracticeSchemaV1.self, PracticeSchemaV2.self] }
+    static var stages: [MigrationStage] {
+        [.lightweight(fromVersion: PracticeSchemaV1.self, toVersion: PracticeSchemaV2.self)]
+    }
 }
 
 extension Theme {
     /// As `Session` and `DayTheme` save it; nil if that is unusable.
-    fileprivate init?(tonic: Int?, mode: String?, system: String?, number: Int?, octave: Int?) {
+    fileprivate init?(tonic: Int?, mode: String?, system: String?, number: Int?, octave: Int?, stringSet: String?) {
         guard let tonic, let mode = mode.flatMap(Key.Mode.init), let system = system.flatMap(Position.System.init),
               let number, let octave else { return nil }
         self.init(key: .app(tonic: PitchClass(tonic), mode: mode),
-                  position: Position.ID(system: system, number: number, octave: octave))
+                  position: Position.ID(system: system, number: number, octave: octave),
+                  stringSet: stringSet.flatMap(StringSet.init))
     }
 }
 
@@ -28,11 +31,15 @@ extension DayTheme {
         self.init(day: day, rerolls: rerolls, tonic: theme.key.tonic.pitchClass.value, mode: theme.key.mode.rawValue,
                   positionSystem: theme.position.system.rawValue, positionNumber: theme.position.number,
                   positionOctave: theme.position.octave)
+        stringSet = theme.stringSet?.rawValue
     }
 
     /// Nil only if what is saved is unusable.
     var theme: Theme? {
-        get { Theme(tonic: tonic, mode: mode, system: positionSystem, number: positionNumber, octave: positionOctave) }
+        get {
+            Theme(tonic: tonic, mode: mode, system: positionSystem, number: positionNumber, octave: positionOctave,
+                  stringSet: stringSet)
+        }
         set {
             guard let newValue else { return }
             tonic = newValue.key.tonic.pitchClass.value
@@ -40,6 +47,7 @@ extension DayTheme {
             positionSystem = newValue.position.system.rawValue
             positionNumber = newValue.position.number
             positionOctave = newValue.position.octave
+            stringSet = newValue.stringSet?.rawValue
         }
     }
 }
@@ -54,7 +62,7 @@ extension PracticeSession {
     var theme: Theme? {
         get {
             Theme(tonic: themeTonic, mode: themeMode, system: themePositionSystem, number: themePositionNumber,
-                  octave: themePositionOctave)
+                  octave: themePositionOctave, stringSet: themeStringSet)
         }
         set {
             themeTonic = newValue?.key.tonic.pitchClass.value
@@ -62,13 +70,14 @@ extension PracticeSession {
             themePositionSystem = newValue?.position.system.rawValue
             themePositionNumber = newValue?.position.number
             themePositionOctave = newValue?.position.octave
+            themeStringSet = newValue?.stringSet?.rawValue
         }
     }
 }
 
 extension LoggedAttempt {
     /// The record of an attempt at a drill, ending now.
-    convenience init(_ attempt: Attempt, in drill: any Drill, date: Date, source: AttemptSource, sweepID: UUID?,
+    convenience init(_ attempt: Attempt, in drill: any Drill, date: Date, source: AttemptSource, groupID: UUID?,
                      blockIndex: Int?) {
         let fretboard = drill.fretboard
         let location = attempt.prompt.target ?? attempt.location
@@ -79,8 +88,41 @@ extension LoggedAttempt {
                   targetPitch: location.map { fretboard.pitch(at: $0).midi },
                   outcomeRaw: attempt.outcome.rawValue, firstRight: attempt.firstRight,
                   responseSeconds: attempt.responseTime.map { $0 / .seconds(1) },
-                  wrongAnswers: attempt.rawWrongAnswers.map(WrongAnswerRecord.init), sweepID: sweepID,
+                  wrongAnswers: attempt.rawWrongAnswers.map(WrongAnswerRecord.init), groupID: groupID,
                   blockIndex: blockIndex)
+        groupSize = attempt.group?.size
+        groupPlace = attempt.group?.place
+        switch attempt.facts {
+        case .pass(let facts): setFacts(facts)
+        case .triad(let facts): setFacts(facts)
+        case nil: break
+        }
+    }
+
+    private func setFacts(_ facts: PassFacts) {
+        scaleKind = facts.scale.kind.rawValue
+        scaleTonic = facts.scale.tonic.pitchClass.value
+        positionSystem = facts.position.system.rawValue
+        positionNumber = facts.position.number
+        positionOctave = facts.position.octave
+        startDegree = facts.startDegree.number
+        startDegreeAlteration = facts.startDegree.alteration
+        tempo = facts.tempo
+        beatsPerBar = facts.signature.beats
+        beatUnit = facts.signature.unit
+        fadeStageRaw = facts.fadeStage.rawValue
+        hinted = facts.hinted
+        clickOffsetSeconds = facts.clickOffset.map { $0 / .seconds(1) }
+    }
+
+    private func setFacts(_ facts: TriadFacts) {
+        chordRootName = facts.triad.root.description
+        chordRoot = facts.triad.root.pitchClass.value
+        chordQuality = facts.triad.quality.rawValue
+        inversion = facts.inversion.rawValue
+        stringSet = facts.stringSet.rawValue
+        fadeStageRaw = facts.fadeStage?.rawValue
+        hinted = facts.fadeStage.map { _ in facts.hinted }
     }
 
     var source: AttemptSource? { AttemptSource(rawValue: sourceRaw) }

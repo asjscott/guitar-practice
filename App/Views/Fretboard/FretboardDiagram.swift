@@ -26,13 +26,21 @@ struct FretboardDiagram: Equatable {
         var location: FretboardLocation
         var label: String
         var role: Role
+        /// Drawn faintly, without its label.
+        var isFaint = false
+        /// Ringed as the last note played.
+        var isLastPlayed = false
     }
 
     /// One name per string, string 6 first (index 0 = physical string 6, drawn at the bottom).
     var stringNames: [String]
 
-    /// The last fret drawn; the neck always runs from the nut to this fret.
+    /// The last fret of the neck, which runs from the nut to this fret.
     var lastFret: Int = Fretboard.frets.upperBound
+
+    /// The frets to zoom in on, with a thin bar showing which part of the neck they are. `nil`, or the whole neck,
+    /// draws the whole neck without one.
+    var fretWindow: ClosedRange<Int>? = nil
 
     /// The capo fret (0 = none). Drawn as a bar with the frets below it dimmed; fret numbers
     /// still count from the nut.
@@ -47,15 +55,20 @@ struct FretboardDiagram: Equatable {
     /// tint behind that location. `nil` draws no tint. Callers pass only playable locations.
     var heat: [FretboardLocation: Double]? = nil
 
-    /// A string to highlight with a band along its length (internal index, 0 = string 6), such as a
-    /// drill's target string. `nil` highlights none.
-    var highlightedString: Int? = nil
+    /// Strings to highlight with a band along their length (internal index, 0 = string 6), such as a drill's target
+    /// string or a string set.
+    var highlightedStrings: Set<Int> = []
 
     var stringCount: Int { stringNames.count }
 
-    /// Whether a location is on the drawn neck (one of its strings, nut to `lastFret`);
+    /// The frets drawn.
+    var frets: ClosedRange<Int> { (fretWindow ?? 0...lastFret).clamped(to: 0...lastFret) }
+
+    var isZoomed: Bool { frets != 0...lastFret }
+
+    /// Whether a location is on the drawn neck (one of its strings, in `frets`);
     /// markers and heat elsewhere are skipped.
     func draws(_ location: FretboardLocation) -> Bool {
-        (0..<stringCount).contains(location.string) && (0...lastFret).contains(location.fret)
+        (0..<stringCount).contains(location.string) && frets.contains(location.fret)
     }
 }

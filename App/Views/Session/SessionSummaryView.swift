@@ -2,7 +2,7 @@ import PracticeCore
 import SwiftUI
 import TheoryCore
 
-/// After a session: its total time, a card per block that started, and the slowest prompts.
+/// After a session: its total time, a card per block that started (narrowing to fit the window), and the slowest prompts.
 struct SessionSummaryView: View {
     let summary: SessionSummary
     let tuning: Tuning
@@ -13,7 +13,7 @@ struct SessionSummaryView: View {
     var body: some View {
         VStack(spacing: 24) {
             Text(clockText(summary.totalTime)).font(.system(size: 84, weight: .bold, design: .rounded)).monospacedDigit()
-            HStack(spacing: 16) {
+            HStack(spacing: summary.blocks.count > 5 ? 8 : 16) {
                 ForEach(Array(summary.blocks.enumerated()), id: \.offset) { _, block in card(block) }
             }
             if summary.hasNoAttempts {
@@ -40,16 +40,25 @@ struct SessionSummaryView: View {
         }
     }
 
+    private func promptsText(_ stats: RunStats) -> String {
+        "\(stats.prompts) \(stats.prompts == 1 ? "prompt" : "prompts") · \(stats.skips) skipped"
+    }
+
     private func card(_ block: SessionSummary.Block) -> some View {
         VStack(spacing: 4) {
             Image(systemName: block.kind.symbol).font(.title2).foregroundStyle(.secondary)
-            Text(block.stats.firstTryText).font(.system(size: 40, weight: .bold, design: .rounded))
-            Text(block.speedText ?? " ").font(.title3.monospacedDigit())
+            Text(block.passes?.cleanText ?? block.stats.firstTryText).font(.system(size: 40, weight: .bold, design: .rounded))
+            Text((block.passes == nil ? block.speedText : block.passes?.tempoText) ?? " ").font(.title3.monospacedDigit())
             Text(block.kind.title).font(.callout)
-            Text("\(block.stats.prompts) \(block.stats.prompts == 1 ? "prompt" : "prompts") · \(block.stats.skips) skipped")
-                .font(.caption).foregroundStyle(.secondary)
+            Text(block.passes?.detailText ?? promptsText(block.stats)).font(.caption).foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
         }
-        .frame(width: 170, height: 180)
+        .lineLimit(1)
+        .minimumScaleFactor(0.6)
+        .padding(.horizontal, 6)
+        .frame(minWidth: 84, maxWidth: 190)
+        .frame(height: 180)
         .sessionCard()
         .accessibilityElement(children: .combine)
     }

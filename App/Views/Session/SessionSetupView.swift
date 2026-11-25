@@ -8,7 +8,7 @@ enum SessionProblem: Equatable {
     case nothingToPrompt(String)
 }
 
-/// Before a session: the theme, minutes, difficulty, the blocks they give, and Start (↩).
+/// Before a session: the theme with its string set, and its position on a neck, minutes, difficulty, the blocks they give, and Start (↩).
 struct SessionSetupView: View {
     @Binding var minutes: Int
     @Binding var naturalsOnly: Bool
@@ -21,6 +21,8 @@ struct SessionSetupView: View {
     let problem: SessionProblem?
     /// Nil with sound.
     var noSoundNotice: String?
+    /// Nil with triads.
+    var noTriadsNotice: String?
     let start: () -> Void
 
     /// What is stored could be anything.
@@ -29,7 +31,10 @@ struct SessionSetupView: View {
     var body: some View {
         VStack(spacing: 0) {
             Spacer(minLength: 8)
-            choices
+            ViewThatFits(in: .vertical) {
+                choices(neck: theme?.neck)
+                choices(neck: nil)      // in a short window
+            }
             Spacer(minLength: 8)
             Divider()
             HStack(spacing: 14) {
@@ -42,16 +47,19 @@ struct SessionSetupView: View {
         }
     }
 
-    private var choices: some View {
-        VStack(spacing: 22) {
+    private func choices(neck: FretboardDiagram?) -> some View {
+        VStack(spacing: 12) {
             VStack(spacing: 4) {
-                Text(theme?.key.description ?? " ").font(.system(size: 64, weight: .bold, design: .rounded))
+                Text(theme?.key.description ?? " ").font(.system(size: 52, weight: .bold, design: .rounded))
                 HStack {
-                    Text(theme?.positionName ?? "").foregroundStyle(.secondary)
+                    Text(theme?.detailText ?? "").foregroundStyle(.secondary)
                     if let reroll { Button("Reroll", action: reroll) }
                 }
                 .font(.title3)
                 .frame(minHeight: 28)
+            }
+            if let neck {
+                FretboardView(diagram: neck, minHeight: 130).frame(maxHeight: 200).padding(.horizontal, 24)
             }
             HStack(spacing: 20) {
                 step("minus.circle", "Less time", by: -SessionSetup.minutesStep)
@@ -71,18 +79,10 @@ struct SessionSetupView: View {
             if let noSoundNotice {
                 Label(noSoundNotice, systemImage: "speaker.slash.fill").foregroundStyle(.orange)
             }
-            HStack(spacing: 12) {
-                ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
-                    VStack(spacing: 4) {
-                        Image(systemName: block.kind.symbol).font(.title2).foregroundStyle(.secondary)
-                        Text(block.kind.title).font(.callout)
-                        Text(clockText(block.length)).font(.callout.monospacedDigit()).foregroundStyle(.secondary)
-                    }
-                    .frame(width: 150, height: 84)
-                    .sessionCard()
-                    .accessibilityElement(children: .combine)
-                }
+            if let noTriadsNotice {
+                Label(noTriadsNotice, systemImage: "info.circle").foregroundStyle(.secondary)
             }
+            SessionBlocksByModule(blocks: blocks)
             HStack {
                 Picker("Notes", selection: $naturalsOnly) {
                     Text("Naturals").tag(true)
