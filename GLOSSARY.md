@@ -44,6 +44,10 @@ _Avoid_: String group, string trio
 **Inversion**:
 Which chord tone of a triad is lowest: root position (root lowest), 1st inversion (3rd lowest) or 2nd inversion (5th lowest).
 
+**Progression**:
+A sequence of chords written as Roman numerals, each lasting a number of bars, such as I–V–vi–IV. Played in a key, the numerals become chords (I–V–vi–IV in G is G D Em C).
+_Avoid_: Chord sequence, changes
+
 **Triad voicing**:
 One playable way to fret a triad: a chord, an inversion and a string set at a particular place on the neck, one note per string, spanning at most four frets.
 _Avoid_: Triad shape, grip
@@ -87,7 +91,7 @@ One task inside a drill, such as "F♯ on string 3 (G)". A prompt is answered by
 _Avoid_: Question, item, challenge
 
 **Attempt**:
-The record of one prompt's outcome (answered, timed out or skipped), its response time and any wrong answers given before the right one. A sweep is recorded as one attempt per fretboard location; a pass, a triad prompt and a climb as one per note.
+The record of one prompt's outcome (answered, timed out or skipped), its response time and any wrong answers given before the right one. A sweep is recorded as one attempt per fretboard location; a pass, a triad prompt and a climb as one per note; a time through as one per chord.
 _Avoid_: Answer, try, trial
 
 **Response time**:
@@ -106,13 +110,29 @@ _Avoid_: Run, sweep, lap
 The single prompt of the Inversions drill: one chord on one string set, through every voicing in range by fret, up and back, the highest once.
 _Avoid_: Ladder (that is the tempo ladder), run, sweep, pass
 
+**Time through**:
+One playing of a progression from its first chord to its last, over the backing. A progression drill repeats it until the block ends.
+_Avoid_: Loop, chorus, pass (that is a scale)
+
+**Voicing in the position**:
+A triad voicing whose three fretboard locations all belong to the theme's position, in any inversion and on any string set.
+_Avoid_: Voicing in the shape, voicing in the box
+
 **Clean**:
-Said of a pass whose every expected note was played with no wrong note, timeout, skip or hint. Timing does not affect it. A triad's voicing is clean in the same way.
+Said of a pass whose every expected note was played with no wrong note, timeout, skip or hint. Timing does not affect it. A triad's voicing is clean in the same way, and so is a chord in a time through: its voicing played on time, low to high, with no wrong note.
 _Avoid_: Perfect, correct (for a whole pass)
 
 **Count-in**:
 The whole bars of clicks, at least four clicks, that come before a pass and set its tempo. The first note may come up to half a beat early; anything before that is ignored.
 _Avoid_: Lead-in, pre-roll
+
+**Backing**:
+The accompaniment the app plays for a progression: bass, keys and drums in one style at one tempo. The app does not treat it as its own sound to ignore, so it must not reach the guitar's input.
+_Avoid_: Backing track (when generated), play-along, jam track
+
+**Input delay**:
+How long after a pluck the app hears it, measured by the latency check and taken off every onset before it is compared with clicks or backing.
+_Avoid_: Latency (on its own), lag, offset
 
 **Click**:
 One beat of the metronome, heard and shown. Tempo (BPM) counts clicks, whatever note the time signature makes a beat.
@@ -145,11 +165,11 @@ A timed part of a session, spent on one drill. It ends only when the player move
 _Avoid_: Section, stage, segment
 
 **Theme**:
-What a day's sessions are built around: a key, a position and a string set, later also a progression. Every session on one calendar day shares it.
+What a day's sessions are built around: a key, a position, a string set and a progression in the key's mode. Every session on one calendar day shares it.
 _Avoid_: Seed (the number it is picked with), topic
 
 **Module**:
-A group of drills that train one skill: Fretboard notes, Scales in position, Triads. A session shares its time out by module, in that order.
+A group of drills that train one skill: Fretboard notes, Scales in position, Triads, Progressions. A session shares its time out by module, in that order.
 _Avoid_: Category, area
 
 **Overtime**:
