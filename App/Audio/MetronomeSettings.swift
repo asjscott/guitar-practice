@@ -19,7 +19,10 @@ enum MetronomeSettings {
         /// The tempo ladder's count (`TempoLadder.notClean`), for each scale drill.
         static func notClean(of kind: DrillKind) -> String { "metronome.notClean.\(kind.id)" }
 
-        static let all = [signature, emphasis, volume, isSoundOn]
+        /// Whether backing's Listen has the click on top.
+        static let backingListenHasClick = "backing.listenHasClick"
+
+        static let all = [signature, emphasis, volume, isSoundOn, backingListenHasClick]
     }
 
     static let defaultSignature = TimeSignature.fourFour.name

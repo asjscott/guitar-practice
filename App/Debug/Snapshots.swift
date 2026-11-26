@@ -437,7 +437,7 @@ enum Snapshots {
     }
 
     private static func saveMetronome() async throws {
-        let size = CGSize(width: 520, height: 600)
+        let size = CGSize(width: 520, height: 800)
         func choose(_ signature: String, _ emphasis: String) {
             emptyDefaults.set(signature, forKey: MetronomeSettings.Key.signature)
             emptyDefaults.set(emphasis, forKey: MetronomeSettings.Key.emphasis)
@@ -463,6 +463,15 @@ enum Snapshots {
                            MetronomeSettingsView().environment(metronome).environment(output),
                            size: size, settle: .milliseconds(settle)) { metronome.listen() }
         }
+
+        // Backing: without its sounds, and listening with the click on beat 2 of the count-in.
+        try await save("settings-metronome-no-backing-sounds", MetronomeSettingsView(), size: size,
+                       sound: AppSoundOutput(isInert: true, hasBackingSounds: false))
+        let metronome = Metronome(output: output, defaults: emptyDefaults)
+        let backing = BackingPlayer(output: output, metronome: metronome)
+        try await save("settings-metronome-backing", MetronomeSettingsView().environment(metronome).environment(backing)
+            .environment(output), size: size, settle: .milliseconds(1100)) { backing.listen(withClick: true) }
+        backing.stop()
         try await save("beats-row", BeatsRow(meter: Meter(.fourFour, emphasis: [1, 3]), current: 4).padding(),
                        size: CGSize(width: 260, height: 80))
     }
@@ -854,8 +863,10 @@ enum Snapshots {
                              settle: Duration = .milliseconds(400), neededBy follower: String? = nil,
                              prepare: () -> Void = {}, check: () -> Void = {}) async throws {
         guard isWanted(name) || follower.map(isWanted) == true else { return }
+        let metronome = Metronome(output: sound, defaults: emptyDefaults)
         let host = NSHostingController(rootView: view.frame(width: size.width, height: size.height).environment(audioInput)
-            .environment(sound).environment(Metronome(output: sound, defaults: emptyDefaults)).environment(log).defaultAppStorage(emptyDefaults))
+            .environment(sound).environment(metronome).environment(BackingPlayer(output: sound, metronome: metronome))
+            .environment(log).defaultAppStorage(emptyDefaults))
         host.sceneBridgingOptions = [.title, .toolbars]
         let window = NSWindow(contentViewController: host)
         window.isReleasedWhenClosed = false

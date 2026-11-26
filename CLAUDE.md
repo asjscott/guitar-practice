@@ -30,6 +30,7 @@ scripts/check                         # repo rules + all package tests, under a 
 scripts/check --build                 # the same, then generates the project and builds the app
 scripts/snapshot                      # renders each screen to build/snapshots/*.png; --only <prefix>, --sheet
 scripts/log-check                     # logs practice, relaunches and compares, in a throwaway store
+scripts/fetch-sounds                  # fetches the backing's SoundFont (sounds.json) into the git-ignored Sounds/
 ```
 
 Run `scripts/check` after package changes and `scripts/check --build` after app changes. Fix failures before moving on.
