@@ -153,6 +153,7 @@ final class SessionViewModel: MetronomePanelOwner {
         let fretboard = Fretboard(tuning: tuning, capo: capo)
         var drillSetup = DrillSetup(fretboard: fretboard, options: setup.drillOptions(on: fretboard), seed: seed)
         if let theme { drillSetup.follow(theme.theme) }
+        drillSetup.inputDelay = AudioInputSettings.inputDelay(ofDevice: input?.device?.uid)
         return drillSetup
     }
 

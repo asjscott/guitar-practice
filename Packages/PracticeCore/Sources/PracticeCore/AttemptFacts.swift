@@ -41,11 +41,15 @@ public struct PassFacts: Hashable, Sendable {
     /// Whether a hint had been used in the pass by the time this note was dealt with.
     public var hinted: Bool
 
-    /// The onset less the time the nearest click was heard: positive = late. Nil unless answered.
+    /// The onset, input delay taken off, less the time the nearest click was heard: positive = late. Nil unless
+    /// answered.
     public var clickOffset: Duration?
 
+    /// What was taken off the onsets.
+    public var inputDelay: Duration
+
     public init(scale: Scale, position: Position.ID, startDegree: Scale.Degree, tempo: Int, signature: TimeSignature,
-                fadeStage: FadeStage, hinted: Bool, clickOffset: Duration?) {
+                fadeStage: FadeStage, hinted: Bool, clickOffset: Duration?, inputDelay: Duration = .zero) {
         self.scale = scale
         self.position = position
         self.startDegree = startDegree
@@ -54,6 +58,7 @@ public struct PassFacts: Hashable, Sendable {
         self.fadeStage = fadeStage
         self.hinted = hinted
         self.clickOffset = clickOffset
+        self.inputDelay = inputDelay
     }
 }
 

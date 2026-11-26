@@ -307,7 +307,26 @@ enum Snapshots {
         try await save("settings-instrument-locked", InstrumentSettingsView().environment(activeSessions),
                        size: CGSize(width: 520, height: 700))
         try await save("settings-audio", AudioSettingsView(), size: CGSize(width: 520, height: 480))
+        try await saveLatencyCheck()
         try await saveMetronome()
+    }
+
+    /// Settings › Audio's latency check: under way, measured, and heard too few.
+    private static func saveLatencyCheck() async throws {
+        guard let device = audioInput.choice?.device else { return }
+        let size = CGSize(width: 520, height: 480)
+        let check = LatencyCheckModel(defaults: emptyDefaults)
+        defer { emptyDefaults.removeObject(forKey: AudioInputSettings.Key.inputDelay(ofDevice: device.uid)) }
+        try await save("settings-audio-checking", AudioSettingsView(check: check), size: size) {
+            check.showForSnapshot(.running(LatencyCheck(start: .zero), device: device.uid), progress: .click(3))
+        }
+        check.showForSnapshot(.idle)
+        try await save("settings-audio-measured", AudioSettingsView(check: check), size: size) {
+            check.storeForSnapshot(.milliseconds(18), ofDevice: device.uid)
+        }
+        try await save("settings-audio-try-again", AudioSettingsView(check: check), size: size) {
+            check.showForSnapshot(.tooFew(heard: 4))
+        }
     }
 
     private static func savePasses() async throws {
