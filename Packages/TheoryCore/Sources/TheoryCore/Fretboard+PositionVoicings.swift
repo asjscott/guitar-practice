@@ -17,18 +17,28 @@ extension Fretboard {
         Set(progression.chords(in: key)).allSatisfy { !voicings(of: $0, in: position).isEmpty }
     }
 
+    /// A triad's voicings in the position with this top note (its highest pitch), ordered up the neck.
+    public func voicings(of triad: Triad, in position: Position, topNote: Pitch) -> [TriadVoicing] {
+        voicings(of: triad, in: position).filter { topPitch(of: $0) == topNote }
+    }
+
     /// How far the hand moves from one voicing to another: the semitones each voice moves, lowest to lowest, middle to
-    /// middle and top to top, added up.
+    /// middle and top to top (by pitch), added up.
     public func movement(from a: TriadVoicing, to b: TriadVoicing) -> Int {
-        zip(a.locations, b.locations).map { abs((pitch(at: $1) - pitch(at: $0)).semitones) }.reduce(0, +)
+        zip(pitches(of: a), pitches(of: b)).map { abs(($1 - $0).semitones) }.reduce(0, +)
+    }
+
+    /// Those of some voicings with the least movement from another voicing, in their order; all of them when tied.
+    /// Empty when there are none.
+    public func nearestVoicings(among candidates: [TriadVoicing], to voicing: TriadVoicing) -> [TriadVoicing] {
+        guard let least = candidates.map({ movement(from: voicing, to: $0) }).min() else { return [] }
+        return candidates.filter { movement(from: voicing, to: $0) == least }
     }
 
     /// A triad's voicings in the position with the least movement from another voicing, ordered up the neck; all of
     /// them when tied. Empty when the triad has none in the position.
     public func nearestVoicings(of triad: Triad, in position: Position, to voicing: TriadVoicing) -> [TriadVoicing] {
-        let candidates = voicings(of: triad, in: position)
-        guard let least = candidates.map({ movement(from: voicing, to: $0) }).min() else { return [] }
-        return candidates.filter { movement(from: voicing, to: $0) == least }
+        nearestVoicings(among: voicings(of: triad, in: position), to: voicing)
     }
 
     /// The triad's voicing in the position nearest its middle: the one whose locations, on average, are closest to
@@ -36,7 +46,8 @@ extension Fretboard {
     /// on the neck; nil when it has none.
     public func middleVoicing(of triad: Triad, in position: Position) -> TriadVoicing? {
         let strings = position.locations.map(\.string)
-        let centre = (string: Double(strings.min()! + strings.max()!) / 2,
+        guard let lowest = strings.min(), let highest = strings.max() else { return nil }
+        let centre = (string: Double(lowest + highest) / 2,
                       fret: Double(position.frets.lowerBound + position.frets.upperBound) / 2)
         func distance(_ voicing: TriadVoicing) -> Double {
             let count = Double(voicing.locations.count)
@@ -55,18 +66,19 @@ extension Fretboard {
         let chords = progression.chords(in: key)
         var tops: [[Pitch]] = []
         for chord in chords {
-            let available = voicings(of: chord, in: position).map { pitch(at: $0.locations[2]) }
+            let available = voicings(of: chord, in: position).map(topPitch)
             guard !available.isEmpty else { return nil }
             tops.append(available)
         }
-        guard let first = tops.first else { return [] }
-        var line = [first.filter { $0.pitchClass == chords[0].root.pitchClass }.max() ?? first.max()!]
+        guard let first = tops.first, let highest = first.max() else { return [] }
+        var line = [first.filter { $0.pitchClass == chords[0].root.pitchClass }.max() ?? highest]
         for available in tops.dropFirst() {
             let previous = line[line.count - 1]
-            line.append(available.min { a, b in
+            guard let nearest = available.min(by: { a, b in
                 let (da, db) = (abs((a - previous).semitones), abs((b - previous).semitones))
                 return da != db ? da < db : a < b
-            }!)
+            }) else { return nil }
+            line.append(nearest)
         }
         return line
     }

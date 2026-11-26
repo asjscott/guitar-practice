@@ -45,7 +45,7 @@ struct TargetTopNoteTests {
                     #expect(facts.count == progression.steps.count)
                     for (index, chord) in facts.enumerated() {
                         let all = fretboard.voicings(of: chord.triad, in: position)
-                        #expect(Set(chord.accepted) == Set(all.filter { fretboard.pitch(at: $0.locations[2]) == line[index] }))
+                        #expect(Set(chord.accepted) == Set(all.filter { fretboard.topPitch(of: $0) == line[index] }))
                     }
                 }
             }

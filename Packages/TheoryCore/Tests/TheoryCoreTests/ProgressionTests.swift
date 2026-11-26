@@ -23,6 +23,11 @@ struct ProgressionTests {
         #expect(Progression.library.allSatisfy { p in p.steps.allSatisfy { $0.bars >= 1 } })
     }
 
+    @Test func onlyThe12BarBluesShuffles() {
+        #expect(Progression.library.filter { $0.feel == .shuffle }.map(\.id) == ["12-bar blues"])
+        #expect(Progression.library.filter { $0.feel == .straight }.count == 7)
+    }
+
     @Test func numeralsAreWrittenWithTheirCase() throws {
         #expect(try progression("I–V–vi–IV").steps.map(\.numeral.text) == ["I", "V", "vi", "IV"])
         #expect(try progression("i–VI–III–VII").steps.map(\.numeral.text) == ["i", "VI", "III", "VII"])

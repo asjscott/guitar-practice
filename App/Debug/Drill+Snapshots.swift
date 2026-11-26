@@ -43,9 +43,9 @@ func progressionNotesForSnapshot(_ kind: DrillKind, _ progression: Progression, 
                              timeThrough: slot / chords.count,
                              voicings: fretboard.voicings(of: chords[index], in: position),
                              previousPlayed: previous, previousDrawn: drawn, topNote: topNotes?[index])
-        let voicing = rules.expected(for: turn).drawn
+        guard let voicing = rules.expected(for: turn)?.drawn else { break }
         drawn = voicing
-        let pitches = voicing.locations.map(fretboard.pitch)
+        let pitches = fretboard.pitches(of: voicing)
         let start = backing.start + beatLength * slotBeat
         if wrong.contains(slot) {
             notes.append((pitches[0] + Interval(1), start))

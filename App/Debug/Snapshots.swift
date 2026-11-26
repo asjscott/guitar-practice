@@ -462,6 +462,7 @@ enum Snapshots {
     private static func saveProgressions() async throws {
         func model(_ kind: DrillKind = .nearestVoicing) -> DrillViewModel {
             let model = DrillViewModel()
+            model.keepOptionsForSnapshot()
             model.kind = kind
             model.progressionKey = .major(.g)
             model.progression = Progression.named("I–V–vi–IV")!
@@ -477,7 +478,7 @@ enum Snapshots {
         let noSounds = model()
         try await save("progression-no-sounds", DrillView(model: noSounds),
                        sound: AppSoundOutput(isInert: true, hasBackingSounds: false)) {
-            noSounds.setInputBuiltInForSnapshot()
+            noSounds.backingHearing.setInputBuiltInForSnapshot()
         }
         let countIn = model()
         try await save("progression-count-in", DrillView(model: countIn)) {

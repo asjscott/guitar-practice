@@ -2,8 +2,8 @@ import Testing
 import PracticeCore
 import TheoryCore
 
-@Suite("Chord run summary")
-struct ChordRunSummaryTests {
+@Suite("Chord summary")
+struct ChordSummaryTests {
     /// Plays the drawn path of I–V–vi–IV in G, E shape, 60 BPM, `timesThrough` times, with D wrong in the 5th.
     private func run(timesThrough: Int) -> [Attempt] {
         var options = DrillOptions()
@@ -38,7 +38,7 @@ struct ChordRunSummaryTests {
     }
 
     @Test func cleanChordsTimesThroughWhenHiddenAndTheHardest() {
-        let summary = ChordRunSummary(attempts: run(timesThrough: 6))
+        let summary = ChordSummary(attempts: run(timesThrough: 6))
         #expect(summary.chords == 24)
         #expect(summary.clean == 23)
         #expect(summary.timesThrough == 6)
@@ -49,7 +49,7 @@ struct ChordRunSummaryTests {
     }
 
     @Test func nothingHiddenYet() {
-        let summary = ChordRunSummary(attempts: run(timesThrough: 1))
+        let summary = ChordSummary(attempts: run(timesThrough: 1))
         #expect(summary.firstHidden == nil)
         #expect(summary.hardest.isEmpty)
         #expect(summary.text == "4 of 4 chords clean · 1 time through")

@@ -47,7 +47,7 @@ enum TopNoteLineInvariants {
         let chords = progression.chords(in: key)
         #expect(line.count == chords.count)
         let tops = chords.map { chord in
-            Set(fretboard.voicings(of: chord, in: position).map { fretboard.pitch(at: $0.locations[2]) })
+            Set(fretboard.voicings(of: chord, in: position).map(fretboard.topPitch))
         }
         for (top, available) in zip(line, tops) { #expect(available.contains(top)) }
         guard let first = line.first else { return }

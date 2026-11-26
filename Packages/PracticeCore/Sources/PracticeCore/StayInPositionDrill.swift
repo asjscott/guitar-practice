@@ -8,12 +8,13 @@ extension DrillKind {
 }
 
 /// Stay in position: time through *k* (from 0) expects each chord's voicing number *k* in the position, ordered up the
-/// neck, wrapping per chord, so a few times through cover every voicing in the area. That voicing is the only one
+/// neck, wrapping per chord, so a few times through cover every voicing in the position. That voicing is the only one
 /// accepted, and the one drawn.
 public enum StayInPositionRules: ProgressionRules {
     public static var kind: DrillKind { .stayInPosition }
 
-    public static func expected(for turn: ChordTurn) -> ExpectedVoicings {
+    public static func expected(for turn: ChordTurn) -> ExpectedVoicings? {
+        guard !turn.voicings.isEmpty else { return nil }
         let voicing = turn.voicings[turn.timeThrough % turn.voicings.count]
         return ExpectedVoicings(accepted: [voicing], drawn: voicing)
     }

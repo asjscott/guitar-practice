@@ -14,14 +14,14 @@ extension DrillKind {
 public enum NearestVoicingRules: ProgressionRules {
     public static var kind: DrillKind { .nearestVoicing }
 
-    public static func expected(for turn: ChordTurn) -> ExpectedVoicings {
+    public static func expected(for turn: ChordTurn) -> ExpectedVoicings? {
         let fretboard = turn.fretboard
         let accepted = turn.previousPlayed.map {
             fretboard.nearestVoicings(of: turn.triad, in: turn.position, to: $0)
         } ?? turn.voicings
         let from = turn.previousPlayed ?? turn.previousDrawn
         let drawn = from.flatMap { fretboard.nearestVoicings(of: turn.triad, in: turn.position, to: $0).first }
-            ?? fretboard.middleVoicing(of: turn.triad, in: turn.position)!
+            ?? fretboard.middleVoicing(of: turn.triad, in: turn.position)
         return ExpectedVoicings(accepted: accepted, drawn: drawn)
     }
 }

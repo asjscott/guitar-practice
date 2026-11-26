@@ -19,13 +19,12 @@ public enum TargetTopNoteRules: ProgressionRules {
         fretboard.topNoteLine(of: progression, in: key, position: position)
     }
 
-    public static func expected(for turn: ChordTurn) -> ExpectedVoicings {
+    public static func expected(for turn: ChordTurn) -> ExpectedVoicings? {
+        guard let topNote = turn.topNote else { return nil }
         let fretboard = turn.fretboard
-        let accepted = turn.voicings.filter { fretboard.pitch(at: $0.locations[2]) == turn.topNote }
+        let accepted = fretboard.voicings(of: turn.triad, in: turn.position, topNote: topNote)
         let from = turn.previousPlayed ?? turn.previousDrawn
-        let drawn = from.map { from in
-            accepted.min { fretboard.movement(from: from, to: $0) < fretboard.movement(from: from, to: $1) }!
-        } ?? accepted[0]
+        let drawn = from.flatMap { fretboard.nearestVoicings(among: accepted, to: $0).first } ?? accepted.first
         return ExpectedVoicings(accepted: accepted, drawn: drawn)
     }
 }
