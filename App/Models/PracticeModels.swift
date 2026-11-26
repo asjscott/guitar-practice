@@ -4,14 +4,17 @@ import SwiftData
 import TheoryCore
 
 // The current version's models. `LoggedAttempt` is the saved record; PracticeCore's `Attempt` is the drill's.
-typealias PracticeSession = PracticeSchemaV2.Session
-typealias LoggedAttempt = PracticeSchemaV2.Attempt
-typealias DayTheme = PracticeSchemaV2.DayTheme
+typealias PracticeSession = PracticeSchemaV3.Session
+typealias LoggedAttempt = PracticeSchemaV3.Attempt
+typealias DayTheme = PracticeSchemaV3.DayTheme
 
 enum PracticeMigrationPlan: SchemaMigrationPlan {
-    static var schemas: [any VersionedSchema.Type] { [PracticeSchemaV1.self, PracticeSchemaV2.self] }
+    static var schemas: [any VersionedSchema.Type] {
+        [PracticeSchemaV1.self, PracticeSchemaV2.self, PracticeSchemaV3.self]
+    }
     static var stages: [MigrationStage] {
-        [.lightweight(fromVersion: PracticeSchemaV1.self, toVersion: PracticeSchemaV2.self)]
+        [.lightweight(fromVersion: PracticeSchemaV1.self, toVersion: PracticeSchemaV2.self),
+         .lightweight(fromVersion: PracticeSchemaV2.self, toVersion: PracticeSchemaV3.self)]
     }
 }
 
