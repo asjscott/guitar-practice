@@ -37,6 +37,16 @@ public struct ProgressionProgress: Hashable, Sendable {
     /// The frets to zoom the neck to: the position's.
     public var fretWindow: ClosedRange<Int>
 
+    /// A note of the top-note line.
+    public struct TopNote: Hashable, Sendable {
+        /// Spelled as the chord's tone: "F♯".
+        public var name: String
+        public var pitch: Pitch
+    }
+
+    /// In Target top note, the line's note for each chord, at every fade stage; else nil.
+    public var topNotes: [TopNote]?
+
     /// "3rd time through · Faded".
     public var timeThroughText: String {
         "\(timeThrough.ordinal) time through · \(fadeStage.title)"

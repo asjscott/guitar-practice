@@ -46,6 +46,8 @@ public struct ProgressionDrill<Rules: ProgressionRules>: Drill {
     private let anywhere: [[TriadVoicing]]
     /// Bars before each chord in a time through.
     private let barsBefore: [Int]
+    /// The rules' top-note line, if they have one.
+    private let topNotes: [Pitch]?
     private var settings: BackingSettings { setup.options.backing }
 
     /// As heard.
@@ -56,6 +58,8 @@ public struct ProgressionDrill<Rules: ProgressionRules>: Drill {
     private var open: OpenChord?
     /// The run's time through `open` is in, from 0.
     private var timeThrough = 0
+    /// The slot `timeThrough` began at.
+    private var timeThroughStart = 0
     /// This time through's chords so far.
     private var outcomes: [ChordOutcome?] = []
     private var group = -1
@@ -84,6 +88,11 @@ public struct ProgressionDrill<Rules: ProgressionRules>: Drill {
         }
         let bars = progression?.steps.map(\.bars) ?? []
         barsBefore = bars.indices.map { bars[..<$0].reduce(0, +) }
+        if let progression = setup.options.progression, let position = setup.progressionPosition {
+            topNotes = Rules.topNotes(of: progression, in: setup.chosenKey, position: position, on: fretboard)
+        } else {
+            topNotes = nil
+        }
         backing = Backing(chords: [BackingChord(Triad(.major, root: .c))], style: setup.options.backing.style,
                           bpm: setup.options.backing.tempo, start: .zero)
     }
@@ -194,6 +203,7 @@ public struct ProgressionDrill<Rules: ProgressionRules>: Drill {
         group += 1
         phase = .waiting
         open = nil
+        timeThroughStart = 0
         open(slot: 0)
     }
 
@@ -208,10 +218,9 @@ public struct ProgressionDrill<Rules: ProgressionRules>: Drill {
     // MARK: - Chords
 
     private func turn(slot: Int, previousPlayed: TriadVoicing?, previousDrawn: TriadVoicing?) -> ChordTurn {
-        let base = open.map { $0.slot / count } ?? 0
-        return ChordTurn(fretboard: fretboard, position: position!, chords: chords, index: slot % count,
-                         timeThrough: timeThrough + slot / count - base, voicings: inPosition[slot % count],
-                         previousPlayed: previousPlayed, previousDrawn: previousDrawn)
+        ChordTurn(fretboard: fretboard, position: position!, chords: chords, index: slot % count,
+                  timeThrough: timeThrough + (slot - timeThroughStart) / count, voicings: inPosition[slot % count],
+                  previousPlayed: previousPlayed, previousDrawn: previousDrawn, topNote: topNotes?[slot % count])
     }
 
     private mutating func open(slot: Int) {
@@ -229,7 +238,10 @@ public struct ProgressionDrill<Rules: ProgressionRules>: Drill {
         previousPlayed = outcome == .missed ? nil : chord.played
         previousDrawn = chord.played ?? chord.expected.drawn
         let next = chord.slot + 1
-        if index == count - 1 { endTimeThrough() }
+        if index == count - 1 {
+            endTimeThrough()
+            timeThroughStart = next
+        }
         open(slot: next)
     }
 
@@ -390,8 +402,14 @@ public struct ProgressionDrill<Rules: ProgressionRules>: Drill {
         let current = beat < 0 ? nil : barsBefore.indices.last { Double(barsBefore[$0] * Backing.beatsPerBar) <= beat }
         var countIn: Int?
         if isCountingIn, now >= backing.start { countIn = min(4, Int((now - backing.start) / self.beat) + 1) }
+        let topNotes = topNotes.map { line in
+            zip(chords, line).map { chord, pitch in
+                let name = chord.notes.first { $0.pitchClass == pitch.pitchClass } ?? key.spell(pitch.pitchClass)
+                return ProgressionProgress.TopNote(name: name.description, pitch: pitch)
+            }
+        }
         return ProgressionProgress(blocks: blocks, current: current, beat: beat, timeThrough: timeThrough + 1,
                                    fadeStage: stage, countIn: countIn, tempo: settings.tempo,
-                                   fretWindow: fretWindow)
+                                   fretWindow: fretWindow, topNotes: topNotes)
     }
 }
