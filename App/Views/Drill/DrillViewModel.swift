@@ -230,7 +230,9 @@ final class DrillViewModel: MetronomePanelOwner {
     var setup: DrillSetup {
         var options = options
         if kind.hasBacking { options.progression = progression }
-        return DrillSetup(fretboard: fretboard, options: options, seed: 0)
+        var setup = DrillSetup(fretboard: fretboard, options: options, seed: 0)
+        setup.inputDelay = AudioInputSettings.inputDelay(ofDevice: input?.device?.uid)
+        return setup
     }
 
     private func newDrill(seed: UInt64, fadeStages: FadeStages = FadeStages()) -> any Drill {
