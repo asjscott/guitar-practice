@@ -46,4 +46,28 @@ extension Fretboard {
         }
         return voicings(of: triad, in: position).min { distance($0) < distance($1) }
     }
+
+    /// The melody on a progression's top notes in the position, one per chord: the first chord's root, as high as a
+    /// voicing in the position has it on top (or, if none does, the highest top note one has); then for each next
+    /// chord, of the top notes its voicings in the position have, the nearest the one before, the lower when two are
+    /// as near. Nil when a chord has no voicing in the position.
+    public func topNoteLine(of progression: Progression, in key: Key, position: Position) -> [Pitch]? {
+        let chords = progression.chords(in: key)
+        var tops: [[Pitch]] = []
+        for chord in chords {
+            let available = voicings(of: chord, in: position).map { pitch(at: $0.locations[2]) }
+            guard !available.isEmpty else { return nil }
+            tops.append(available)
+        }
+        guard let first = tops.first else { return [] }
+        var line = [first.filter { $0.pitchClass == chords[0].root.pitchClass }.max() ?? first.max()!]
+        for available in tops.dropFirst() {
+            let previous = line[line.count - 1]
+            line.append(available.min { a, b in
+                let (da, db) = (abs((a - previous).semitones), abs((b - previous).semitones))
+                return da != db ? da < db : a < b
+            }!)
+        }
+        return line
+    }
 }
