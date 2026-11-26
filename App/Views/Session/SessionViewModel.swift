@@ -105,13 +105,8 @@ final class SessionViewModel: MetronomePanelOwner {
     /// The audio input, while the screen is open; nil (in `LogCheck`) is no problem.
     private var input: AudioInputState?
 
-    /// Whether the input is the Mac's own microphone, which would hear the backing as notes.
-    private(set) var isInputBuiltIn = false
-
-    #if DEBUG
-    /// For snapshots, where there is no input.
-    func setInputBuiltInForSnapshot() { isInputBuiltIn = true }
-    #endif
+    /// How the backing will be heard. Settable for snapshots, where there is no input.
+    var backingHearing = BackingHearing()
 
     private(set) var snapshot = Snapshot()
 
@@ -200,14 +195,7 @@ final class SessionViewModel: MetronomePanelOwner {
     /// Whether a progression block is planned, and its backing would be heard as notes or not at all; for setup.
     var backingNotices: [String] {
         guard plan().contains(where: \.kind.hasBacking) else { return [] }
-        var notices: [String] = []
-        if backingPlayer?.hasSounds == false {
-            notices.append("No backing sounds: Progressions plays clicks. " + BackingSounds.fetchHint)
-        }
-        if isInputBuiltIn {
-            notices.append("The built-in microphone will hear the backing as notes: use the interface, or headphones.")
-        }
-        return notices
+        return backingHearing.notices(hasSounds: backingPlayer?.hasSounds, player: "Progressions")
     }
 
     /// The blocks a session would have, of the drills that have something to prompt, and can be heard if they need to be.
@@ -232,9 +220,7 @@ final class SessionViewModel: MetronomePanelOwner {
     /// The audio input changed. Losing it pauses.
     func inputChanged(_ new: AudioInputState) {
         defer { input = new }
-        if new.device?.uid != input?.device?.uid {
-            isInputBuiltIn = new.device.map { CoreAudioDevices.isBuiltIn(uid: $0.uid) } ?? false
-        }
+        backingHearing.inputChanged(from: input, to: new)
         if let notice = input.flatMap(new.lossNotice) { pause(notice: notice) }
     }
 

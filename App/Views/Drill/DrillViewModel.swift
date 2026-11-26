@@ -111,6 +111,27 @@ final class DrillViewModel: MetronomePanelOwner {
         }
     }
 
+    /// The practice day whose theme a progression drill's options last started from; nil before one has.
+    @ObservationIgnored private var themeDay: String?
+
+    /// Free practice of a progression drill starts from the day's theme: its key, progression and position, once a
+    /// day, from when a progression drill is first chosen or shown; changes after that are kept until the next day.
+    /// Not during a run. Picks and saves the day's theme if need be, as the session screen does.
+    func startFromDaysTheme(system: Position.System, on date: Date = .now) {
+        let day = Calendar.practiceDay(of: date)
+        guard kind.hasBacking, !isRunning, themeDay != day, let log else { return }
+        themeDay = day
+        let theme = log.theme(on: date, fretboard: fretboard, system: system)
+        options.key = theme.key
+        options.position = theme.position
+        if let themed = theme.progression { progression = themed }
+    }
+
+    #if DEBUG
+    /// For snapshots, which choose their own key, progression and position.
+    func keepOptionsForSnapshot(on date: Date = .now) { themeDay = Calendar.practiceDay(of: date) }
+    #endif
+
     /// The key, for progression drills: changing its mode changes the progression too.
     var progressionKey: Key {
         get { options.key }
@@ -136,26 +157,14 @@ final class DrillViewModel: MetronomePanelOwner {
         metronome.loadBacking(of: progression, into: &options.backing)
     }
 
-    /// Whether the input is the Mac's own microphone, which would hear the backing as notes.
-    private(set) var isInputBuiltIn = false
-
-    #if DEBUG
-    /// For snapshots, where there is no input.
-    func setInputBuiltInForSnapshot() { isInputBuiltIn = true }
-    #endif
+    /// How the backing will be heard. Settable for snapshots, where there is no input.
+    var backingHearing = BackingHearing()
 
     /// What a progression drill should know about how the backing will be heard: none fetched, or a built-in
     /// microphone.
     var backingNotices: [String] {
         guard kind.hasBacking else { return [] }
-        var notices: [String] = []
-        if backingPlayer?.hasSounds == false {
-            notices.append("No backing sounds: the drill plays clicks. " + BackingSounds.fetchHint)
-        }
-        if isInputBuiltIn {
-            notices.append("The built-in microphone will hear the backing as notes: use the interface, or headphones.")
-        }
-        return notices
+        return backingHearing.notices(hasSounds: backingPlayer?.hasSounds, player: "the drill")
     }
 
     /// The chosen position of the key's scale, for progression drills; nil if it isn't on the neck.
@@ -313,9 +322,7 @@ final class DrillViewModel: MetronomePanelOwner {
     /// The audio input changed. Losing it pauses.
     func inputChanged(_ new: AudioInputState) {
         defer { input = new }
-        if new.device?.uid != input?.device?.uid {
-            isInputBuiltIn = new.device.map { CoreAudioDevices.isBuiltIn(uid: $0.uid) } ?? false
-        }
+        backingHearing.inputChanged(from: input, to: new)
         if let notice = input.flatMap(new.lossNotice) { pause(notice: notice) }
     }
 

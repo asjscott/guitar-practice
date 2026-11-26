@@ -7,7 +7,7 @@ import TheoryCore
 /// it the target card with its countdown ring, a feedback line and a strip of recent attempts; a status bar with
 /// running stats and the input meter; a summary sheet on Stop. A listening screen: audio input runs while it is
 /// open. Leaving it pauses the run, as do sleep and losing the input. Follows the tuning, capo, position system,
-/// time signature and emphasis in Settings.
+/// time signature and emphasis in Settings. A progression drill starts from the day’s theme.
 struct DrillView: View {
     @Bindable var model: DrillViewModel
     @State private var showSummary = false
@@ -55,6 +55,7 @@ struct DrillView: View {
             model.capo = capo
         }
         .onChange(of: positionSystem, initial: true) { model.positionSystem = positionSystem }
+        .task(id: model.kind) { model.startFromDaysTheme(system: positionSystem) }
         .onChange(of: meters.meter, initial: true) { model.passSettings.meter = meters.meter }
         .onChange(of: model.isRunning) {
             if !model.isRunning, !model.snapshot.attempts.isEmpty { showSummary = true }
