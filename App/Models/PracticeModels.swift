@@ -98,6 +98,7 @@ extension LoggedAttempt {
         switch attempt.facts {
         case .pass(let facts): setFacts(facts)
         case .triad(let facts): setFacts(facts)
+        case .chord(let facts): setFacts(facts)
         case nil: break
         }
     }
@@ -128,8 +129,37 @@ extension LoggedAttempt {
         hinted = facts.fadeStage.map { _ in facts.hinted }
     }
 
+    private func setFacts(_ facts: ChordFacts) {
+        progression = facts.progression.id
+        keyTonic = facts.key.tonic.pitchClass.value
+        keyMode = facts.key.mode.rawValue
+        numeral = facts.numeral.text
+        chordRootName = facts.triad.root.description
+        chordRoot = facts.triad.root.pitchClass.value
+        chordQuality = facts.triad.quality.rawValue
+        positionSystem = facts.position.system.rawValue
+        positionNumber = facts.position.number
+        positionOctave = facts.position.octave
+        playedVoicing = facts.played.map(VoicingRecord.init)
+        acceptedVoicings = facts.accepted.map(VoicingRecord.init)
+        backingStyle = facts.style.rawValue
+        tempo = facts.tempo
+        (beatsPerBar, beatUnit) = (4, 4)
+        fadeStageRaw = facts.fadeStage.rawValue
+        hinted = facts.hinted
+        chordOutcomeRaw = facts.outcome.rawValue
+        firstOnsetSeconds = facts.firstOnset.map { $0 / .seconds(1) }
+        inputDelaySeconds = facts.inputDelay / .seconds(1)
+    }
+
     var source: AttemptSource? { AttemptSource(rawValue: sourceRaw) }
     var outcome: Attempt.Outcome? { Attempt.Outcome(rawValue: outcomeRaw) }
+}
+
+extension VoicingRecord {
+    init(_ voicing: TriadVoicing) {
+        notes = voicing.locations.map { Location(string: $0.string, fret: $0.fret) }
+    }
 }
 
 extension WrongAnswerRecord {

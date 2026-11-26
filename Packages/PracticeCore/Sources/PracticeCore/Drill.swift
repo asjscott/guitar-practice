@@ -37,6 +37,9 @@ public enum DrillEvent: Hashable, Sendable {
     case hold(until: Duration)
     /// The clicks just asked for, as they will be heard.
     case clicksStarted(ClickTrack)
+    /// The backing just asked for, as it will be heard: its start may be later than asked. Without sounds the app
+    /// plays its beats as clicks, and answers the same.
+    case backingStarted(Backing)
     /// H held or let go: the position or voicing is shown meanwhile, and the pass or voicing is hinted. Pausing lets go.
     case hint(isShown: Bool, at: Duration)
     /// What passes are played at, from the next one on.
@@ -76,6 +79,15 @@ public enum ClickRequest: Hashable, Sendable {
     case start(ClickTrack)
     /// None at or after a time.
     case stop(at: Duration)
+}
+
+/// What a progression drill wants of the backing player.
+public enum BackingRequest: Hashable, Sendable {
+    /// This backing from its count-in on, in place of any other. Answered at once with `DrillEvent.backingStarted`;
+    /// without an answer it is taken to be heard as asked.
+    case start(Backing)
+    /// No backing from now on.
+    case stop
 }
 
 /// The one interface to every drill: a pure state machine driven by events and a clock.
@@ -127,6 +139,9 @@ public protocol Drill: Sendable {
     /// The clicks asked for since the last call, to be done in order: call it after every event.
     mutating func takeClicks() -> [ClickRequest]
 
+    /// The backing asked for since the last call, to be done in order: call it after every event.
+    mutating func takeBacking() -> [BackingRequest]
+
     /// Between passes, when the last one's last bar ends: a chime waits for that. Nil during a pass, while paused, and in
     /// drills without passes.
     var passEnd: Duration? { get }
@@ -140,6 +155,8 @@ public protocol Drill: Sendable {
 
 extension Drill {
     public mutating func takeClicks() -> [ClickRequest] { [] }
+
+    public mutating func takeBacking() -> [BackingRequest] { [] }
 
     public var isPartWay: Bool { false }
 

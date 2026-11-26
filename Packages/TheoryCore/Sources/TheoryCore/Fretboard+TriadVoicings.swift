@@ -14,7 +14,7 @@ public struct TriadVoicing: Hashable, Sendable {
     public var frets: ClosedRange<Int> { locations.fretSpan }
 
     /// The order up the neck.
-    fileprivate func isBelow(_ other: TriadVoicing) -> Bool {
+    func isBelow(_ other: TriadVoicing) -> Bool {
         (frets.lowerBound, locations[0].fret) < (other.frets.lowerBound, other.locations[0].fret)
     }
 }

@@ -94,6 +94,9 @@ public struct DrillDisplay: Hashable, Sendable {
     /// The pass, in scale drills.
     public var pass: PassProgress?
 
+    /// The time through, in progression drills.
+    public var progression: ProgressionProgress?
+
     /// Waiting for a typed name: what is typed so far replaces the headline.
     public var acceptsTypedName = false
 

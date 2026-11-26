@@ -55,7 +55,31 @@ public struct DrillOptions: Hashable, Sendable {
     /// Scales only: what passes are played at, at first.
     public var pass = PassSettings()
 
+    /// Progressions only: what is played, in the key, and in the position of the key's scale. Nil = none chosen yet,
+    /// so progression drills have nothing to prompt.
+    public var progression: Progression?
+
+    /// Progressions only: how the backing is played.
+    public var backing = BackingSettings()
+
     public init() {}
+}
+
+/// How a progression drill's backing is played, and how its onsets are heard.
+public struct BackingSettings: Hashable, Sendable {
+    public static let defaultTempo = 70
+
+    public var style = BackingStyle.rock
+    /// BPM.
+    public var tempo = defaultTempo
+    /// Taken off every onset before it is compared with the backing (see "Input delay" in GLOSSARY.md).
+    public var inputDelay = Duration.zero
+
+    public init(style: BackingStyle = .rock, tempo: Int = defaultTempo, inputDelay: Duration = .zero) {
+        self.style = style
+        self.tempo = tempo
+        self.inputDelay = inputDelay
+    }
 }
 
 /// Notes to ask for more often, such as the theme key's.
@@ -79,7 +103,24 @@ public struct DrillSetup: Hashable, Sendable {
     /// The key prompts are spelled in; nil = sharps.
     public var key: Key?
 
-    /// Notes to ask for more often; nil = all alike.
+    /// How a progression drill's backing is played, and how its onsets are heard.
+public struct BackingSettings: Hashable, Sendable {
+    public static let defaultTempo = 70
+
+    public var style = BackingStyle.rock
+    /// BPM.
+    public var tempo = defaultTempo
+    /// Taken off every onset before it is compared with the backing (see "Input delay" in GLOSSARY.md).
+    public var inputDelay = Duration.zero
+
+    public init(style: BackingStyle = .rock, tempo: Int = defaultTempo, inputDelay: Duration = .zero) {
+        self.style = style
+        self.tempo = tempo
+        self.inputDelay = inputDelay
+    }
+}
+
+/// Notes to ask for more often; nil = all alike.
     public var weighting: NoteWeighting?
 
     /// The session's: scale drills take turns through the scales of its mode, in its position. Nil in free practice.

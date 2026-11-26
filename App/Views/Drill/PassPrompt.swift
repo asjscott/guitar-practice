@@ -62,7 +62,7 @@ private struct PassBeats: View {
     }
 }
 
-private struct CountInNumber: View {
+struct CountInNumber: View {
     let beat: Int
 
     var body: some View {

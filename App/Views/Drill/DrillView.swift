@@ -15,6 +15,7 @@ struct DrillView: View {
     @Environment(AppSoundOutput.self) private var soundOutput
     @Environment(AttemptLog.self) private var log
     @Environment(Metronome.self) private var metronome
+    @Environment(BackingPlayer.self) private var backingPlayer
     @AppStorage(InstrumentSettings.Key.positionSystem) private var positionSystem = InstrumentSettings.defaultPositionSystem
     private let meters = StoredMeters()
 
@@ -45,6 +46,7 @@ struct DrillView: View {
             model.log = log
             model.soundOutput = soundOutput
             model.metronome = metronome
+            model.backingPlayer = backingPlayer
         }
         .onChange(of: soundOutput.problem) { model.soundProblemChanged() }
         .onDisappear { model.leave() }
@@ -73,12 +75,17 @@ struct DrillView: View {
             case .notes: notes
             case .scales: scales
             case .triads: triads
+            case .progressions: progressions
             }
             Divider()
             HStack(spacing: 18) {
                 if model.kind.hasPasses {
                     Text("\(model.completePasses) \(model.completePasses == 1 ? "pass" : "passes")")
                     Text("\(model.cleanPasses) clean")
+                } else if model.kind.hasBacking {
+                    let summary = model.chordSummary
+                    Text("\(summary.chords) \(summary.chords == 1 ? "chord" : "chords")")
+                    Text("\(summary.clean) clean")
                 } else {
                     Text("\(model.stats.prompts) \(model.stats.prompts == 1 ? "prompt" : "prompts")")
                     Text("first-try \(model.stats.firstTryText)")
@@ -112,6 +119,13 @@ struct DrillView: View {
     private var scales: some View {
         PassPrompt(display: model.snapshot.display, position: model.position, restingMarkers: model.restingMarkers,
                    settings: model.passSettings, fretboard: model.fretboard) {
+            DrillRestingText(model: model)
+        }
+    }
+
+    private var progressions: some View {
+        ProgressionPrompt(display: model.snapshot.display, position: model.progressionPosition,
+                          fretboard: model.fretboard, notices: model.backingNotices) {
             DrillRestingText(model: model)
         }
     }
@@ -154,6 +168,7 @@ private struct DrillOptionsBar: View {
         // Gone during a run, when the header names them: its buttons need the room.
         case .scales: if !model.isRunning { ScaleOptions(setup: model.setup, options: $model.options) }
         case .triads: if !model.isRunning { TriadOptions(kind: model.kind, options: $model.options) }
+        case .progressions: if !model.isRunning { ProgressionOptions(model: model) }
         }
     }
 }
@@ -311,12 +326,14 @@ private struct DrillRestingText: View {
     }
 
     private var hintText: String {
-        let (shown, unclean) = model.kind.hasPasses ? ("position", "pass") : ("notes", "voicing")
+        let (shown, unclean) = model.kind.hasPasses ? ("position", "pass")
+            : model.kind.hasBacking ? ("voicing", "chord") : ("notes", "voicing")
         return " Hold H to see the \(shown): the \(unclean) then isn’t clean."
     }
 
     private var resumeText: String {
         if model.kind.hasPasses { return model.resumesSamePrompt ? "Resume (P) to restart the pass" : "Resume (P) for the next pass" }
+        if model.kind.hasBacking { return "Resume (P) to start the time through again, after a count-in" }
         return model.resumesSamePrompt ? "Resume (P) to carry on" : "Resume (P) for a new prompt"
     }
 }
@@ -368,17 +385,31 @@ private struct DrillRunSummary: View {
                 if model.kind.hasPasses {
                     stat("Passes", "\(model.completePasses)")
                     stat("Clean", "\(model.cleanPasses)")
+                } else if model.kind.hasBacking {
+                    let summary = model.chordSummary
+                    stat("Chords", "\(summary.chords)")
+                    stat("Clean", "\(summary.clean)")
+                    stat("Times through", "\(summary.timesThrough)")
                 } else {
                     stat("Prompts", "\(stats.prompts)")
                     stat("First-try right", stats.firstTryText)
                     stat("Median time", stats.medianText)
                 }
-                stat("Timed out", "\(stats.timeouts)")
-                stat("Skipped", "\(stats.skips)")
+                if !model.kind.hasBacking {
+                    stat("Timed out", "\(stats.timeouts)")
+                    stat("Skipped", "\(stats.skips)")
+                }
             }
             if model.isCheckRun {
                 list("Misses", stats.misses, emptyText: "None: every location was right first time.")
                 list("Slowest onsets", stats.slowest(5).filter { $0.outcome == .answered })
+            } else if model.kind.hasBacking {
+                let summary = model.chordSummary
+                Text(summary.text).font(.callout).foregroundStyle(.secondary)
+                if !summary.hardest.isEmpty {
+                    Text("Hardest: " + summary.hardest.map(\.text).joined(separator: ", "))
+                        .font(.callout).foregroundStyle(.secondary)
+                }
             } else if !model.kind.hasPasses {
                 list("Slowest", stats.slowest(3))
                 if !model.sweeps.isEmpty { lines("Sweeps", model.sweeps.suffix(6).map(\.summaryLine)) }
@@ -428,6 +459,7 @@ private struct DrillRunSummary: View {
         .environment(AudioInputService())
         .environment(AppSoundOutput(isInert: true))
         .environment(Metronome(output: AppSoundOutput(isInert: true)))
+        .environment(BackingPlayer(output: AppSoundOutput(isInert: true), metronome: Metronome(output: AppSoundOutput(isInert: true))))
         .environment(AttemptLog.inMemory())
         .frame(width: 1100, height: 600)
 }

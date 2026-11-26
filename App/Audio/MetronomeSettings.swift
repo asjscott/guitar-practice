@@ -1,5 +1,6 @@
 import Foundation
 import PracticeCore
+import TheoryCore
 
 /// The persisted metronome setup, stored with `@AppStorage` (UserDefaults). Not locked during a session.
 enum MetronomeSettings {
@@ -22,7 +23,12 @@ enum MetronomeSettings {
         /// Whether backing's Listen has the click on top.
         static let backingListenHasClick = "backing.listenHasClick"
 
-        static let all = [signature, emphasis, volume, isSoundOn, backingListenHasClick]
+        /// BPM, for the progression drills.
+        static let backingTempo = "backing.tempo"
+        /// A `BackingStyle` raw value, for each progression.
+        static func backingStyle(of progression: Progression) -> String { "backing.style.\(progression.id)" }
+
+        static let all = [signature, emphasis, volume, isSoundOn, backingListenHasClick, backingTempo]
     }
 
     static let defaultSignature = TimeSignature.fourFour.name

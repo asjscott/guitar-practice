@@ -71,6 +71,16 @@ enum CoreAudioDevices {
         AudioObjectSetPropertyData(id, &address, 0, nil, UInt32(MemoryLayout<UInt32>.size), &wanted)
     }
 
+    /// Whether a device is built into the Mac, such as its microphone. False when it can't be found.
+    static func isBuiltIn(uid: String) -> Bool {
+        guard let id = deviceID(forUID: uid) else { return false }
+        var address = globalAddress(kAudioDevicePropertyTransportType)
+        var type: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        guard AudioObjectGetPropertyData(id, &address, 0, nil, &size, &type) == noErr else { return false }
+        return type == kAudioDeviceTransportTypeBuiltIn
+    }
+
     /// The device's sample rate in Hz; 0 if it has none.
     static func sampleRate(of id: AudioDeviceID) -> Double {
         var address = globalAddress(kAudioDevicePropertyNominalSampleRate)
