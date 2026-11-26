@@ -87,6 +87,6 @@ extension Array where Element: Hashable {
 }
 
 extension Progression {
-    /// The style its backing has until one is chosen for it.
-    public var defaultStyle: BackingStyle { .rock }
+    /// The style its backing has until one is chosen for it: the shuffle for the 12-bar blues, else rock.
+    public var defaultStyle: BackingStyle { id == "12-bar blues" ? .bluesShuffle : .rock }
 }
