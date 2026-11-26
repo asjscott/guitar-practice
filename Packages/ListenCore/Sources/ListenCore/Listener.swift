@@ -23,6 +23,7 @@ public struct Listener: Sendable {
     private var notes = NoteTracker(windowDuration: 0)
     private var lowSound = LowSound(sampleRate: 48_000)
     private var highs = Highs(sampleRate: 48_000)
+    private var newSound = NewSound(sampleRate: 48_000)
     private var playedNotes: [PlayedNote] = []
 
     /// A listener with nothing heard yet.
@@ -43,6 +44,7 @@ public struct Listener: Sendable {
             if let candidate = onsets.add(sample, time: sampleTime) { notes.candidate(candidate) }
             lowSound.add(sample, time: sampleTime)
             highs.add(sample, time: sampleTime)
+            newSound.add(sample, time: sampleTime)
             window.append(sample)
             samplesSinceAnalysis += 1
             if window.count >= windowSize, samplesSinceAnalysis >= hopSize {
@@ -70,6 +72,7 @@ public struct Listener: Sendable {
         notes = NoteTracker(windowDuration: Double(windowSize) / sampleRate)
         lowSound = LowSound(sampleRate: sampleRate)
         highs = Highs(sampleRate: sampleRate)
+        newSound = NewSound(sampleRate: sampleRate)
     }
 
     /// Analyses one window, from `start` to `end` in stream seconds.
@@ -82,13 +85,16 @@ public struct Listener: Sendable {
             tunerReading = nil
             return
         }
+        if let note = notes.overRinging(end: end, sound: lowSound, highs: highs, newSound: newSound) {
+            playedNotes.append(note)
+        }
         guard let estimate = detector.estimate(samples) else {
             notes.noPitch()
             smoother = PitchSmoother()
             tunerReading = nil
             return
         }
-        if let note = notes.estimate(frequency: estimate.frequency, start: start, end: end, sound: lowSound, highs: highs) {
+        if let note = notes.estimate(frequency: estimate.frequency, start: start, end: end, sound: lowSound, highs: highs, newSound: newSound) {
             playedNotes.append(note)
         }
         tunerReading = TunerReading(frequency: smoother.add(estimate.frequency))
