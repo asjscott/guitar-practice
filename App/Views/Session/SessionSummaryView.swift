@@ -58,11 +58,14 @@ struct SessionSummaryView: View {
         return (block.stats.firstTryText, block.speedText, promptsText(block.stats))
     }
 
+    /// So many blocks that the cards are narrower.
+    private var isCrowded: Bool { summary.blocks.count > 8 }
+
     private func card(_ block: SessionSummary.Block) -> some View {
         let lines = lines(of: block)
         return VStack(spacing: 4) {
             Image(systemName: block.kind.symbol).font(.title2).foregroundStyle(.secondary)
-            Text(lines.main).font(.system(size: 40, weight: .bold, design: .rounded))
+            Text(lines.main).font(.system(size: isCrowded ? 30 : 40, weight: .bold, design: .rounded))
             Text(lines.sub ?? " ").font(.title3.monospacedDigit())
             Text(block.kind.title).font(.callout)
             Text(lines.detail).font(.caption).foregroundStyle(.secondary)
@@ -72,7 +75,8 @@ struct SessionSummaryView: View {
         .lineLimit(1)
         .minimumScaleFactor(0.6)
         .padding(.horizontal, 6)
-        .frame(minWidth: 84, maxWidth: 190)
+        // Narrower with many blocks, so that eleven fit a 920-point window.
+        .frame(minWidth: isCrowded ? 64 : 84, maxWidth: 190)
         .frame(height: 180)
         .sessionCard()
         .accessibilityElement(children: .combine)
