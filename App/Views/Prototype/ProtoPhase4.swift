@@ -1,3 +1,5 @@
+// VERDICT (25 Nov 2026): B, provisionally. Neck + scrolling timeline past a playhead; the next voicing ghosted on the neck
+// while Shown; Target top note as a line over the blocks. The player will judge it in use with the backing; A (chord row) is the fallback.
 // PROTOTYPE, throwaway. Three variants of the Phase 4 Progressions drill screen (A, B, C) on one Prototype screen.
 // ← → variant · 1–5 scene · D drill · G progression · T next time through · Space plays or stops. No audio, nothing saved.
 // Question: what should a progression drill look like while the backing runs, with a run-scoped fade and a score per chord?
