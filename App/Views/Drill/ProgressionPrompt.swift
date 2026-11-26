@@ -35,7 +35,7 @@ struct ProgressionPrompt<Resting: View>: View {
                     VStack(spacing: 4) { resting }.multilineTextAlignment(.center).frame(maxHeight: .infinity)
                 }
             }
-            .frame(height: 110)
+            .frame(height: display?.progression?.topNotes == nil ? 110 : 150)
             .padding(.horizontal, 24)
             VStack(spacing: 2) {
                 ForEach(notices, id: \.self) { Label($0, systemImage: "exclamationmark.triangle").foregroundStyle(.orange) }
@@ -58,28 +58,33 @@ struct ProgressionPrompt<Resting: View>: View {
 }
 
 /// The time through's chords as blocks, a tick per beat, scrolling left past a fixed playhead; the next time through
-/// comes in from the right. Past blocks are tinted by outcome, the current one outlined. One view, so that a row of
-/// chord cards (screen A) could take its place.
+/// comes in from the right. Past blocks are tinted by outcome, the current one outlined. In Target top note, the line
+/// of top notes rises and falls under the blocks, each note named. One view, so that a row of chord cards (screen A)
+/// could take its place.
 struct ProgressionTimeline: View {
     let progress: ProgressionProgress
 
     private static let beatWidth: CGFloat = 46
     private static let playheadShare: CGFloat = 0.25
+    /// The height the top-note line takes, under the blocks.
+    private static let lineBand: CGFloat = 48
 
     var body: some View {
         GeometryReader { geometry in
             let playhead = geometry.size.width * Self.playheadShare
-            let lapBeats = progress.blocks.map(\.beats).reduce(0, +)
+            let band = progress.topNotes == nil ? 0 : Self.lineBand
             ZStack(alignment: .topLeading) {
                 ForEach(laps, id: \.self) { lap in
                     ForEach(Array(progress.blocks.enumerated()), id: \.offset) { index, block in
-                        let start = Double(lap * lapBeats + beatsBefore(index))
-                        let x = playhead + CGFloat(start - progress.beat) * Self.beatWidth
                         blockView(block, isCurrent: lap == 0 && index == progress.current, hasOutcome: lap == 0)
-                            .frame(width: CGFloat(block.beats) * Self.beatWidth - 6, height: geometry.size.height - 20)
+                            .frame(width: CGFloat(block.beats) * Self.beatWidth - 6,
+                                   height: geometry.size.height - 20 - band)
                             .opacity(lap == 0 ? 1 : 0.5)
-                            .offset(x: x + 3, y: 10)
+                            .offset(x: x(lap: lap, block: index, playhead: playhead) + 3, y: 10)
                     }
+                }
+                if let topNotes = progress.topNotes {
+                    topLine(topNotes, playhead: playhead, top: geometry.size.height - band - 4, height: band)
                 }
                 Rectangle()
                     .fill(Color.orange)
@@ -90,7 +95,42 @@ struct ProgressionTimeline: View {
         .clipped()
         .accessibilityElement()
         .accessibilityLabel("Chords")
-        .accessibilityValue(progress.blocks.map(\.name).joined(separator: ", "))
+        .accessibilityValue(progress.blocks.map(\.name).joined(separator: ", ")
+            + (progress.topNotes.map { "; top notes " + $0.map(\.name).joined(separator: ", ") } ?? ""))
+    }
+
+    /// Where a block starts, in a lap (0 = this time through).
+    private func x(lap: Int, block index: Int, playhead: CGFloat) -> CGFloat {
+        let lapBeats = progress.blocks.map(\.beats).reduce(0, +)
+        let start = Double(lap * lapBeats + beatsBefore(index))
+        return playhead + CGFloat(start - progress.beat) * Self.beatWidth
+    }
+
+    /// The top notes, one at the start of each block, joined, higher notes higher; each named.
+    private func topLine(_ notes: [ProgressionProgress.TopNote], playhead: CGFloat, top: CGFloat,
+                         height: CGFloat) -> some View {
+        let pitches = notes.map(\.pitch.midi)
+        let low = pitches.min() ?? 0, high = max(pitches.max() ?? 0, low + 1)
+        let points = laps.flatMap { lap in
+            notes.indices.map { index in
+                let y = top + (height - 24) * CGFloat(high - notes[index].pitch.midi) / CGFloat(high - low) + 10
+                return (point: CGPoint(x: x(lap: lap, block: index, playhead: playhead) + 22, y: y),
+                        name: notes[index].name, lap: lap)
+            }
+        }
+        return ZStack(alignment: .topLeading) {
+            Path { $0.addLines(points.map(\.point)) }.stroke(Color.purple.opacity(0.5), lineWidth: 2)
+            ForEach(Array(points.enumerated()), id: \.offset) { _, point in
+                Text(point.name)
+                    .font(.callout.bold())
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1)
+                    .background(Capsule().fill(Color.purple))
+                    .opacity(point.lap == 0 ? 1 : 0.5)
+                    .position(point.point)
+            }
+        }
     }
 
     /// The time through before, while it can still be seen, this one and the next.

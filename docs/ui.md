@@ -77,7 +77,7 @@ B on branch `prototype/phase4-screens`, chosen provisionally: the player will ju
 - Playing: a header line (the drill and the progression's chords, feedback, which time through and the fade stage), the tall zoomed neck, then a timeline of chord blocks (name and numeral, a tick per beat) that scrolls left past a fixed playhead, with the next time through coming in from the right.
 - The neck shows the current chord's voicing at the run's fade stage, with the notes played so far solid and the last one ringed. While Shown, the next chord's voicing is ghosted on it.
 - Past blocks are tinted by outcome: green clean, orange wrong, grey missed; the current one is outlined.
-- Target top note: the top notes as a line that rises and falls over the blocks, each named.
+- Target top note: the top notes as a line that rises and falls in a band under the blocks, each named, at every fade stage (as in the prototype), each at its chord's first beat; the timeline grows to make room.
 - The count-in is a big number over the neck, as for scales.
 - The neck moves on to the next chord half a beat before its first beat, when its window opens. The header's right end says which time through and the fade stage ("3rd time through · Faded"); H shows the current voicing but doesn't bring back the ghost.
 - Free practice: Key (all 24, by mode), Progression (of the key's mode), Position (of the key's scale), Style (rock, pop ballad or blues shuffle; the 12-bar blues starts on the shuffle, the rest on rock) and Tempo (♩ = 70 at first). The tempo is remembered for all progression drills, the style per progression. They give way to the run's buttons during a run. At rest the neck shows the position faintly, with the drill's text where the timeline goes.

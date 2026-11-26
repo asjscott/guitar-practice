@@ -438,11 +438,12 @@ enum Snapshots {
         model.stop()
     }
 
-    /// Nearest voicing: I–V–vi–IV in G, E shape, at 70 BPM, played along the drawn path.
+    /// Nearest voicing, then Stay in position and Target top note Shown and Hidden: I–V–vi–IV in G, E shape, at
+    /// 70 BPM, played along the drawn path.
     private static func saveProgressions() async throws {
-        func model() -> DrillViewModel {
+        func model(_ kind: DrillKind = .nearestVoicing) -> DrillViewModel {
             let model = DrillViewModel()
-            model.kind = .nearestVoicing
+            model.kind = kind
             model.progressionKey = .major(.g)
             model.progression = Progression.named("I–V–vi–IV")!
             model.options.position = Position.ID(system: .caged, number: CAGEDShape.e.number)
@@ -490,6 +491,20 @@ enum Snapshots {
             paused.togglePause()
         }
         paused.stop()
+        for (kind, name) in [(DrillKind.stayInPosition, "stay"), (.targetTopNote, "top")] {
+            let shown = model(kind)
+            try await save("progression-\(name)-shown", DrillView(model: shown)) {
+                shown.start(seed: 1)
+                shown.playProgressionForSnapshot(chords: 5, partial: 2, untilBeat: 25.6)
+            }
+            shown.stop()
+            let hidden = model(kind)
+            try await save("progression-\(name)-hidden", DrillView(model: hidden)) {
+                hidden.start(seed: 1)
+                hidden.playProgressionForSnapshot(chords: 18, partial: 1, untilBeat: 76.8)
+            }
+            hidden.stop()
+        }
     }
 
     private static func saveMetronome() async throws {
