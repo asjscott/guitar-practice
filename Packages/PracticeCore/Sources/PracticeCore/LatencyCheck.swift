@@ -1,5 +1,5 @@
 /// The latency check in Settings › Audio: a bar of count-in, then eight clicks at 80 BPM, with a muted note played on
-/// each. The input delay is the median offset of the onsets from the clicks as heard (see "Input delay" in
+/// each. The input delay is the median time from each click as heard to its onset (see "Input delay" in
 /// GLOSSARY.md). Times are on the drill clock.
 public struct LatencyCheck: Hashable, Sendable {
     public static let bpm = 80
@@ -55,12 +55,12 @@ public struct LatencyCheck: Hashable, Sendable {
     /// Each click takes the onset nearest it within half a beat either side.
     public var result: Result {
         let window = (.zero - halfBeat)..<halfBeat
-        let offsets: [Duration] = clickTimes.compactMap { (click: Duration) -> Duration? in
+        let delays: [Duration] = clickTimes.compactMap { (click: Duration) -> Duration? in
             let near: [Duration] = onsets.map { $0 - click }.filter { window.contains($0) }
             return near.min { max($0, .zero - $0) < max($1, .zero - $1) }
         }
-        guard offsets.count >= Self.needed else { return .tooFew(heard: offsets.count) }
-        let sorted = offsets.sorted(), middle = sorted.count / 2
+        guard delays.count >= Self.needed else { return .tooFew(heard: delays.count) }
+        let sorted = delays.sorted(), middle = sorted.count / 2
         let median = sorted.count.isMultiple(of: 2) ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle]
         return .measured(max(.zero, median))
     }

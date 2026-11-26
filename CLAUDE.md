@@ -44,7 +44,7 @@ To see a UI change, run `scripts/snapshot --only <prefix> --sheet` and read the 
 - **Layers:** Views → Session engine / Exercise modules / Progress engine → TheoryCore + Audio engine → SwiftData. Lower layers never import higher ones.
 - Before changing the fretboard, explorer or Settings, read `docs/ui.md`.
 - Use `@Observable` for view state; keep views thin.
-- SwiftData models live in `App/Models` only. Run `scripts/log-check` after changing them. The schema is V2: never edit a released version; copy it and add a migration stage (V1 → V2 is the example). The player's store is opened only by `AttemptLog.live()`; snapshots and previews use `.inMemory()`.
+- SwiftData models live in `App/Models` only. Run `scripts/log-check` after changing them. The schema is V3: never edit a released version; copy it and add a migration stage (V2 → V3 is the latest example). The player's store is opened only by `AttemptLog.live()`; snapshots and previews use `.inMemory()`.
 - No new dependencies without asking first.
 
 ## Music conventions (TheoryCore)

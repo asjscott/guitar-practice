@@ -57,7 +57,7 @@ struct ProgressionPrompt<Resting: View>: View {
     }
 }
 
-/// The time through's chords as blocks, a tick per beat, scrolling left past a fixed playhead; the next time through
+/// The time through's chords as blocks, a mark per beat, scrolling left past a fixed playhead; the next time through
 /// comes in from the right. Past blocks are tinted by outcome, the current one outlined. In Target top note, the line
 /// of top notes rises and falls under the blocks, each note named. One view, so that a row of chord cards (screen A)
 /// could take its place.
@@ -74,13 +74,14 @@ struct ProgressionTimeline: View {
             let playhead = geometry.size.width * Self.playheadShare
             let band = progress.topNotes == nil ? 0 : Self.lineBand
             ZStack(alignment: .topLeading) {
-                ForEach(laps, id: \.self) { lap in
+                ForEach(timesThrough, id: \.self) { timeThrough in
                     ForEach(Array(progress.blocks.enumerated()), id: \.offset) { index, block in
-                        blockView(block, isCurrent: lap == 0 && index == progress.current, hasOutcome: lap == 0)
+                        blockView(block, isCurrent: timeThrough == 0 && index == progress.current,
+                                  hasOutcome: timeThrough == 0)
                             .frame(width: CGFloat(block.beats) * Self.beatWidth - 6,
                                    height: geometry.size.height - 20 - band)
-                            .opacity(lap == 0 ? 1 : 0.5)
-                            .offset(x: x(lap: lap, block: index, playhead: playhead) + 3, y: 10)
+                            .opacity(timeThrough == 0 ? 1 : 0.5)
+                            .offset(x: x(timeThrough: timeThrough, block: index, playhead: playhead) + 3, y: 10)
                     }
                 }
                 if let topNotes = progress.topNotes {
@@ -99,10 +100,10 @@ struct ProgressionTimeline: View {
             + (progress.topNotes.map { "; top notes " + $0.map(\.name).joined(separator: ", ") } ?? ""))
     }
 
-    /// Where a block starts, in a lap (0 = this time through).
-    private func x(lap: Int, block index: Int, playhead: CGFloat) -> CGFloat {
-        let lapBeats = progress.blocks.map(\.beats).reduce(0, +)
-        let start = Double(lap * lapBeats + beatsBefore(index))
+    /// Where a block starts, in a time through (0 = this one, -1 the one before, 1 the next).
+    private func x(timeThrough: Int, block index: Int, playhead: CGFloat) -> CGFloat {
+        let beatsPerTimeThrough = progress.blocks.map(\.beats).reduce(0, +)
+        let start = Double(timeThrough * beatsPerTimeThrough + beatsBefore(index))
         return playhead + CGFloat(start - progress.beat) * Self.beatWidth
     }
 
@@ -111,11 +112,11 @@ struct ProgressionTimeline: View {
                          height: CGFloat) -> some View {
         let pitches = notes.map(\.pitch.midi)
         let low = pitches.min() ?? 0, high = max(pitches.max() ?? 0, low + 1)
-        let points = laps.flatMap { lap in
+        let points = timesThrough.flatMap { timeThrough in
             notes.indices.map { index in
                 let y = top + (height - 24) * CGFloat(high - notes[index].pitch.midi) / CGFloat(high - low) + 10
-                return (point: CGPoint(x: x(lap: lap, block: index, playhead: playhead) + 22, y: y),
-                        name: notes[index].name, lap: lap)
+                return (point: CGPoint(x: x(timeThrough: timeThrough, block: index, playhead: playhead) + 22, y: y),
+                        name: notes[index].name, timeThrough: timeThrough)
             }
         }
         return ZStack(alignment: .topLeading) {
@@ -127,14 +128,14 @@ struct ProgressionTimeline: View {
                     .padding(.horizontal, 5)
                     .padding(.vertical, 1)
                     .background(Capsule().fill(Color.purple))
-                    .opacity(point.lap == 0 ? 1 : 0.5)
+                    .opacity(point.timeThrough == 0 ? 1 : 0.5)
                     .position(point.point)
             }
         }
     }
 
     /// The time through before, while it can still be seen, this one and the next.
-    private var laps: [Int] { progress.beat < 0 ? [0, 1] : [-1, 0, 1] }
+    private var timesThrough: [Int] { progress.beat < 0 ? [0, 1] : [-1, 0, 1] }
 
     private func beatsBefore(_ index: Int) -> Int { progress.blocks[..<index].map(\.beats).reduce(0, +) }
 
