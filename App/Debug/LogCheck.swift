@@ -151,6 +151,20 @@ enum LogCheck {
             log.context.insert(chord)
         }
 
+        // Nearest voicing at 60 BPM: G clean on D-G-B, D with a wrong note, Em missed.
+        var progressionSetup = DrillSetup(fretboard: Fretboard(tuning: .standard), seed: 1)
+        progressionSetup.options.key = .major(.g)
+        progressionSetup.options.progression = Progression.named("I–V–vi–IV")
+        progressionSetup.options.backing = BackingSettings(tempo: 60)
+        var chords = DrillKind.nearestVoicing.makeDrill(progressionSetup)
+        let chordRun = log.run()
+        chords.handle(.start(at: .zero))
+        for (pitch, onset) in [(55, 3.75), (59, 4.25), (62, 4.75), (54, 8.0), (58, 8.5)] {
+            chords.handle(.played(Pitch(pitch), onset: .seconds(onset), at: .seconds(onset)))
+        }
+        chords.handle(.tick(at: .seconds(16.5)))
+        chordRun.update(from: chords)
+
         // Two clean passes and one cut short by a pause, so the next is played at Hidden.
         var passes = DrillKind.upAndDown.makeDrill(DrillSetup(fretboard: Fretboard(tuning: .standard), seed: 1))
         let passRun = log.run()

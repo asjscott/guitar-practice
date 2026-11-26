@@ -85,3 +85,8 @@ extension Array where Element: Hashable {
         return filter { seen.insert($0).inserted }
     }
 }
+
+extension Progression {
+    /// The style its backing has until one is chosen for it.
+    public var defaultStyle: BackingStyle { .rock }
+}

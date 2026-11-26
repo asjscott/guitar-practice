@@ -95,6 +95,9 @@ struct SessionPlayingView: View {
             } resting: {
                 EmptyView()
             }
+        case .progressions:
+            // Sessions don't plan progression blocks yet (#60): the theme has no progression.
+            ProgressionPrompt(display: display, position: nil, fretboard: model.fretboard) {}
         }
     }
 

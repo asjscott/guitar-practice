@@ -99,10 +99,17 @@ public struct ProgressionDrill<Rules: ProgressionRules>: Drill {
 
     public var nothingToPromptReason: String? { setup.progressionProblem }
 
+    /// The chord on the neck: its root, where the voicing has it.
     public var prompt: NotePrompt? {
         guard isRunning, phase != .paused, let neck else { return nil }
-        let first = neck.voicing.locations[0]
-        return NotePrompt(name: chords[neck.slot % chords.count].root, string: first.string, target: first)
+        return rootPrompt(of: neck.voicing)
+    }
+
+    private func rootPrompt(of voicing: TriadVoicing) -> NotePrompt {
+        let root = voicing.triad.root
+        let location = voicing.locations.first { fretboard.pitch(at: $0).pitchClass == root.pitchClass }
+            ?? voicing.locations[0]
+        return NotePrompt(name: root, string: location.string, target: location)
     }
 
     public mutating func takeSounds() -> [DrillSoundRequest] { [] }
@@ -287,12 +294,12 @@ public struct ProgressionDrill<Rules: ProgressionRules>: Drill {
         guard let progression, let position else { return }
         let index = chord.slot % count
         let played = outcome == .missed ? nil : chord.played
-        let shown = (played ?? chord.expected.drawn).locations[0]
         let facts = ChordFacts(progression: progression, key: key, place: index, triad: chords[index],
                                position: position.id, played: played, accepted: chord.expected.accepted,
                                style: settings.style, tempo: settings.tempo, fadeStage: stage, hinted: chord.hinted,
                                outcome: outcome, firstOnset: chord.firstOnset, inputDelay: settings.inputDelay)
-        attempts.append(Attempt(prompt: NotePrompt(name: chords[index].root, string: shown.string, target: shown),
+        // The prompt is the chord's root in the voicing played, or else the one drawn.
+        attempts.append(Attempt(prompt: rootPrompt(of: played ?? chord.expected.drawn),
                                 outcome: outcome == .missed ? .timedOut : .answered,
                                 wrongAnswers: chord.wrong.map { .pitch($0) },
                                 group: AttemptGroup(number: group, size: count, place: index), facts: .chord(facts)))

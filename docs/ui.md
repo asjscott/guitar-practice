@@ -79,6 +79,10 @@ B on branch `prototype/phase4-screens`, chosen provisionally: the player will ju
 - Past blocks are tinted by outcome: green clean, orange wrong, grey missed; the current one is outlined.
 - Target top note: the top notes as a line that rises and falls over the blocks, each named.
 - The count-in is a big number over the neck, as for scales.
+- The neck moves on to the next chord half a beat before its first beat, when its window opens. The header's right end says which time through and the fade stage ("3rd time through · Faded"); H shows the current voicing but doesn't bring back the ghost.
+- Free practice: Key (all 24, by mode), Progression (of the key's mode), Position (of the key's scale), Style and Tempo (♩ = 70 at first). The tempo is remembered for all progression drills, the style per progression. They give way to the run's buttons during a run. At rest the neck shows the position faintly, with the drill's text where the timeline goes.
+- Under the timeline, orange notices: without the backing's sounds, that the drill plays clicks and how to fetch them; with the Mac's built-in microphone as input, that it will hear the backing as notes.
+- Summary: chords, clean and times through, then "23 of 24 chords clean · 6 times through · Hidden from the 5th" and the hardest chords ("Hardest: D (5 of 6)"), only those not always clean.
 
 ## Settings
 

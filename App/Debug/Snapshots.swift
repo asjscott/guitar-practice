@@ -232,6 +232,8 @@ enum Snapshots {
             triads.capo = 12
         }
 
+        try await saveProgressions()
+
         let climb = DrillViewModel()
         climb.kind = .inversions
         climb.options.stringSets = [.dGB]
@@ -434,6 +436,56 @@ enum Snapshots {
             for _ in 0..<4 { model.playForSnapshot(right: true) }
         }
         model.stop()
+    }
+
+    /// Nearest voicing: I–V–vi–IV in G, E shape, at 70 BPM, played along the drawn path.
+    private static func saveProgressions() async throws {
+        func model() -> DrillViewModel {
+            let model = DrillViewModel()
+            model.kind = .nearestVoicing
+            model.progressionKey = .major(.g)
+            model.progression = Progression.named("I–V–vi–IV")!
+            model.options.position = Position.ID(system: .caged, number: CAGEDShape.e.number)
+            return model
+        }
+        let idle = model()
+        try await save("progression-idle", DrillView(model: idle))
+        let noSounds = model()
+        try await save("progression-no-sounds", DrillView(model: noSounds),
+                       sound: AppSoundOutput(isInert: true, hasBackingSounds: false)) {
+            noSounds.setInputBuiltInForSnapshot()
+        }
+        let countIn = model()
+        try await save("progression-count-in", DrillView(model: countIn)) {
+            countIn.start(seed: 1)
+            countIn.playProgressionForSnapshot(chords: 0, untilBeat: 1.5)
+        }
+        countIn.stop()
+        let shown = model()
+        try await save("progression-shown", DrillView(model: shown)) {
+            shown.start(seed: 1)
+            shown.playProgressionForSnapshot(chords: 1, partial: 2, untilBeat: 9.6)
+        }
+        shown.stop()
+        let faded = model()
+        try await save("progression-faded", DrillView(model: faded)) {
+            faded.start(seed: 1)
+            faded.playProgressionForSnapshot(chords: 8, partial: 2, untilBeat: 37.6)
+        }
+        faded.stop()
+        let hidden = model()
+        try await save("progression-hidden-wrong", DrillView(model: hidden)) {
+            hidden.start(seed: 1)
+            hidden.playProgressionForSnapshot(chords: 18, wrong: [16], partial: 1, untilBeat: 76.8)
+        }
+        hidden.stop()
+        let paused = model()
+        try await save("progression-paused", DrillView(model: paused)) {
+            paused.start(seed: 1)
+            paused.playProgressionForSnapshot(chords: 1, partial: 2, untilBeat: 9.6)
+            paused.togglePause()
+        }
+        paused.stop()
     }
 
     private static func saveMetronome() async throws {
