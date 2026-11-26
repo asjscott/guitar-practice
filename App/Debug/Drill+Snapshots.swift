@@ -13,6 +13,14 @@ extension Drill {
 }
 
 extension DrillViewModel {
+    private var progressionRulesForSnapshot: any ProgressionRules.Type {
+        switch kind {
+        case .stayInPosition: StayInPositionRules.self
+        case .targetTopNote: TargetTopNoteRules.self
+        default: NearestVoicingRules.self
+        }
+    }
+
     /// Plays a progression drill's drawn path in time with the backing as heard (see `Snapshots`): `chords` chords
     /// whole, those in `wrong` as a wrong pitch, then `partial` notes of the next; then moves the clock to `beat`,
     /// counted from the count-in's first.
@@ -23,11 +31,18 @@ extension DrillViewModel {
         let beatLength = Duration.seconds(60) / backing.bpm
         var notes: [(pitch: Pitch, onset: Duration)] = []
         var previous: TriadVoicing?
+        var drawn: TriadVoicing?
+        let rules = progressionRulesForSnapshot
+        let topNotes = rules.topNotes(of: progression, in: options.key, position: position, on: fretboard)
         var slotBeat = Double(Backing.beatsPerBar)
         for slot in 0..<(count + (partial > 0 ? 1 : 0)) {
             let index = slot % chords.count
-            let voicing = previous.flatMap { fretboard.nearestVoicings(of: chords[index], in: position, to: $0).first }
-                ?? fretboard.middleVoicing(of: chords[index], in: position)!
+            let turn = ChordTurn(fretboard: fretboard, position: position, chords: chords, index: index,
+                                 timeThrough: slot / chords.count,
+                                 voicings: fretboard.voicings(of: chords[index], in: position),
+                                 previousPlayed: previous, previousDrawn: drawn, topNote: topNotes?[index])
+            let voicing = rules.expected(for: turn).drawn
+            drawn = voicing
             let pitches = voicing.locations.map(fretboard.pitch)
             let start = backing.start + beatLength * slotBeat
             if wrong.contains(slot) {
