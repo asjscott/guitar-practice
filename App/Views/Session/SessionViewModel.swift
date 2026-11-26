@@ -176,6 +176,7 @@ final class SessionViewModel: MetronomePanelOwner {
         if let progression = drillSetup.options.progression {
             metronome?.loadBacking(of: progression, into: &drillSetup.options.backing)
         }
+        drillSetup.inputDelay = AudioInputSettings.inputDelay(ofDevice: input?.device?.uid)
         return drillSetup
     }
 
@@ -621,9 +622,9 @@ final class SessionViewModel: MetronomePanelOwner {
     /// In a progression block, plays the drawn path in time with the backing as heard (see
     /// `progressionNotesForSnapshot`); then moves the clock to `beat`, counted from the count-in's first.
     func playProgressionForSnapshot(chords count: Int, wrong: Set<Int> = [], partial: Int = 0, untilBeat beat: Double) {
-        guard let backing = backingForSnapshot, let theme = theme?.theme, let progression = theme.progression,
-              let position = theme.position(on: fretboard) else { return }
-        let notes = progressionNotesForSnapshot(progression, in: theme.key, position: position, on: fretboard,
+        guard let backing = backingForSnapshot, let kind = blockKind, let theme = theme?.theme,
+              let progression = theme.progression, let position = theme.position(on: fretboard) else { return }
+        let notes = progressionNotesForSnapshot(kind, progression, in: theme.key, position: position, on: fretboard,
                                                 backing: backing, chords: count, wrong: wrong, partial: partial)
         for note in notes { send(.played(note.pitch, onset: note.onset, at: note.onset + .milliseconds(50))) }
         let end = backing.start + Duration.seconds(60) / backing.bpm * beat

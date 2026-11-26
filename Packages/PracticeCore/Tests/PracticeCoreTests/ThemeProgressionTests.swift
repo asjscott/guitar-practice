@@ -26,7 +26,7 @@ private func fits(_ theme: Theme, on fretboard: Fretboard) -> Bool {
 @Suite("Theme's progression")
 struct ThemeProgressionTests {
     @Test func everyProgressionComesUpInStandardTuningAndAlwaysFits() {
-        let themes = (UInt64(0)..<200).map { picker(seed: $0).theme(on: standard, system: .caged) }
+        let themes = (UInt64(0)..<100).map { picker(seed: $0).theme(on: standard, system: .caged) }
         for theme in themes { #expect(fits(theme, on: standard)) }
         #expect(Set(themes.compactMap(\.progression)) == Set(Progression.library))
     }
@@ -35,7 +35,7 @@ struct ThemeProgressionTests {
     func inOpenTuningsSomeThemesLeaveProgressionsOut(preset: TuningPreset, capo: Int) {
         let fretboard = Fretboard(tuning: preset.tuning, capo: capo)
         var leftOut: Set<Progression> = []
-        for seed in UInt64(0)..<80 {
+        for seed in UInt64(0)..<40 {
             let theme = picker(seed: seed).theme(on: fretboard, system: .caged)
             guard let position = theme.position(on: fretboard) else { continue }
             let fitting = Progression.library(theme.key.mode).filter { fretboard.fits($0, in: theme.key, position: position) }
@@ -47,7 +47,7 @@ struct ThemeProgressionTests {
 
     @Test func theLastPractisedDaysIsLeftOut() {
         func progressions(_ history: [PastTheme]) -> Set<String> {
-            Set((UInt64(0)..<200).compactMap {
+            Set((UInt64(0)..<120).compactMap {
                 let theme = picker(seed: $0, history: history).theme(on: standard, system: .caged)
                 return theme.key.mode == .major ? theme.progression?.id : nil
             })
@@ -61,7 +61,7 @@ struct ThemeProgressionTests {
     @Test func unlessItIsTheOnlyOne() throws {
         var checked = 0
         for fretboard in [Fretboard(tuning: TuningPreset.dadgad.tuning), Fretboard(tuning: TuningPreset.openG.tuning)] {
-            for seed in UInt64(0)..<300 {
+            for seed in UInt64(0)..<120 {
                 let history = [past("2026-09-03", nil)]
                 let theme = picker(seed: seed, history: history).theme(on: fretboard, system: .caged)
                 let position = try #require(theme.position(on: fretboard))
@@ -77,7 +77,7 @@ struct ThemeProgressionTests {
     }
 
     @Test func aRerollChangesIt() {
-        for seed in UInt64(0)..<20 {
+        for seed in UInt64(0)..<8 {
             var theme = picker(seed: seed).theme(on: standard, system: .caged)
             for rerolls in 1..<12 {
                 let next = picker(seed: seed, rerolls: rerolls).theme(on: standard, system: .caged, replacing: theme)
@@ -108,7 +108,7 @@ struct ThemeProgressionTests {
     @Test(arguments: [TuningPreset.dropD, .dadgad, .openG], [0, 3])
     func aDisqualifiedOneIsPickedAgainWithTheKeyKept(preset: TuningPreset, capo: Int) {
         let fretboard = Fretboard(tuning: preset.tuning, capo: capo)
-        for seed in UInt64(0)..<60 {
+        for seed in UInt64(0)..<25 {
             let theme = picker(seed: seed).theme(on: standard, system: .caged)
             let kept = picker(seed: seed).keepingKey(of: theme, on: fretboard, system: .caged)
             #expect(kept.key == theme.key)

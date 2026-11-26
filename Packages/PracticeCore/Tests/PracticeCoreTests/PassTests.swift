@@ -456,3 +456,60 @@ struct PassNoteTests {
         #expect(drill.promptStart == s(10))
     }
 }
+
+@Suite("Input delay in passes")
+struct PassInputDelayTests {
+    /// Running with every note heard 0.3 s after it was played; beat 1 at 4 s.
+    private func started(holdsTempo: Bool = true) -> any Drill {
+        var setup = setup { $0.pass.holdsTempo = holdsTempo }
+        setup.inputDelay = .milliseconds(300)
+        var drill = DrillKind.upAndDown.makeDrill(setup)
+        drill.handle(.start(at: s(0)))
+        return drill
+    }
+
+    @Test func itIsTakenOffTheClickOffsetAndRecorded() {
+        var drill = started()
+        play(45, at: 4.35, &drill)
+        #expect(drill.attempts[0].responseTime == s(0.05))
+        #expect(facts(drill.attempts[0])?.clickOffset == s(0.05))
+        #expect(facts(drill.attempts[0])?.inputDelay == .milliseconds(300))
+    }
+
+    @Test func theFirstNoteMayBeHalfABeatEarlyOnceItIsTakenOff() {
+        var drill = started()
+        // Played at 3.45: too early.
+        play(45, at: 3.75, &drill)
+        #expect(drill.attempts.isEmpty)
+        // Played at 3.55.
+        play(45, at: 3.85, &drill)
+        #expect(facts(drill.attempts[0])?.clickOffset == s(-0.45))
+    }
+
+    @Test func aNotePlayedInTimeCountsThoughHeardAfterTheTimeout() {
+        var drill = started()
+        drill.handle(.tick(at: s(9.1)))
+        // Heard at 9.15, played at 8.85: within the five seconds from beat 1.
+        drill.handle(.played(Pitch(45), onset: s(9.15), at: s(9.2)))
+        #expect(drill.attempts.map(\.outcome) == [.answered])
+    }
+
+    @Test func evennessAndTheLadderAreJudgedOnTheNotesAsPlayed() {
+        var drill = started(holdsTempo: false)
+        // Played a note a second from beat 1, so kept up and even.
+        playPass(from: 4.3, &drill)
+        #expect(drill.passes.last?.evenness == .zero)
+        #expect(drill.passSettings?.tempo == 64)
+        #expect(drill.attempts.allSatisfy { facts($0)?.clickOffset == .zero })
+    }
+
+    @Test func withNoCheckRunNothingIsTakenOff() {
+        let setup = setup()
+        #expect(setup.inputDelay == .zero)
+        var drill = DrillKind.upAndDown.makeDrill(setup)
+        drill.handle(.start(at: s(0)))
+        play(45, at: 4.35, &drill)
+        #expect(facts(drill.attempts[0])?.clickOffset == s(0.35))
+        #expect(facts(drill.attempts[0])?.inputDelay == .zero)
+    }
+}

@@ -97,7 +97,7 @@ public struct ThemePicker: Sendable {
         if !keepsSet { kept.stringSet = pickStringSet(in: theme.key, on: fretboard) }
         let fitting = progressions(for: kept.key, at: kept.position, on: fretboard)
         if !(theme.progression.map(fitting.contains) ?? false) {
-            kept.progression = pickProgression(in: kept.key, at: kept.position, on: fretboard)
+            kept.progression = pickProgression(from: fitting)
         }
         return kept
     }
@@ -105,16 +105,24 @@ public struct ThemePicker: Sendable {
     /// Of the key's mode, with every chord in the position, in the library's order. Empty where none fits.
     private func progressions(for key: Key, at id: Position.ID, on fretboard: Fretboard) -> [Progression] {
         guard let position = Theme(key: key, position: id).position(on: fretboard) else { return [] }
-        return Progression.library(key.mode).filter { fretboard.fits($0, in: key, position: position) }
+        let library = Progression.library(key.mode)
+        // Each chord looked at once: several progressions share it.
+        let chords = Set(library.flatMap { $0.chords(in: key) })
+        let playable = chords.filter { !fretboard.voicings(of: $0, in: position).isEmpty }
+        return library.filter { Set($0.chords(in: key)).isSubset(of: playable) }
     }
 
     /// The last practised day's is left out unless it is the only choice, and then the one to be replaced likewise.
     private func pickProgression(in key: Key, at position: Position.ID, on fretboard: Fretboard,
                                  replacing old: Progression? = nil) -> Progression? {
+        pickProgression(from: progressions(for: key, at: position, on: fretboard), replacing: old)
+    }
+
+    private func pickProgression(from fitting: [Progression], replacing old: Progression? = nil) -> Progression? {
         let recent = Set(recentDays.first?.compactMap(\.progression) ?? [])
         // Other random numbers than the key's, the position's and the string set's, so that it doesn't follow them.
         var random = SplitMix64(seed: seed ^ 0x5052_4F47_5245_5353)
-        var choices = random.shuffled(progressions(for: key, at: position, on: fretboard))
+        var choices = random.shuffled(fitting)
         for leftOut in [recent, Set([old].compactMap { $0 })] {
             let others = choices.filter { !leftOut.contains($0) }
             if !others.isEmpty { choices = others }

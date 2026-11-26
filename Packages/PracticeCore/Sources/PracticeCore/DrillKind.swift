@@ -14,6 +14,8 @@ public struct DrillKind: Identifiable, Sendable {
         .triadPlayIt,
         .inversions,
         .nearestVoicing,
+        .stayInPosition,
+        .targetTopNote,
     ]
 
     /// Saved in the attempt log: never change it.

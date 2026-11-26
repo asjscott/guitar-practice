@@ -13,6 +13,10 @@ private func rock(_ chords: [BackingChord] = gDEmC, bpm: Int = 60, start: Durati
     Backing(chords: chords, style: .rock, bpm: bpm, start: start)
 }
 
+private func backing(_ style: BackingStyle, _ chords: [BackingChord] = gDEmC, bpm: Int = 60) -> Backing {
+    Backing(chords: chords, style: style, bpm: bpm, start: .seconds(10))
+}
+
 private func beats(_ notes: [BackingNote], at bpm: Int = 60, from start: Duration) -> [Double] {
     notes.map { (($0.time - start) / .seconds(60) * Double(bpm) * 1000).rounded() / 1000 }
 }
@@ -89,5 +93,82 @@ struct BackingTests {
         let ii = BackingChord(minor(.a)), v = BackingChord(major(.d)), i = BackingChord(major(.g), bars: 2)
         let bass = rock([ii, v, i]).timeThrough.filter { $0.part == .bass }
         #expect(bass.map(\.pitch.midi) == [33, 38, 31, 31].flatMap { Array(repeating: $0, count: 8) })
+    }
+
+    // MARK: - Pop ballad
+
+    /// Half time: the snare on 3 only, so a bar feels like two slow beats.
+    @Test func popBalladDrumsKickOn1SnareOn3AndHiHatsOnTheBeats() {
+        let drums = backing(.popBallad).timeThrough.filter { $0.part == .drums }
+        let on = { (drum: Pitch) in beats(drums.filter { $0.pitch == drum }, from: .seconds(10)) }
+        #expect(on(Backing.Drum.kick) == [4, 8, 12, 16])
+        #expect(on(Backing.Drum.snare) == [6, 10, 14, 18])
+        #expect(on(Backing.Drum.closedHiHat) == Array(stride(from: 4.0, to: 20, by: 1)))
+    }
+
+    /// The root on 1 and its fifth above on 3: G1 D2, D2 A2, E1 B1, C2 G2.
+    @Test func popBalladBassPlaysRootOn1AndFifthOn3() {
+        let bass = backing(.popBallad).timeThrough.filter { $0.part == .bass }
+        #expect(beats(bass, from: .seconds(10)) == Array(stride(from: 4.0, to: 20, by: 2)))
+        #expect(bass.map(\.pitch.midi) == [31, 38, 38, 45, 28, 35, 36, 43])
+    }
+
+    /// One chord a bar, held nearly to the next, in the same middle register as rock's.
+    @Test(arguments: [60, 120])
+    func popBalladKeysHoldEachChordForItsBar(_ bpm: Int) {
+        let ballad = backing(.popBallad, bpm: bpm)
+        let bar = Duration.seconds(60) / bpm * 4
+        let keys = ballad.timeThrough.filter { $0.part == .keys }
+        #expect(beats(keys, at: bpm, from: .seconds(10)) == [4, 8, 12, 16].flatMap { Array(repeating: $0, count: 3) })
+        #expect(keys.allSatisfy { $0.length > bar * 0.9 && $0.length < bar })
+        let chords = stride(from: 0, to: keys.count, by: 3).map { keys[$0..<$0 + 3].map(\.pitch.midi).sorted() }
+        #expect(chords == [[55, 59, 62], [57, 62, 66], [55, 59, 64], [55, 60, 64]])
+    }
+
+    // MARK: - Blues shuffle
+
+    /// Shuffled eighths: the second of each beat's pair two thirds of the way through it.
+    @Test func bluesShuffleDrumsKickOn1And3SnareOn2And4AndShuffledHiHats() {
+        let drums = backing(.bluesShuffle).timeThrough.filter { $0.part == .drums }
+        let on = { (drum: Pitch) in beats(drums.filter { $0.pitch == drum }, from: .seconds(10)) }
+        #expect(on(Backing.Drum.kick) == [4, 6, 8, 10, 12, 14, 16, 18])
+        #expect(on(Backing.Drum.snare) == [5, 7, 9, 11, 13, 15, 17, 19])
+        #expect(on(Backing.Drum.closedHiHat) == (4..<20).flatMap { [Double($0), Double($0) + 0.667] })
+    }
+
+    /// Root, fifth, sixth, fifth, a beat each in shuffled pairs: in G, G1 D2 E2 D2.
+    @Test func bluesShuffleBassWalksRootFifthSixthInShuffledEighths() {
+        let bass = backing(.bluesShuffle).timeThrough.filter { $0.part == .bass }
+        #expect(beats(bass, from: .seconds(10)) == (4..<20).flatMap { [Double($0), Double($0) + 0.667] })
+        #expect(Array(bass.prefix(8).map(\.pitch.midi)) == [31, 31, 38, 38, 40, 40, 38, 38])
+        // C: C2 G2 A2 G2.
+        #expect(Array(bass.suffix(8).map(\.pitch.midi)) == [36, 36, 43, 43, 45, 45, 43, 43])
+    }
+
+    @Test(arguments: [BackingStyle.popBallad, .bluesShuffle])
+    func everyStyleCountsInWithFourDrumsticks(_ style: BackingStyle) {
+        let countIn = backing(style).countIn
+        #expect(countIn.allSatisfy { $0.part == .drums && $0.pitch == Backing.Drum.sticks })
+        #expect(beats(countIn, from: .seconds(10)) == [0, 1, 2, 3])
+    }
+
+    @Test(arguments: BackingStyle.allCases, [60, 120])
+    func noStylesNoteOutlastsItsBar(_ style: BackingStyle, _ bpm: Int) {
+        let styled = backing(style, bpm: bpm)
+        let bar = Duration.seconds(60) / bpm * 4
+        for (index, note) in styled.timeThrough.enumerated() {
+            let barStart = styled.start + bar * Int((note.time - styled.start) / bar)
+            #expect(note.time + note.length <= barStart + bar, "note \(index)")
+        }
+    }
+}
+
+@Suite("Backing style per progression")
+struct BackingStyleDefaultTests {
+    @Test func theTwelveBarBluesDefaultsToTheShuffleAndEveryOtherProgressionToRock() {
+        let defaults = Dictionary(uniqueKeysWithValues: Progression.library.map { ($0.id, $0.defaultStyle) })
+        #expect(defaults["12-bar blues"] == .bluesShuffle)
+        #expect(defaults.filter { $0.key != "12-bar blues" }.values.allSatisfy { $0 == .rock })
+        #expect(defaults.count == 8)
     }
 }

@@ -17,6 +17,22 @@ public struct ChordTurn: Sendable {
     public let previousPlayed: TriadVoicing?
     /// The voicing the app drew for the chord before it; nil for the run's first chord and after Resume.
     public let previousDrawn: TriadVoicing?
+    /// The top-note line's note for this chord, in a drill with one (see `ProgressionRules.topNotes`); else nil.
+    public let topNote: Pitch?
+
+    public init(fretboard: Fretboard, position: Position, chords: [Triad], index: Int, timeThrough: Int,
+                voicings: [TriadVoicing], previousPlayed: TriadVoicing?, previousDrawn: TriadVoicing?,
+                topNote: Pitch? = nil) {
+        self.fretboard = fretboard
+        self.position = position
+        self.chords = chords
+        self.index = index
+        self.timeThrough = timeThrough
+        self.voicings = voicings
+        self.previousPlayed = previousPlayed
+        self.previousDrawn = previousDrawn
+        self.topNote = topNote
+    }
 
     public var triad: Triad { chords[index] }
 }
@@ -45,6 +61,16 @@ public protocol ProgressionRules: Sendable {
 
     /// The chord's expected voicings, worked out when it comes up, and again for the neck before then.
     static func expected(for turn: ChordTurn) -> ExpectedVoicings
+
+    /// A melody on the top notes, one per chord, drawn over the timeline at every fade stage and handed to each
+    /// chord's turn; nil (the default) for none.
+    static func topNotes(of progression: Progression, in key: Key, position: Position,
+                         on fretboard: Fretboard) -> [Pitch]?
+}
+
+extension ProgressionRules {
+    public static func topNotes(of progression: Progression, in key: Key, position: Position,
+                                on fretboard: Fretboard) -> [Pitch]? { nil }
 }
 
 extension DrillSetup {
@@ -87,6 +113,6 @@ extension Array where Element: Hashable {
 }
 
 extension Progression {
-    /// The style its backing has until one is chosen for it.
-    public var defaultStyle: BackingStyle { .rock }
+    /// The style its backing has until one is chosen for it: the shuffle for the 12-bar blues, else rock.
+    public var defaultStyle: BackingStyle { id == "12-bar blues" ? .bluesShuffle : .rock }
 }

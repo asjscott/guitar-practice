@@ -17,10 +17,11 @@ final class BackingPlayer {
     /// Whether it was started by Listen in Settings.
     private(set) var isListening = false
 
-    /// Listen's progression, style and tempo: I–V–vi–IV in G, rock, 70 BPM.
-    static let listenChords = [Triad(.major, root: .g), Triad(.major, root: .d), Triad(.minor, root: .e), Triad(.major, root: .c)]
-        .map { BackingChord($0) }
-    static let listenStyle = BackingStyle.rock
+    /// Listen's progression and tempo: I–V–vi–IV in G, 70 BPM. Its style is the progression's, as chosen in Settings
+    /// or free practice.
+    static let listenProgression = Progression.named("I–V–vi–IV")!
+    static let listenKey = Key.major(.g)
+    static let listenChords = listenProgression.chords(in: listenKey).map { BackingChord($0) }
     static let listenBPM = 70
 
     @ObservationIgnored private var backing: Backing?
@@ -114,9 +115,9 @@ final class BackingPlayer {
 
     // MARK: - Listen
 
-    /// Plays Listen's progression, with the metronome's click on top if asked, so that the two can be heard landing
-    /// together. Does nothing while a drill has the click or the backing, or without the sounds.
-    func listen(withClick: Bool) {
+    /// Plays Listen's progression in a style, with the metronome's click on top if asked, so that the two can be heard
+    /// landing together. Does nothing while a drill has the click or the backing, or without the sounds.
+    func listen(style: BackingStyle, withClick: Bool) {
         guard hasSounds, isListening || !isRunning, !metronome.isRunning || metronome.isListening || hasClick else { return }
         if hasClick { metronome.stop() }
         metronome.stopListening()
@@ -126,7 +127,7 @@ final class BackingPlayer {
             let track = ClickTrack(meter: Meter(.fourFour, emphasis: emphasis), bpm: Self.listenBPM, start: start)
             start = metronome.start(track).start
         }
-        self.start(Backing(chords: Self.listenChords, style: Self.listenStyle, bpm: Self.listenBPM, start: start))
+        self.start(Backing(chords: Self.listenChords, style: style, bpm: Self.listenBPM, start: start))
         hasClick = withClick
         isListening = true
     }

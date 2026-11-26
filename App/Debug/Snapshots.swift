@@ -307,7 +307,26 @@ enum Snapshots {
         try await save("settings-instrument-locked", InstrumentSettingsView().environment(activeSessions),
                        size: CGSize(width: 520, height: 700))
         try await save("settings-audio", AudioSettingsView(), size: CGSize(width: 520, height: 480))
+        try await saveLatencyCheck()
         try await saveMetronome()
+    }
+
+    /// Settings › Audio's latency check: under way, measured, and heard too few.
+    private static func saveLatencyCheck() async throws {
+        guard let device = audioInput.choice?.device else { return }
+        let size = CGSize(width: 520, height: 480)
+        let check = LatencyCheckModel(defaults: emptyDefaults)
+        defer { emptyDefaults.removeObject(forKey: AudioInputSettings.Key.inputDelay(ofDevice: device.uid)) }
+        try await save("settings-audio-checking", AudioSettingsView(check: check), size: size) {
+            check.showForSnapshot(.running(LatencyCheck(start: .zero), device: device.uid), progress: .click(3))
+        }
+        check.showForSnapshot(.idle)
+        try await save("settings-audio-measured", AudioSettingsView(check: check), size: size) {
+            check.storeForSnapshot(.milliseconds(18), ofDevice: device.uid)
+        }
+        try await save("settings-audio-try-again", AudioSettingsView(check: check), size: size) {
+            check.showForSnapshot(.tooFew(heard: 4))
+        }
     }
 
     private static func savePasses() async throws {
@@ -438,11 +457,12 @@ enum Snapshots {
         model.stop()
     }
 
-    /// Nearest voicing: I–V–vi–IV in G, E shape, at 70 BPM, played along the drawn path.
+    /// Nearest voicing, then Stay in position and Target top note Shown and Hidden: I–V–vi–IV in G, E shape, at
+    /// 70 BPM, played along the drawn path.
     private static func saveProgressions() async throws {
-        func model() -> DrillViewModel {
+        func model(_ kind: DrillKind = .nearestVoicing) -> DrillViewModel {
             let model = DrillViewModel()
-            model.kind = .nearestVoicing
+            model.kind = kind
             model.progressionKey = .major(.g)
             model.progression = Progression.named("I–V–vi–IV")!
             model.options.position = Position.ID(system: .caged, number: CAGEDShape.e.number)
@@ -450,6 +470,10 @@ enum Snapshots {
         }
         let idle = model()
         try await save("progression-idle", DrillView(model: idle))
+        // The 12-bar blues, which starts on the shuffle.
+        let blues = model()
+        blues.progression = Progression.named("12-bar blues")!
+        try await save("progression-idle-blues", DrillView(model: blues))
         let noSounds = model()
         try await save("progression-no-sounds", DrillView(model: noSounds),
                        sound: AppSoundOutput(isInert: true, hasBackingSounds: false)) {
@@ -486,6 +510,20 @@ enum Snapshots {
             paused.togglePause()
         }
         paused.stop()
+        for (kind, name) in [(DrillKind.stayInPosition, "stay"), (.targetTopNote, "top")] {
+            let shown = model(kind)
+            try await save("progression-\(name)-shown", DrillView(model: shown)) {
+                shown.start(seed: 1)
+                shown.playProgressionForSnapshot(chords: 5, partial: 2, untilBeat: 25.6)
+            }
+            shown.stop()
+            let hidden = model(kind)
+            try await save("progression-\(name)-hidden", DrillView(model: hidden)) {
+                hidden.start(seed: 1)
+                hidden.playProgressionForSnapshot(chords: 18, partial: 1, untilBeat: 76.8)
+            }
+            hidden.stop()
+        }
     }
 
     private static func saveMetronome() async throws {
@@ -522,8 +560,13 @@ enum Snapshots {
         let metronome = Metronome(output: output, defaults: emptyDefaults)
         let backing = BackingPlayer(output: output, metronome: metronome)
         try await save("settings-metronome-backing", MetronomeSettingsView().environment(metronome).environment(backing)
-            .environment(output), size: size, settle: .milliseconds(1100)) { backing.listen(withClick: true) }
+            .environment(output), size: size, settle: .milliseconds(1100)) { backing.listen(style: .rock, withClick: true) }
         backing.stop()
+        // The shuffle chosen for Listen's progression.
+        emptyDefaults.set(BackingStyle.bluesShuffle.rawValue,
+                          forKey: MetronomeSettings.Key.backingStyle(of: BackingPlayer.listenProgression))
+        try await save("settings-metronome-backing-shuffle", MetronomeSettingsView(), size: size)
+        emptyDefaults.removeObject(forKey: MetronomeSettings.Key.backingStyle(of: BackingPlayer.listenProgression))
         try await save("beats-row", BeatsRow(meter: Meter(.fourFour, emphasis: [1, 3]), current: 4).padding(),
                        size: CGSize(width: 260, height: 80))
     }

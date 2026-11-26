@@ -116,14 +116,13 @@ enum LogCheck {
         // Passes and triads.
         let pass = PassFacts(scale: Scale(.blues, tonic: .a), position: Position.ID(system: .caged, number: 4, octave: 1),
                              startDegree: Scale.Degree(5, -1), tempo: 72, signature: TimeSignature(beats: 7, unit: 8) ?? .fourFour, fadeStage: .faded,
-                             hinted: true, clickOffset: .milliseconds(-125))
+                             hinted: true, clickOffset: .milliseconds(-125), inputDelay: .microseconds(12500))
         let triad = TriadFacts(triad: Triad(.minor, root: .bFlat), inversion: .second, stringSet: .dGB)
         for (place, facts) in [AttemptFacts.pass(pass), .triad(triad)].enumerated() {
             let attempt = Attempt(prompt: NotePrompt(name: .f, string: 2, target: target), outcome: .skipped,
                                   group: AttemptGroup(number: place, size: 3, place: place), facts: facts)
             let record = LoggedAttempt(attempt, in: newDrill(), date: .now, source: .freePractice, groupID: UUID(),
                                        blockIndex: nil)
-            if place == 0 { record.inputDelaySeconds = 0.0125 }
             log.context.insert(record)
         }
 
