@@ -162,7 +162,7 @@ final class DrillViewModel: MetronomePanelOwner {
     var progressionPosition: Position? { setup.progressionPosition }
 
     /// The run's chords so far, and how they went.
-    var chordSummary: ChordRunSummary { ChordRunSummary(attempts: snapshot.attempts) }
+    var chordSummary: ChordSummary { ChordSummary(attempts: snapshot.attempts) }
 
     /// Those reached by now in what the drill goes through, a session's included.
     private func loggedFadeStages() -> FadeStages? {

@@ -1,7 +1,7 @@
 import TheoryCore
 
 /// How a progression drill's chords went: for the summary at the end of a run or block.
-public struct ChordRunSummary: Hashable, Sendable {
+public struct ChordSummary: Hashable, Sendable {
     /// A chord of the progression and how often it was clean.
     public struct Chord: Hashable, Sendable {
         /// "Em".
