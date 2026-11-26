@@ -450,6 +450,10 @@ enum Snapshots {
         }
         let idle = model()
         try await save("progression-idle", DrillView(model: idle))
+        // The 12-bar blues, which starts on the shuffle.
+        let blues = model()
+        blues.progression = Progression.named("12-bar blues")!
+        try await save("progression-idle-blues", DrillView(model: blues))
         let noSounds = model()
         try await save("progression-no-sounds", DrillView(model: noSounds),
                        sound: AppSoundOutput(isInert: true, hasBackingSounds: false)) {
@@ -522,8 +526,13 @@ enum Snapshots {
         let metronome = Metronome(output: output, defaults: emptyDefaults)
         let backing = BackingPlayer(output: output, metronome: metronome)
         try await save("settings-metronome-backing", MetronomeSettingsView().environment(metronome).environment(backing)
-            .environment(output), size: size, settle: .milliseconds(1100)) { backing.listen(withClick: true) }
+            .environment(output), size: size, settle: .milliseconds(1100)) { backing.listen(style: .rock, withClick: true) }
         backing.stop()
+        // The shuffle chosen for Listen's progression.
+        emptyDefaults.set(BackingStyle.bluesShuffle.rawValue,
+                          forKey: MetronomeSettings.Key.backingStyle(of: BackingPlayer.listenProgression))
+        try await save("settings-metronome-backing-shuffle", MetronomeSettingsView(), size: size)
+        emptyDefaults.removeObject(forKey: MetronomeSettings.Key.backingStyle(of: BackingPlayer.listenProgression))
         try await save("beats-row", BeatsRow(meter: Meter(.fourFour, emphasis: [1, 3]), current: 4).padding(),
                        size: CGSize(width: 260, height: 80))
     }

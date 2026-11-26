@@ -176,10 +176,12 @@ struct ProgressionOptions: View {
 }
 
 extension BackingStyle {
-    /// "Rock".
+    /// "Rock", "Pop ballad".
     var title: String {
         switch self {
         case .rock: "Rock"
+        case .popBallad: "Pop ballad"
+        case .bluesShuffle: "Blues shuffle"
         }
     }
 }
