@@ -118,6 +118,38 @@ struct SessionPlannerTests {
         #expect(orders(.triads) == 2)
     }
 
+    // 15 : 20 : 20 : 20 of 600, 900, 1800 and 3600 s.
+    private static let fourModuleLengths: [(minutes: Int, lengths: [DrillModule: [Int]])] = [
+        (10, [.notes: [120], .scales: [160], .triads: [160], .progressions: [160]]),
+        (15, [.notes: [90, 90], .scales: [240], .triads: [240], .progressions: [240]]),
+        (30, [.notes: [90, 90, 90, 90], .scales: [240, 240], .triads: [240, 240], .progressions: [240, 240]]),
+        (60, [.notes: [180, 180, 180, 180], .scales: [480, 480], .triads: [480, 480], .progressions: [320, 320, 320]]),
+    ]
+
+    @Test(arguments: 0..<4)
+    func withProgressionsFourModulesShareTheTime(index: Int) {
+        let (minutes, expected) = Self.fourModuleLengths[index]
+        for day in days {
+            let blocks = plan(minutes, day: day, kinds: Self.fourModules)
+            #expect(lengths(blocks) == expected)
+            let modules = blocks.map(\.kind.module).reduce(into: [DrillModule]()) { if $0.last != $1 { $0.append($1) } }
+            #expect(modules == [.notes, .scales, .triads, .progressions])
+            #expect(abs(blocks.map { $0.length / .seconds(1) }.reduce(0, +) - Double(minutes) * 60) < 0.1)
+        }
+    }
+
+    private static let progressions = ["p1", "p2", "p3"].map { kind($0, module: .progressions) }
+    /// In no particular order.
+    private static let fourModules = progressions + triads + scales + notes
+
+    @Test func progressionDrillsHaveTheirTurnByDay() {
+        let kept = (739_000..<739_006).flatMap {
+            plan(10, day: $0, kinds: notes + Self.progressions).filter { $0.kind.module == .progressions }.map(\.kind.id)
+        }
+        #expect(Set(kept.prefix(3)) == ["p1", "p2", "p3"])
+        #expect(Array(kept.prefix(3)) == Array(kept.suffix(3)))
+    }
+
     @Test func oneDrillGetsTheWholeBudgetAndNoneGivesNoBlocks() {
         #expect(plan(10, day: 3, kinds: [notes[1]]).map(\.length) == [s(600)])
         #expect(plan(10, day: 3, kinds: []).isEmpty)
@@ -171,6 +203,19 @@ struct SessionPlannerDrillsTests {
         #expect(!kinds.contains { $0.module == .triads })
         let total = SessionPlanner.plan(kinds, budget: s(900), day: 1).map { $0.length / .seconds(1) }.reduce(0, +)
         #expect(abs(total - 900) < 0.1)
+    }
+
+    @Test func progressionsWithNoneInTheThemeAreLeftOutAndSetupSaysWhy() {
+        var setup = setup
+        let eShape = Position.ID(system: .caged, number: CAGEDShape.e.number)
+        setup.follow(Theme(key: .major(.g), position: eShape, stringSet: .dGB, progression: Progression.named("I–IV–V")))
+        #expect(SessionPlanner.noProgressionsNotice(from: DrillKind.all, for: setup) == nil)
+        #expect(SessionPlanner.drills(from: DrillKind.all, for: setup, hasSound: true).contains(.nearestVoicing))
+        setup.follow(Theme(key: .major(.g), position: eShape, stringSet: .dGB))
+        #expect(SessionPlanner.noProgressionsNotice(from: DrillKind.all, for: setup)
+                == "Progressions are left out: no progression in G major has every chord in the E shape.")
+        #expect(SessionPlanner.noProgressionsNotice(from: [.notePlayIt], for: setup) == nil)
+        #expect(!SessionPlanner.drills(from: DrillKind.all, for: setup, hasSound: true).contains { $0.module == .progressions })
     }
 
     @Test func aDrillWithNothingToPromptIsLeftOut() {

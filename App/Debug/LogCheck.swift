@@ -406,6 +406,15 @@ enum LogCheck {
         record?.theme = rerolled?.theme
         session.showTheme(on: evening)
         try require(before == given?.theme && session.theme == rerolled, "back to the first tuning")
+        // Saved before themes had a progression.
+        record?.progression = nil
+        session.showTheme(on: evening)
+        try require(session.theme?.theme.progression != nil && record?.progression == session.theme?.theme.progression?.id,
+                    "a theme without a progression gets one")
+        try require(session.theme?.theme.stringSet == rerolled?.theme.stringSet && session.theme?.key == rerolled?.key,
+                    "and keeps the rest")
+        record?.theme = rerolled?.theme
+        session.showTheme(on: evening)
 
         session.start(on: evening)
         session.next()

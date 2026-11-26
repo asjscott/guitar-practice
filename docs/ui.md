@@ -83,6 +83,7 @@ B on branch `prototype/phase4-screens`, chosen provisionally: the player will ju
 - Free practice: Key (all 24, by mode), Progression (of the key's mode), Position (of the key's scale), Style (rock, pop ballad or blues shuffle; the 12-bar blues starts on the shuffle, the rest on rock) and Tempo (♩ = 70 at first). The tempo is remembered for all progression drills, the style per progression. They give way to the run's buttons during a run. At rest the neck shows the position faintly, with the drill's text where the timeline goes.
 - Under the timeline, orange notices: without the backing's sounds, that the drill plays clicks and how to fetch them; with the Mac's built-in microphone as input, that it will hear the backing as notes.
 - Summary: chords, clean and times through, then "23 of 24 chords clean · 6 times through · Hidden from the 5th" and the hardest chords ("Hardest: D (5 of 6)"), only those not always clean.
+- In a session: setup shows the theme's progression under the position ("I–V–vi–IV: G D Em C"), a notice when progressions are left out, and the two orange backing notices when a Progressions block is planned; its Ready card repeats them. The status bar's theme ends with the progression. The session plays at the remembered tempo and the progression's style. A due chime waits for the time through to end: the backing stops there, and the next time through counts in once the chime is over. The summary card: chords clean of all, large, then "chords clean", then times through with when it went Hidden, and the hardest chords.
 
 ## Settings
 

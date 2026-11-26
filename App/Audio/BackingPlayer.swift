@@ -27,6 +27,8 @@ final class BackingPlayer {
     @ObservationIgnored private var backing: Backing?
     /// Notes before this have been handed to the output.
     @ObservationIgnored private var scheduledUntil: Duration = .zero
+    /// No note is heard at or after this; nil = none set.
+    @ObservationIgnored private var endsAt: Duration?
     @ObservationIgnored private let output: AppSoundOutput
     @ObservationIgnored private let metronome: Metronome
     @ObservationIgnored private var task: Task<Void, Never>?
@@ -63,6 +65,7 @@ final class BackingPlayer {
                             start: max(backing.start, readyOutput()))
         self.backing = heard
         scheduledUntil = heard.start
+        endsAt = nil
         isRunning = true
         playOn()
         if task == nil {
@@ -93,10 +96,18 @@ final class BackingPlayer {
         output.cancelBacking(from: Metronome.now)
     }
 
+    /// No note heard at or after a time; until then the backing goes on. A start replaces it.
+    func end(at time: Duration) {
+        guard isRunning else { return }
+        endsAt = time
+        output.cancelBacking(from: time)
+    }
+
     /// Hands the output the next second's notes.
     private func playOn() {
         guard let backing else { return }
-        let until = Metronome.now + Self.ahead
+        var until = Metronome.now + Self.ahead
+        if let endsAt { until = min(until, endsAt) }
         guard until > scheduledUntil else { return }
         output.schedule(backing.notes(from: scheduledUntil, before: until))
         scheduledUntil = until
@@ -123,5 +134,34 @@ final class BackingPlayer {
 
     func stopListening() {
         if isListening { stop() }
+    }
+}
+
+extension BackingPlayer {
+    /// Does what a drill asks of the backing, in order, answering each start with the backing as it will be heard: on
+    /// the player with its sounds, or without them (or a player), its beats as clicks on the metronome. Neither (in
+    /// `LogCheck`) is heard as asked.
+    static func perform(_ requests: [BackingRequest], on player: BackingPlayer?, metronome: Metronome?,
+                        heard: (Backing) -> Void) {
+        let hasSounds = player?.hasSounds == true
+        for request in requests {
+            switch request {
+            case .start(let backing):
+                if let player, hasSounds {
+                    metronome?.stop()
+                    heard(player.start(backing))
+                } else if let metronome {
+                    let clicks = metronome.start(ClickTrack(meter: Meter(.fourFour), bpm: backing.bpm, start: backing.start))
+                    heard(Backing(chords: backing.chords, style: backing.style, bpm: backing.bpm, start: clicks.start))
+                } else {
+                    heard(backing)
+                }
+            case .end(let time):
+                if hasSounds { player?.end(at: time) } else { metronome?.stop(at: time) }
+            case .stop:
+                player?.stop()
+                metronome?.stop()
+            }
+        }
     }
 }

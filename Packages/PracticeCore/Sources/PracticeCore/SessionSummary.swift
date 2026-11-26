@@ -13,6 +13,11 @@ public struct SessionSummary: Hashable, Sendable {
             kind.hasPasses ? PassStats(PassResult.passes(in: stats.attempts)) : nil
         }
 
+        /// In progression blocks only.
+        public var chords: ChordRunSummary? {
+            kind.hasBacking ? ChordRunSummary(attempts: stats.attempts) : nil
+        }
+
         /// In triad blocks only.
         public var medianVoicingTime: Duration? { kind.module == .triads ? stats.medianVoicingTime : nil }
 
@@ -33,9 +38,10 @@ public struct SessionSummary: Hashable, Sendable {
     /// Such a session isn't saved.
     public var hasNoAttempts: Bool { blocks.allSatisfy(\.stats.attempts.isEmpty) }
 
-    /// The slowest prompts of every block but the scale blocks: timeouts, then the longest response times.
+    /// The slowest prompts of every block but the scale and progression blocks: timeouts, then the longest response
+    /// times.
     public func slowest(_ count: Int) -> [Attempt] {
-        RunStats(attempts: blocks.filter { $0.passes == nil }.flatMap(\.stats.attempts)).slowest(count)
+        RunStats(attempts: blocks.filter { $0.passes == nil && $0.chords == nil }.flatMap(\.stats.attempts)).slowest(count)
     }
 }
 

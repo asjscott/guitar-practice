@@ -31,6 +31,16 @@ public enum SessionPlanner {
         return "Triads are left out: no voicing of the key’s chords on \(sets.joined(separator: ", ")) fits these frets."
     }
 
+    /// Why a session has no progressions, when the theme has none; nil when it has one.
+    public static func noProgressionsNotice(from kinds: [DrillKind], for setup: DrillSetup) -> String? {
+        let progressions = kinds.filter { $0.module == .progressions }
+        guard !progressions.isEmpty, drills(from: progressions, for: setup, hasSound: true).isEmpty else { return nil }
+        guard setup.options.progression == nil, let position = setup.progressionPosition else {
+            return progressions[0].makeDrill(setup).nothingToPromptReason.map { "Progressions are left out: \($0)" }
+        }
+        return "Progressions are left out: no progression in \(setup.chosenKey) has every chord in the \(position.name)."
+    }
+
     /// Why a session can't prompt anything; nil when one of its drills can.
     public static func nothingToPromptReason(from kinds: [DrillKind], for setup: DrillSetup, hasSound: Bool) -> String? {
         let reasons = kinds.filter { canUse($0, hasSound: hasSound) }.map { $0.makeDrill(setup).nothingToPromptReason }

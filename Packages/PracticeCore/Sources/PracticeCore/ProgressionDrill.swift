@@ -71,6 +71,10 @@ public struct ProgressionDrill<Rules: ProgressionRules>: Drill {
     private var isHintShown = false
     /// How the last time through went: "3 of 4 clean".
     private var lastTimeThroughText: String?
+    /// Held (`DrillEvent.hold`): once this time through ends, the backing stops, and the next counts in from then.
+    private var countInAfter: Duration?
+    /// When the time through before a held count-in ended; nil once one counts in.
+    private var heldEnd: Duration?
 
     public init(setup: DrillSetup) {
         self.setup = setup
@@ -140,6 +144,17 @@ public struct ProgressionDrill<Rules: ProgressionRules>: Drill {
 
     private func end(ofSlot slot: Int) -> Duration { start(ofSlot: slot + 1) }
 
+    /// When the time through the open chord is in ends.
+    private var timeThroughEnd: Duration? { open.map { end(ofSlot: $0.slot / count * count + count - 1) } }
+
+    /// The backing goes round without a gap, so a chime waits for a time through to end; while a count-in is held for
+    /// one, the time through before it.
+    public var passEnd: Duration? {
+        guard isRunning, phase != .paused else { return nil }
+        if let heldEnd, now < backing.start { return heldEnd }
+        return timeThroughEnd
+    }
+
     // MARK: - Events
 
     public mutating func handle(_ event: DrillEvent) {
@@ -158,6 +173,8 @@ public struct ProgressionDrill<Rules: ProgressionRules>: Drill {
             phase = .paused
             open = nil
             isHintShown = false
+            countInAfter = nil
+            heldEnd = nil
             pendingBacking = [.stop]
         case .resume(let now):
             guard phase == .paused else { return }
@@ -167,6 +184,8 @@ public struct ProgressionDrill<Rules: ProgressionRules>: Drill {
             phase = .idle
             open = nil
             isHintShown = false
+            countInAfter = nil
+            heldEnd = nil
             pendingBacking = [.stop]
         case .played(let pitch, let onset, let now):
             guard isRunning, phase != .paused else { return }
@@ -185,22 +204,41 @@ public struct ProgressionDrill<Rules: ProgressionRules>: Drill {
             advance(to: now)
         case .skip(let now), .repeat(let now):
             advance(to: now)
-        case .typed, .soundStarted, .hold, .clicksStarted, .passSettings, .fadeStages:
+        case .hold(let end):
+            hold(until: end)
+        case .typed, .soundStarted, .clicksStarted, .passSettings, .fadeStages:
             break
         }
     }
 
-    /// The time through `timeThrough`, from its first chord, after a count-in.
-    private mutating func begin(at now: Duration) {
+    /// No time through begins before `end`. Before anything of a count-in's time through is played, the count-in starts
+    /// again then; during a time through that ends sooner, the backing stops at its end and the next counts in then.
+    private mutating func hold(until end: Duration) {
+        guard isRunning, phase != .paused, let chord = open, let timeThroughEnd else { return }
+        if chord.slot == 0, chord.notes.isEmpty, now < start(ofSlot: 0) - halfBeat {
+            guard end > backing.start else { return }
+            let ended = heldEnd
+            begin(at: now, countingInAt: end, isNewGroup: false)
+            heldEnd = ended
+        } else if end > timeThroughEnd {
+            if countInAfter == nil { pendingBacking.append(.end(at: timeThroughEnd)) }
+            countInAfter = max(countInAfter ?? end, end)
+        }
+    }
+
+    /// The time through `timeThrough`, from its first chord, after a count-in from `start` (or now).
+    private mutating func begin(at now: Duration, countingInAt start: Duration? = nil, isNewGroup: Bool = true) {
         self.now = max(self.now, now)
         guard let progression else { return }
         backing = Backing(chords: zip(chords, progression.steps).map { BackingChord($0, bars: $1.bars) },
-                          style: settings.style, bpm: settings.tempo, start: now)
+                          style: settings.style, bpm: settings.tempo, start: start ?? now)
         pendingBacking = [.start(backing)]
         previousPlayed = nil
         previousDrawn = nil
         outcomes = Array(repeating: nil, count: count)
-        group += 1
+        if isNewGroup { group += 1 }
+        countInAfter = nil
+        heldEnd = nil
         phase = .waiting
         open = nil
         timeThroughStart = 0
@@ -240,6 +278,13 @@ public struct ProgressionDrill<Rules: ProgressionRules>: Drill {
         let next = chord.slot + 1
         if index == count - 1 {
             endTimeThrough()
+            if let countInAfter {
+                // Held: the next time through counts in afresh, in the group just begun.
+                let ended = end(ofSlot: chord.slot)
+                begin(at: now, countingInAt: countInAfter, isNewGroup: false)
+                heldEnd = ended
+                return
+            }
             timeThroughStart = next
         }
         open(slot: next)

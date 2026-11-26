@@ -88,6 +88,8 @@ public enum BackingRequest: Hashable, Sendable {
     case start(Backing)
     /// No backing from now on.
     case stop
+    /// No backing heard at or after a time: what is playing goes on until then.
+    case end(at: Duration)
 }
 
 /// The one interface to every drill: a pure state machine driven by events and a clock.
@@ -143,7 +145,8 @@ public protocol Drill: Sendable {
     mutating func takeBacking() -> [BackingRequest]
 
     /// Between passes, when the last one's last bar ends: a chime waits for that. Nil during a pass, while paused, and in
-    /// drills without passes.
+    /// drills without passes. In progression drills, when the time through ends (the one just ended, until the next
+    /// counts in), since the backing goes round without a gap.
     var passEnd: Duration? { get }
 
     /// What the next pass will be played at, as the tempo ladder moves it; nil in drills without passes.

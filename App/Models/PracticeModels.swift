@@ -20,12 +20,14 @@ enum PracticeMigrationPlan: SchemaMigrationPlan {
 
 extension Theme {
     /// As `Session` and `DayTheme` save it; nil if that is unusable.
-    fileprivate init?(tonic: Int?, mode: String?, system: String?, number: Int?, octave: Int?, stringSet: String?) {
+    /// A progression that isn't in the library is as none: one is picked again when the theme is next shown.
+    fileprivate init?(tonic: Int?, mode: String?, system: String?, number: Int?, octave: Int?, stringSet: String?,
+                      progression: String?) {
         guard let tonic, let mode = mode.flatMap(Key.Mode.init), let system = system.flatMap(Position.System.init),
               let number, let octave else { return nil }
         self.init(key: .app(tonic: PitchClass(tonic), mode: mode),
                   position: Position.ID(system: system, number: number, octave: octave),
-                  stringSet: stringSet.flatMap(StringSet.init))
+                  stringSet: stringSet.flatMap(StringSet.init), progression: progression.flatMap(Progression.named))
     }
 }
 
@@ -35,13 +37,14 @@ extension DayTheme {
                   positionSystem: theme.position.system.rawValue, positionNumber: theme.position.number,
                   positionOctave: theme.position.octave)
         stringSet = theme.stringSet?.rawValue
+        progression = theme.progression?.id
     }
 
     /// Nil only if what is saved is unusable.
     var theme: Theme? {
         get {
             Theme(tonic: tonic, mode: mode, system: positionSystem, number: positionNumber, octave: positionOctave,
-                  stringSet: stringSet)
+                  stringSet: stringSet, progression: progression)
         }
         set {
             guard let newValue else { return }
@@ -51,6 +54,7 @@ extension DayTheme {
             positionNumber = newValue.position.number
             positionOctave = newValue.position.octave
             stringSet = newValue.stringSet?.rawValue
+            progression = newValue.progression?.id
         }
     }
 }
@@ -65,7 +69,7 @@ extension PracticeSession {
     var theme: Theme? {
         get {
             Theme(tonic: themeTonic, mode: themeMode, system: themePositionSystem, number: themePositionNumber,
-                  octave: themePositionOctave, stringSet: themeStringSet)
+                  octave: themePositionOctave, stringSet: themeStringSet, progression: themeProgression)
         }
         set {
             themeTonic = newValue?.key.tonic.pitchClass.value
@@ -74,6 +78,7 @@ extension PracticeSession {
             themePositionNumber = newValue?.position.number
             themePositionOctave = newValue?.position.octave
             themeStringSet = newValue?.stringSet?.rawValue
+            themeProgression = newValue?.progression?.id
         }
     }
 }
