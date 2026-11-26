@@ -76,12 +76,8 @@ struct ProgressionTimeline: View {
             ZStack(alignment: .topLeading) {
                 ForEach(timesThrough, id: \.self) { timeThrough in
                     ForEach(Array(progress.blocks.enumerated()), id: \.offset) { index, block in
-                        blockView(block, isCurrent: timeThrough == 0 && index == progress.current,
-                                  hasOutcome: timeThrough == 0)
-                            .frame(width: CGFloat(block.beats) * Self.beatWidth - 6,
-                                   height: geometry.size.height - 20 - band)
-                            .opacity(timeThrough == 0 ? 1 : 0.5)
-                            .offset(x: x(timeThrough: timeThrough, block: index, playhead: playhead) + 3, y: 10)
+                        placedBlock(block, index: index, timeThrough: timeThrough, playhead: playhead,
+                                    height: geometry.size.height - 20 - band)
                     }
                 }
                 if let topNotes = progress.topNotes {
@@ -96,8 +92,27 @@ struct ProgressionTimeline: View {
         .clipped()
         .accessibilityElement()
         .accessibilityLabel("Chords")
-        .accessibilityValue(progress.blocks.map(\.name).joined(separator: ", ")
-            + (progress.topNotes.map { "; top notes " + $0.map(\.name).joined(separator: ", ") } ?? ""))
+        .accessibilityValue(accessibilityValue)
+    }
+
+    private var accessibilityValue: String {
+        let chords: String = progress.blocks.map(\.name).joined(separator: ", ")
+        guard let topNotes = progress.topNotes else { return chords }
+        let names: String = topNotes.map(\.name).joined(separator: ", ")
+        return chords + "; top notes " + names
+    }
+
+    /// One chord block, sized by its beats and placed along the timeline. Split out so the compiler can type-check
+    /// the timeline's body in reasonable time (CI's Xcode timed out on it).
+    private func placedBlock(_ block: ProgressionProgress.Block, index: Int, timeThrough: Int, playhead: CGFloat,
+                             height: CGFloat) -> some View {
+        let isThis = timeThrough == 0
+        let width: CGFloat = CGFloat(block.beats) * Self.beatWidth - 6
+        let left: CGFloat = x(timeThrough: timeThrough, block: index, playhead: playhead) + 3
+        return blockView(block, isCurrent: isThis && index == progress.current, hasOutcome: isThis)
+            .frame(width: width, height: height)
+            .opacity(isThis ? 1 : 0.5)
+            .offset(x: left, y: 10)
     }
 
     /// Where a block starts, in a time through (0 = this one, -1 the one before, 1 the next).
