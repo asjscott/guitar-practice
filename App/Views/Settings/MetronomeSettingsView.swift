@@ -8,6 +8,9 @@ struct MetronomeSettingsView: View {
     @Environment(AppSoundOutput.self) private var soundOutput
     @Environment(BackingPlayer.self) private var backing
     @AppStorage(MetronomeSettings.Key.backingListenHasClick) private var backingHasClick = true
+    /// Listen's style is its progression's, the same one free practice remembers.
+    @AppStorage(MetronomeSettings.Key.backingStyle(of: BackingPlayer.listenProgression))
+    private var backingStyle = BackingPlayer.listenProgression.defaultStyle
 
     var body: some View {
         Form {
@@ -45,13 +48,17 @@ struct MetronomeSettingsView: View {
             Section {
                 LabeledContent {
                     Button(backing.isListening ? "Stop" : "Listen") {
-                        backing.isListening ? backing.stopListening() : backing.listen(withClick: backingHasClick)
+                        backing.isListening ? backing.stopListening() : listen()
                     }
                     .disabled(!backing.hasSounds || !backing.isListening
                               && (backing.isRunning || metronome.isRunning && !metronome.isListening))
                 } label: {
-                    Text("I–V–vi–IV in G, \(BackingPlayer.listenStyle.rawValue), \(BackingPlayer.listenBPM) BPM")
+                    Text("\(BackingPlayer.listenProgression.id) in \(BackingPlayer.listenKey.shortName),\(BackingPlayer.listenBPM) BPM")
                 }
+                Picker("Style", selection: $backingStyle) {
+                    ForEach(BackingStyle.allCases, id: \.self) { Text($0.title).tag($0) }
+                }
+                .disabled(!backing.hasSounds)
                 Toggle("With the click", isOn: $backingHasClick)
                     .disabled(!backing.hasSounds)
             } header: {
@@ -69,12 +76,17 @@ struct MetronomeSettingsView: View {
         .frame(width: 460)
         .fixedSize(horizontal: false, vertical: true)
         .onChange(of: meters.meter) { if metronome.isListening { metronome.listen() } }
-        .onChange(of: backingHasClick) { if backing.isListening { backing.listen(withClick: backingHasClick) } }
+        .onChange(of: backingHasClick) { if backing.isListening { listen() } }
+        .onChange(of: backingStyle) { if backing.isListening { listen() } }
         .onChange(of: soundOutput.problem) { if soundOutput.problem != nil { stopListening() } }
         .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.willSleepNotification)) { _ in
             stopListening()
         }
         .onDisappear { stopListening() }
+    }
+
+    private func listen() {
+        backing.listen(style: backingStyle, withClick: backingHasClick)
     }
 
     private func stopListening() {
