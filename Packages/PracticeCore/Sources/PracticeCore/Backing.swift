@@ -12,9 +12,19 @@ public struct BackingChord: Hashable, Sendable {
     }
 }
 
-/// How the backing plays a chord. Rock for now; pop ballad and blues shuffle come later.
+/// How the backing plays a chord. Raw values are logged and remembered per progression: never change them.
+///
+/// By ear (for the player, at the gate): each should sound right from 60 to 120 BPM. Rock drives on eighths; the pop
+/// ballad breathes, a bar feeling like two slow beats; the shuffle swings, its offbeats late (two thirds through the
+/// beat), not straight.
 public enum BackingStyle: String, Hashable, Sendable, Codable, CaseIterable {
+    /// Eighth-note bass on the root, keys on 1 and 3, kick on 1 and 3, snare on 2 and 4, eighth hi-hats.
     case rock
+    /// Half time: bass root on 1 and fifth on 3, keys held for the bar, kick on 1, snare on 3, hi-hats on the beats.
+    case popBallad
+    /// Shuffled eighths: bass walking root–fifth–sixth–fifth, keys on 1 and 3, kick on 1 and 3, snare on 2 and 4,
+    /// shuffled hi-hats.
+    case bluesShuffle
 }
 
 /// Which instrument plays a note. Each is one sampler in the app.
@@ -60,9 +70,12 @@ public struct Backing: Hashable, Sendable {
         self.start = start
     }
 
-    /// When an eighth note is heard, counting from beat 1 of the count-in. Worked out from the start, so that it
-    /// doesn't drift.
-    func time(ofEighth index: Int) -> Duration { start + .seconds(60) * index / (bpm * 2) }
+    /// When an eighth note is heard, counting from beat 1 of the count-in.
+    func time(ofEighth index: Int) -> Duration { time(ofTick: index * Self.ticksPerEighth) }
+
+    /// When a tick (a sixth of a beat, so straight and shuffled eighths both fall on one) is heard, counting from
+    /// beat 1 of the count-in. Worked out from the start, so that it doesn't drift.
+    private func time(ofTick index: Int) -> Duration { start + .seconds(60) * index / (bpm * Self.ticksPerBeat) }
 
     /// A bar of drumsticks on the beats.
     public var countIn: [BackingNote] {
@@ -111,32 +124,72 @@ public struct Backing: Hashable, Sendable {
 
     private static let eighthsPerBar = beatsPerBar * 2
 
+    private static let ticksPerBeat = 6
+    private static let ticksPerEighth = ticksPerBeat / 2
+    private static let ticksPerBar = ticksPerBeat * beatsPerBar
+    /// Where a beat's second shuffled eighth falls: two thirds of the way through it.
+    private static let shuffledOffbeat = ticksPerBeat * 2 / 3
+
     /// One bar of a chord in the style; bar 0 is the count-in.
     private func bar(_ bar: Int, of triad: Triad) -> [BackingNote] {
-        let first = bar * Self.eighthsPerBar
-        func note(_ part: BackingPart, _ pitch: Pitch, _ velocity: Int, eighth: Int, eighths length: Int) -> BackingNote {
-            let time = time(ofEighth: first + eighth)
+        let first = bar * Self.ticksPerBar
+        /// A note at a tick of the bar, lasting most of `ticks`, so that repeated notes are heard apart.
+        func note(_ part: BackingPart, _ pitch: Pitch, _ velocity: Int, tick: Int, ticks: Int, held: Double = 0.9)
+            -> BackingNote {
+            let time = time(ofTick: first + tick)
             return BackingNote(part: part, pitch: pitch, velocity: velocity, time: time,
-                               length: (self.time(ofEighth: first + eighth + length) - time) * 0.9)
+                               length: (self.time(ofTick: first + tick + ticks) - time) * held)
+        }
+        let beats = 0..<Self.beatsPerBar
+        let root = Self.lowest(triad.root.pitchClass, from: Self.bassLowest)
+        let voicing = triad.pitchClasses.map { Self.lowest($0, from: Self.keysLowest) }
+        /// The keys' chord on beats 1 and 3, held to the next.
+        let halfBarKeys = [0, 2].flatMap { beat in
+            voicing.map { note(.keys, $0, 70, tick: beat * Self.ticksPerBeat, ticks: 2 * Self.ticksPerBeat) }
+        }
+        /// Kick on 1 and 3, snare on 2 and 4.
+        let backbeat = beats.map { beat in
+            note(.drums, beat.isMultiple(of: 2) ? Drum.kick : Drum.snare, beat.isMultiple(of: 2) ? 110 : 100,
+                 tick: beat * Self.ticksPerBeat, ticks: Self.ticksPerEighth)
         }
         switch style {
         case .rock:
-            let drums = (0..<Self.eighthsPerBar).flatMap { eighth -> [BackingNote] in
-                var hits = [note(.drums, Drum.closedHiHat, eighth.isMultiple(of: 2) ? 80 : 60, eighth: eighth, eighths: 1)]
-                switch eighth {
-                case 0, 4: hits.append(note(.drums, Drum.kick, 110, eighth: eighth, eighths: 1))
-                case 2, 6: hits.append(note(.drums, Drum.snare, 100, eighth: eighth, eighths: 1))
-                default: break
-                }
-                return hits
+            let eighths = 0..<(Self.ticksPerBar / Self.ticksPerEighth)
+            let hiHats = eighths.map { eighth in
+                note(.drums, Drum.closedHiHat, eighth.isMultiple(of: 2) ? 80 : 60,
+                     tick: eighth * Self.ticksPerEighth, ticks: Self.ticksPerEighth)
             }
-            let root = Self.lowest(triad.root.pitchClass, from: Self.bassLowest)
-            let bass = (0..<Self.eighthsPerBar).map { eighth in
-                note(.bass, root, eighth.isMultiple(of: 2) ? 100 : 85, eighth: eighth, eighths: 1)
+            let bass = eighths.map { eighth in
+                note(.bass, root, eighth.isMultiple(of: 2) ? 100 : 85, tick: eighth * Self.ticksPerEighth,
+                     ticks: Self.ticksPerEighth)
             }
-            let voicing = triad.pitchClasses.map { Self.lowest($0, from: Self.keysLowest) }
-            let keys = [0, 4].flatMap { eighth in voicing.map { note(.keys, $0, 70, eighth: eighth, eighths: 4) } }
-            return drums + bass + keys
+            return backbeat + hiHats + bass + halfBarKeys
+        case .popBallad:
+            let drums = [note(.drums, Drum.kick, 100, tick: 0, ticks: Self.ticksPerEighth),
+                         note(.drums, Drum.snare, 90, tick: 2 * Self.ticksPerBeat, ticks: Self.ticksPerEighth)]
+            let hiHats = beats.map { beat in
+                note(.drums, Drum.closedHiHat, beat.isMultiple(of: 2) ? 65 : 50, tick: beat * Self.ticksPerBeat,
+                     ticks: Self.ticksPerEighth)
+            }
+            let bass = [note(.bass, root, 95, tick: 0, ticks: 2 * Self.ticksPerBeat),
+                        note(.bass, root + Interval(7), 85, tick: 2 * Self.ticksPerBeat, ticks: 2 * Self.ticksPerBeat)]
+            let keys = voicing.map { note(.keys, $0, 60, tick: 0, ticks: Self.ticksPerBar, held: 0.97) }
+            return drums + hiHats + bass + keys
+        case .bluesShuffle:
+            /// Each beat's pair of shuffled eighths: the long one on the beat, the short one late.
+            func shuffled(_ beat: Int, _ make: (_ tick: Int, _ ticks: Int, _ isOnBeat: Bool) -> BackingNote) -> [BackingNote] {
+                let tick = beat * Self.ticksPerBeat
+                return [make(tick, Self.shuffledOffbeat, true),
+                        make(tick + Self.shuffledOffbeat, Self.ticksPerBeat - Self.shuffledOffbeat, false)]
+            }
+            let hiHats = beats.flatMap { beat in
+                shuffled(beat) { note(.drums, Drum.closedHiHat, $2 ? 80 : 55, tick: $0, ticks: $1) }
+            }
+            let walk = [0, 7, 9, 7].map { root + Interval($0) }
+            let bass = beats.flatMap { beat in
+                shuffled(beat) { note(.bass, walk[beat], $2 ? 100 : 80, tick: $0, ticks: $1) }
+            }
+            return backbeat + hiHats + bass + halfBarKeys
         }
     }
 
