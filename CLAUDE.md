@@ -6,7 +6,7 @@ Full spec and roadmap: Claude Docs `c1631de5-f295-4bd8-a9fe-f1c1948a980d`. Befor
 
 ## Current phase
 
-**Phase 4 · Backing and progressions.** Scope: MIDI backing via SoundFont (bass, keys, drums; tempo and style); progression library and Roman-numeral → key rendering; nearest voicing, stay in position and target top note drills; latency check. Spec #51 (audio file import moved to Phase 5); no tickets yet.
+**Phase 4 · Backing and progressions.** Scope: MIDI backing via SoundFont (bass, keys, drums; tempo and style); progression library and Roman-numeral → key rendering; nearest voicing, stay in position and target top note drills; latency check. Spec #51 (audio file import moved to Phase 5); tickets #52–#61.
 
 Carried over from the Phase 3 gate (#48), to check on a guitar in Phase 4: a full Inversions climb on the theme's string set, with the triad fade.
 
