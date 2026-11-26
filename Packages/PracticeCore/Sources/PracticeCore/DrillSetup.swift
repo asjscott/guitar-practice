@@ -65,20 +65,17 @@ public struct DrillOptions: Hashable, Sendable {
     public init() {}
 }
 
-/// How a progression drill's backing is played, and how its onsets are heard.
+/// How a progression drill's backing is played.
 public struct BackingSettings: Hashable, Sendable {
     public static let defaultTempo = 70
 
     public var style = BackingStyle.rock
     /// BPM.
     public var tempo = defaultTempo
-    /// Taken off every onset before it is compared with the backing (see "Input delay" in GLOSSARY.md).
-    public var inputDelay = Duration.zero
 
-    public init(style: BackingStyle = .rock, tempo: Int = defaultTempo, inputDelay: Duration = .zero) {
+    public init(style: BackingStyle = .rock, tempo: Int = defaultTempo) {
         self.style = style
         self.tempo = tempo
-        self.inputDelay = inputDelay
     }
 }
 
@@ -103,25 +100,12 @@ public struct DrillSetup: Hashable, Sendable {
     /// The key prompts are spelled in; nil = sharps.
     public var key: Key?
 
-    /// How a progression drill's backing is played, and how its onsets are heard.
-public struct BackingSettings: Hashable, Sendable {
-    public static let defaultTempo = 70
-
-    public var style = BackingStyle.rock
-    /// BPM.
-    public var tempo = defaultTempo
-    /// Taken off every onset before it is compared with the backing (see "Input delay" in GLOSSARY.md).
-    public var inputDelay = Duration.zero
-
-    public init(style: BackingStyle = .rock, tempo: Int = defaultTempo, inputDelay: Duration = .zero) {
-        self.style = style
-        self.tempo = tempo
-        self.inputDelay = inputDelay
-    }
-}
-
-/// Notes to ask for more often; nil = all alike.
+    /// Notes to ask for more often; nil = all alike.
     public var weighting: NoteWeighting?
+
+    /// Taken off every onset before it is compared with clicks or backing, in passes and progression drills (see
+    /// "Input delay" in GLOSSARY.md). The input device's, measured by the latency check; zero until it has run.
+    public var inputDelay = Duration.zero
 
     /// The session's: scale drills take turns through the scales of its mode, in its position. Nil in free practice.
     public var theme: Theme?

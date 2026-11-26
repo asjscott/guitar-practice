@@ -117,6 +117,7 @@ extension LoggedAttempt {
         fadeStageRaw = facts.fadeStage.rawValue
         hinted = facts.hinted
         clickOffsetSeconds = facts.clickOffset.map { $0 / .seconds(1) }
+        inputDelaySeconds = facts.inputDelay / .seconds(1)
     }
 
     private func setFacts(_ facts: TriadFacts) {

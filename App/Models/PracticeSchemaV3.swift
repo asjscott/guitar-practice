@@ -127,7 +127,8 @@ enum PracticeSchemaV3: VersionedSchema {
         var fadeStageRaw: String?
         /// Whether a hint had been used in the pass by the time this note was dealt with.
         var hinted: Bool?
-        /// The onset less the time the nearest click was heard: positive = late. Nil unless answered.
+        /// The onset less the time the nearest click was heard: positive = late. Nil unless answered. From V3 on, the
+        /// input delay is taken off the onset first.
         var clickOffsetSeconds: Double?
 
         // Triads only.
@@ -141,7 +142,8 @@ enum PracticeSchemaV3: VersionedSchema {
 
         // Passes and chords.
         /// The input delay taken off the onset before it was compared with clicks or backing; nil in older versions'
-        /// attempts and where no onset is compared. Onsets themselves are saved raw (ADR 0003).
+        /// attempts and where no onset is compared. The times saved from onsets (response time, click offset, first
+        /// onset) have it taken off; adding it back gives the onset as the listener reported it (ADR 0003).
         var inputDelaySeconds: Double?
 
         // Chords only: one attempt per chord of a time through, whose chords share a group. The group's size is the

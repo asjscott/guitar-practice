@@ -161,7 +161,7 @@ public struct ProgressionDrill<Rules: ProgressionRules>: Drill {
             pendingBacking = [.stop]
         case .played(let pitch, let onset, let now):
             guard isRunning, phase != .paused else { return }
-            let onset = onset - settings.inputDelay
+            let onset = onset - setup.inputDelay
             advance(to: onset, grace: .zero)
             take(pitch, onset: onset)
             advance(to: now)
@@ -297,7 +297,7 @@ public struct ProgressionDrill<Rules: ProgressionRules>: Drill {
         let facts = ChordFacts(progression: progression, key: key, place: index, triad: chords[index],
                                position: position.id, played: played, accepted: chord.expected.accepted,
                                style: settings.style, tempo: settings.tempo, fadeStage: stage, hinted: chord.hinted,
-                               outcome: outcome, firstOnset: chord.firstOnset, inputDelay: settings.inputDelay)
+                               outcome: outcome, firstOnset: chord.firstOnset, inputDelay: setup.inputDelay)
         // The prompt is the chord's root in the voicing played, or else the one drawn.
         attempts.append(Attempt(prompt: rootPrompt(of: played ?? chord.expected.drawn),
                                 outcome: outcome == .missed ? .timedOut : .answered,

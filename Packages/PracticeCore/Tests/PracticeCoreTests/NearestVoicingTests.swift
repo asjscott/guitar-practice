@@ -15,8 +15,10 @@ private struct Run {
         options.key = .major(.g)
         options.progression = Progression.named("I–V–vi–IV")
         options.position = Position.ID(system: .caged, number: CAGEDShape.e.number)
-        options.backing = BackingSettings(tempo: 60, inputDelay: inputDelay)
-        drill = DrillKind.nearestVoicing.makeDrill(DrillSetup(fretboard: Fretboard(tuning: tuning), options: options, seed: 1))
+        options.backing = BackingSettings(tempo: 60)
+        var setup = DrillSetup(fretboard: Fretboard(tuning: tuning), options: options, seed: 1)
+        setup.inputDelay = inputDelay
+        drill = DrillKind.nearestVoicing.makeDrill(setup)
     }
 
     var position: Position { drill.setup.progressionPosition! }
