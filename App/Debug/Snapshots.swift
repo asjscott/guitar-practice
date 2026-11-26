@@ -47,6 +47,23 @@ enum Snapshots {
     }
 
     private static func saveAll() async throws {
+        // PROTOTYPE: only the Phase 4 variants.
+        func shot(_ name: String, _ model: P4Model) async throws {
+            try await save("p4-\(name)", P4Screen(model: model, showsSwitcher: false))
+        }
+        try await shot("setup", P4Model(scene: .setup))
+        try await shot("summary", P4Model(scene: .summary))
+        for v in P4Variant.allCases {
+            let n = v.rawValue
+            try await shot("\(n)-1-countin", P4Model(variant: v, scene: .countIn, beat: 1))
+            try await shot("\(n)-2-shown", P4Model(variant: v, timeThrough: 1, beat: 5))
+            try await shot("\(n)-3-faded", P4Model(variant: v, timeThrough: 3, beat: 9))
+            try await shot("\(n)-4-hidden-wrong", P4Model(variant: v, scene: .wrong, timeThrough: 6, beat: 13))
+            try await shot("\(n)-5-top-shown", P4Model(variant: v, drill: .top, timeThrough: 2, beat: 6))
+            try await shot("\(n)-6-stay-faded", P4Model(variant: v, drill: .stay, timeThrough: 3, beat: 2))
+            try await shot("\(n)-7-blues-hidden", P4Model(variant: v, progression: .blues, timeThrough: 5, beat: 21))
+        }
+        return;
         try await save("explorer", ExplorerView(model: ExplorerViewModel()))
 
         let tuner = TunerViewModel()
