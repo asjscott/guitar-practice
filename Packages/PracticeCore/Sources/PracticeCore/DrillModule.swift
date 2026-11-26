@@ -1,6 +1,6 @@
 /// A group of drills that train one skill. A session's modules come in this order.
 public enum DrillModule: CaseIterable, Hashable, Sendable {
-    case notes, scales, triads
+    case notes, scales, triads, progressions
 
     /// "Scales in position".
     public var title: String {
@@ -8,6 +8,7 @@ public enum DrillModule: CaseIterable, Hashable, Sendable {
         case .notes: "Fretboard notes"
         case .scales: "Scales in position"
         case .triads: "Triads"
+        case .progressions: "Progressions"
         }
     }
 
@@ -15,7 +16,7 @@ public enum DrillModule: CaseIterable, Hashable, Sendable {
     var weight: Int {
         switch self {
         case .notes: 15
-        case .scales, .triads: 20
+        case .scales, .triads, .progressions: 20
         }
     }
 
@@ -23,7 +24,7 @@ public enum DrillModule: CaseIterable, Hashable, Sendable {
     var minimumLength: Duration {
         switch self {
         case .notes: .seconds(90)
-        case .scales, .triads: .seconds(180)
+        case .scales, .triads, .progressions: .seconds(180)
         }
     }
 

@@ -156,7 +156,7 @@ public struct PassDrill<Rules: PassRules>: Drill {
             if passEnd != nil, end > countInStart { askForClicks(from: end) }
         case .tick(let now):
             advance(to: now)
-        case .typed, .soundStarted:
+        case .typed, .soundStarted, .backingStarted:
             break
         }
     }

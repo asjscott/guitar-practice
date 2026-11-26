@@ -148,7 +148,14 @@ struct SessionPlannerDrillsTests {
     }
 
     @Test func withSoundEveryDrillIsIn() {
+        var setup = setup
+        setup.options.progression = Progression.named("I–IV–V")
         #expect(SessionPlanner.drills(from: DrillKind.all, for: setup, hasSound: true) == DrillKind.all)
+    }
+
+    @Test func progressionDrillsAreLeftOutWithoutAProgression() {
+        #expect(SessionPlanner.drills(from: DrillKind.all, for: setup, hasSound: true)
+                == DrillKind.all.filter { $0.module != .progressions })
     }
 
     @Test func triadsWithNoVoicingInRangeAreLeftOutAndSetupSaysWhy() {
@@ -207,7 +214,7 @@ struct DrillModuleTests {
     @Test func everyDrillSoFarIsInFretboardNotesWithItsSavedID() {
         let notes = DrillKind.all.filter { $0.module == .notes }
         #expect(notes.map(\.id) == ["notePlayIt", "allInstances", "hearFindIt", "fretNameIt"])
-        #expect(DrillModule.allCases.map(\.title) == ["Fretboard notes", "Scales in position", "Triads"])
+        #expect(DrillModule.allCases.map(\.title) == ["Fretboard notes", "Scales in position", "Triads", "Progressions"])
     }
 
     @Test func groupsKeepTheModulesOrderAndLeaveOutEmptyOnes() {
