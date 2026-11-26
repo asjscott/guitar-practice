@@ -11,6 +11,7 @@ struct SessionView: View {
 
     @Environment(AppSoundOutput.self) private var soundOutput
     @Environment(Metronome.self) private var metronome
+    @Environment(BackingPlayer.self) private var backingPlayer
     @Environment(AttemptLog.self) private var log
     @AppStorage("session.minutes") private var minutes = SessionSetup().minutes
     @AppStorage("session.naturalsOnly") private var naturalsOnly = true
@@ -29,6 +30,7 @@ struct SessionView: View {
                 model.log = log
                 model.soundOutput = soundOutput
                 model.metronome = metronome
+                model.backingPlayer = backingPlayer
             }
             .onDisappear { model.leave() }
             .followsInstrumentSettings { tuning, capo in
@@ -53,6 +55,7 @@ struct SessionView: View {
             SessionSetupView(minutes: $minutes, naturalsOnly: $naturalsOnly, range: $range, theme: model.theme,
                              reroll: model.canReroll ? { model.reroll() } : nil, blocks: model.plan(), problem: model.problem,
                              noSoundNotice: model.noSoundNotice, noTriadsNotice: model.noTriadsNotice,
+                             noProgressionsNotice: model.noProgressionsNotice, backingNotices: model.backingNotices,
                              start: { model.start() })
         case .ready, .playing, .paused:
             SessionPlayingView(model: model)
@@ -97,6 +100,7 @@ struct SessionView: View {
         .environment(AudioInputService(isInert: true))
         .environment(AppSoundOutput(isInert: true))
         .environment(Metronome(output: AppSoundOutput(isInert: true)))
+        .environment(BackingPlayer(output: AppSoundOutput(isInert: true), metronome: Metronome(output: AppSoundOutput(isInert: true))))
         .environment(AttemptLog.inMemory())
         .frame(width: 1100, height: 620)
 }

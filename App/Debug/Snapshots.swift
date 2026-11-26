@@ -594,6 +594,22 @@ enum Snapshots {
             reroll: nil, blocks: SessionPlanner.plan(DrillKind.all.filter { $0.module != .triads }, budget: .seconds(900), day: 1),
             problem: nil, noTriadsNotice: "Triads are left out: no voicing of the key’s chords on E-A-D fits these frets.",
             start: {}))
+        // The theme's progression, and what setup says about its backing.
+        let progressionTheme = Theme(key: .major(.g), position: Position.ID(system: .caged, number: CAGEDShape.e.number),
+                                     stringSet: .dGB, progression: Progression.named("I–V–vi–IV"))
+        try await save("session-progression-setup", SessionSetupView(
+            minutes: .constant(15), naturalsOnly: .constant(true), range: .constant(.first12),
+            theme: SessionTheme(progressionTheme, on: Fretboard(tuning: .standard)),
+            reroll: {}, blocks: SessionPlanner.plan(DrillKind.all, budget: .seconds(900), day: 1), problem: nil,
+            start: {}))
+        try await save("session-progression-setup-notices", SessionSetupView(
+            minutes: .constant(15), naturalsOnly: .constant(true), range: .constant(.first12),
+            theme: SessionTheme(progressionTheme, on: Fretboard(tuning: .standard)),
+            reroll: nil, blocks: SessionPlanner.plan(DrillKind.all, budget: .seconds(900), day: 1), problem: nil,
+            backingNotices: ["No backing sounds: Progressions plays clicks. " + BackingSounds.fetchHint,
+                             "The built-in microphone will hear the backing as notes: use the interface, or headphones."],
+            start: {}))
+
         let session = SessionViewModel()
         try await save("session-setup", SessionView(model: session))
         try await save("session-setup-short", SessionView(model: session), size: CGSize(width: 1100, height: 480))
@@ -800,6 +816,16 @@ enum Snapshots {
         }
         try await save("session-triad-ready", SessionView(model: session)) { ready(.triadPlayIt) }
 
+        try await save("session-progression-ready", SessionView(model: session)) { ready(.nearestVoicing) }
+        try await save("session-progression-count-in", SessionView(model: session)) {
+            play(.nearestVoicing)
+            session.playProgressionForSnapshot(chords: 0, untilBeat: 1.5)
+        }
+        try await save("session-progression-playing", SessionView(model: session)) {
+            play(.nearestVoicing)
+            session.playProgressionForSnapshot(chords: 5, wrong: [3], partial: 2, untilBeat: 25.6)
+        }
+
         let unheard = SessionViewModel()
         try await save("session-flash", SessionView(model: unheard), sound: silent, settle: .milliseconds(500)) {
             unheard.start(seed: 1)
@@ -858,9 +884,14 @@ enum Snapshots {
             while session.isActive {
                 session.passTimeForSnapshot(2)
                 session.next()
-                session.skip()
-                session.answerForSnapshot(right: false)
-                playPrompt()
+                if session.blockKind?.hasBacking == true {
+                    // Two times through clean, then one with a wrong chord: Faded from the third.
+                    session.playProgressionForSnapshot(chords: 12, wrong: [9], untilBeat: 4 + 48 + 0.5)
+                } else {
+                    session.skip()
+                    session.answerForSnapshot(right: false)
+                    playPrompt()
+                }
                 session.next()
             }
         }

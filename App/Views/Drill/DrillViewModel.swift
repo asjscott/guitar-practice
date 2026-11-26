@@ -394,29 +394,12 @@ final class DrillViewModel: MetronomePanelOwner {
 
     /// The backing the drill asks for: on the backing player with its sounds, or as clicks without them.
     private func playBacking() {
-        for request in drill.takeBacking() {
-            switch request {
-            case .start(let backing):
-                let heard = startBacking(backing)
-                #if DEBUG
-                backingForSnapshot = heard
-                #endif
-                drill.handle(.backingStarted(heard))
-            case .stop:
-                backingPlayer?.stop()
-                metronome?.stop()
-            }
+        BackingPlayer.perform(drill.takeBacking(), on: backingPlayer, metronome: metronome) { heard in
+            #if DEBUG
+            backingForSnapshot = heard
+            #endif
+            drill.handle(.backingStarted(heard))
         }
-    }
-
-    private func startBacking(_ backing: Backing) -> Backing {
-        if let backingPlayer, backingPlayer.hasSounds {
-            metronome?.stop()
-            return backingPlayer.start(backing)
-        }
-        guard let metronome else { return backing }
-        let clicks = metronome.start(ClickTrack(meter: Meter(.fourFour), bpm: backing.bpm, start: backing.start))
-        return Backing(chords: backing.chords, style: backing.style, bpm: backing.bpm, start: clicks.start)
     }
 
     // MARK: - Listening

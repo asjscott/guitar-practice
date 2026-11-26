@@ -44,13 +44,28 @@ struct SessionSummaryView: View {
         "\(stats.prompts) \(stats.prompts == 1 ? "prompt" : "prompts") · \(stats.skips) skipped"
     }
 
+    /// The big number, the line under it, and the details under the drill's name.
+    private func lines(of block: SessionSummary.Block) -> (main: String, sub: String?, detail: String) {
+        if let chords = block.chords {
+            // "31 of 40" chords clean; the times through and when it went Hidden; the two hardest chords.
+            var through = "\(chords.timesThrough) \(chords.timesThrough == 1 ? "time" : "times") through"
+            if let firstHidden = chords.firstHidden { through += " · Hidden from the \(firstHidden.ordinal)" }
+            let hardest = chords.hardest.isEmpty ? nil : "Hardest: " + chords.hardest.map(\.text).joined(separator: ", ")
+            return (chords.chords == 0 ? "–" : "\(chords.clean) of \(chords.chords)", "chords clean",
+                    [through, hardest].compactMap { $0 }.joined(separator: "\n"))
+        }
+        if let passes = block.passes { return (passes.cleanText, passes.tempoText, passes.detailText) }
+        return (block.stats.firstTryText, block.speedText, promptsText(block.stats))
+    }
+
     private func card(_ block: SessionSummary.Block) -> some View {
-        VStack(spacing: 4) {
+        let lines = lines(of: block)
+        return VStack(spacing: 4) {
             Image(systemName: block.kind.symbol).font(.title2).foregroundStyle(.secondary)
-            Text(block.passes?.cleanText ?? block.stats.firstTryText).font(.system(size: 40, weight: .bold, design: .rounded))
-            Text((block.passes == nil ? block.speedText : block.passes?.tempoText) ?? " ").font(.title3.monospacedDigit())
+            Text(lines.main).font(.system(size: 40, weight: .bold, design: .rounded))
+            Text(lines.sub ?? " ").font(.title3.monospacedDigit())
             Text(block.kind.title).font(.callout)
-            Text(block.passes?.detailText ?? promptsText(block.stats)).font(.caption).foregroundStyle(.secondary)
+            Text(lines.detail).font(.caption).foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
         }
