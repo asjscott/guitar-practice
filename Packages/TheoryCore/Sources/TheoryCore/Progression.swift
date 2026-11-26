@@ -37,17 +37,25 @@ public struct Progression: Hashable, Sendable, Identifiable {
         }
     }
 
+    /// How its eighth notes go: straight, or shuffled (the second of each pair late).
+    public enum Feel: Hashable, Sendable {
+        case straight, shuffle
+    }
+
     /// "I–V–vi–IV", "12-bar blues". Saved in the attempt log and with themes: never change it.
     public let id: String
     /// The mode of the keys it is played in.
     public let mode: Key.Mode
     public let steps: [Step]
+    /// How it is usually played.
+    public let feel: Feel
 
-    init(id: String, mode: Key.Mode, steps: [Step]) {
+    init(id: String, mode: Key.Mode, steps: [Step], feel: Feel = .straight) {
         precondition(!steps.isEmpty)
         self.id = id
         self.mode = mode
         self.steps = steps
+        self.feel = feel
     }
 
     /// Its name as shown: the id.
@@ -77,7 +85,7 @@ public struct Progression: Hashable, Sendable, Identifiable {
             plain(.major, [i, minor(6), iv, v]),
             plain(.major, [minor(6), iv, i, v]),
             Progression(id: "12-bar blues", mode: .major,
-                        steps: [i, i, i, i, iv, iv, i, i, v, iv, i, v].map { Step($0) }),
+                        steps: [i, i, i, i, iv, iv, i, i, v, iv, i, v].map { Step($0) }, feel: .shuffle),
             plain(.minor, [minor(1), minor(4), minor(5)]),
             plain(.minor, [minor(1), major(6), major(3), major(7)]),
         ]

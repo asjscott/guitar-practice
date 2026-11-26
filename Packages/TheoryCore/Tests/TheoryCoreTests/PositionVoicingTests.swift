@@ -38,6 +38,30 @@ struct StandardPositionVoicingTests {
         #expect(fretboard.movement(from: g, to: g) == 0)
     }
 
+    @Test func aVoicingsPitchesGoLowToHighWithTheTopLast() throws {
+        let g = try #require(fretboard.voicings(of: gMajor, in: try eShape()).first { $0.stringSet == .dGB })
+        #expect(fretboard.pitches(of: g).map(\.midi) == [55, 59, 62])
+        #expect(fretboard.topPitch(of: g) == Pitch(62))
+        #expect(fretboard.locationsLowToHigh(of: g).map(\.fret) == [5, 4, 3])
+    }
+
+    @Test func voicingsWithATopNote() throws {
+        // D's voicings in the E shape top out on 54, 57, 62 and 66.
+        let position = try eShape()
+        #expect(fretboard.voicings(of: dMajor, in: position, topNote: Pitch(62)).map(frets) == [[4, 2, 3]])
+        #expect(fretboard.voicings(of: dMajor, in: position, topNote: Pitch(64)).isEmpty)
+    }
+
+    @Test func theNearestAmongSomeVoicings() throws {
+        let position = try eShape()
+        let g = try #require(fretboard.voicings(of: gMajor, in: position).first { $0.stringSet == .dGB })
+        let ds = fretboard.voicings(of: dMajor, in: position)
+        #expect(fretboard.nearestVoicings(among: ds, to: g).map(frets) == [[4, 2, 3]])
+        let farOnes = ds.filter { frets($0) != [4, 2, 3] }
+        #expect(fretboard.nearestVoicings(among: farOnes, to: g).map(frets) == [[2, 3, 2]])
+        #expect(fretboard.nearestVoicings(among: [], to: g).isEmpty)
+    }
+
     @Test func theNearestDFromEachGVoicing() throws {
         let position = try eShape()
         let gs = fretboard.voicings(of: gMajor, in: position)
@@ -109,5 +133,42 @@ struct PositionVoicingInvariantTests {
             }
         }
         #expect(!misfits.isEmpty)
+    }
+}
+
+@Suite("Voicings in the position, a re-entrant tuning")
+struct ReEntrantPositionVoicingTests {
+    /// String 1 tuned down to E3 (52), below strings 3 and 2.
+    let fretboard = Fretboard(tuning: Tuning([40, 45, 50, 55, 59, 52].map(Pitch.init)))
+
+    @Test func pitchesGoLowToHighAndTheTopIsTheHighest() {
+        var count = 0
+        for set in fretboard.stringSets {
+            for inversion in Triad.Inversion.allCases {
+                for voicing in fretboard.voicings(of: Triad(.major, root: .g), inversion: inversion, on: set) {
+                    let pitches = fretboard.pitches(of: voicing)
+                    #expect(pitches == voicing.locations.map(fretboard.pitch).sorted())
+                    #expect(fretboard.topPitch(of: voicing) == pitches.max())
+                    #expect(fretboard.locationsLowToHigh(of: voicing).map(fretboard.pitch) == pitches)
+                    count += 1
+                }
+            }
+        }
+        #expect(count > 0)
+    }
+
+    @Test func theTopNoteLineIsMadeOfTopPitches() {
+        let key = Key.major(.g)
+        var lines = 0
+        for position in fretboard.cagedPositions(of: key.scale) {
+            for progression in Progression.library(.major) {
+                guard let line = fretboard.topNoteLine(of: progression, in: key, position: position) else { continue }
+                lines += 1
+                for (chord, top) in zip(progression.chords(in: key), line) {
+                    #expect(!fretboard.voicings(of: chord, in: position, topNote: top).isEmpty)
+                }
+            }
+        }
+        #expect(lines > 0)
     }
 }

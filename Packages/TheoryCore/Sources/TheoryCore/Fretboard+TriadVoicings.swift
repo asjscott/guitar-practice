@@ -23,6 +23,21 @@ extension Fretboard {
     /// The most frets a triad voicing may cover, counting both ends (5–8 is 4 frets).
     public static let maxTriadVoicingSpan = 4
 
+    /// A voicing's locations in the order its notes are played, low to high by pitch, whatever order its strings are
+    /// in (a re-entrant tuning may have a higher string sounding lower).
+    public func locationsLowToHigh(of voicing: TriadVoicing) -> [FretboardLocation] {
+        voicing.locations.sorted { pitch(at: $0) < pitch(at: $1) }
+    }
+
+    /// A voicing's pitches, low to high.
+    public func pitches(of voicing: TriadVoicing) -> [Pitch] { locationsLowToHigh(of: voicing).map(pitch) }
+
+    /// A voicing's highest pitch: its top note.
+    public func topPitch(of voicing: TriadVoicing) -> Pitch {
+        let pitches = pitches(of: voicing)
+        return pitches[pitches.count - 1]
+    }
+
     /// The string sets this tuning has strings for, lowest first: all four on six or more
     /// strings (sets are counted from string 6 up), fewer on a shorter neck.
     public var stringSets: [StringSet] {

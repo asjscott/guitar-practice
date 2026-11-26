@@ -63,6 +63,9 @@ public struct Triad: Hashable, Sendable, Codable {
 
     /// For example "C major", "B♭ minor".
     public var name: String { "\(root) \(quality.rawValue)" }
+
+    /// "Em", "B♭".
+    public var shortName: String { "\(root)\(quality == .minor ? "m" : "")" }
 }
 
 extension Triad: CustomStringConvertible {

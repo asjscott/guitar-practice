@@ -51,6 +51,11 @@ public struct PitchClass: Hashable, Sendable, Codable, CaseIterable {
     public func interval(upTo other: PitchClass) -> Interval {
         Interval(PitchClass(other.value - value).value)
     }
+
+    /// The lowest pitch of this pitch class at or above `floor`.
+    public func lowestPitch(atOrAbove floor: Pitch) -> Pitch {
+        floor + floor.pitchClass.interval(upTo: self)
+    }
 }
 
 extension PitchClass: CustomStringConvertible {

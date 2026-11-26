@@ -110,7 +110,15 @@ public struct ProgressionDrill<Rules: ProgressionRules>: Drill {
     public var canHold: Bool { false }
     public var resumesSamePrompt: Bool { phase == .paused }
 
-    public var nothingToPromptReason: String? { setup.progressionProblem }
+    public var nothingToPromptReason: String? {
+        if let problem = setup.progressionProblem { return problem }
+        guard position != nil else { return nil }
+        let missing = chords.indices.first { index in
+            Rules.expected(for: turn(slot: index, previousPlayed: nil, previousDrawn: nil)) == nil
+        }
+        return missing.map { "\(Rules.kind.title) has nothing to ask of \(chords[$0].shortName) in the "
+            + "\(position?.name ?? "position"): choose another position." }
+    }
 
     /// The chord on the neck: its root, where the voicing has it.
     public var prompt: NotePrompt? {
@@ -262,7 +270,14 @@ public struct ProgressionDrill<Rules: ProgressionRules>: Drill {
     }
 
     private mutating func open(slot: Int) {
-        let expected = Rules.expected(for: turn(slot: slot, previousPlayed: previousPlayed, previousDrawn: previousDrawn))
+        guard let expected = Rules.expected(for: turn(slot: slot, previousPlayed: previousPlayed,
+                                                      previousDrawn: previousDrawn)) else {
+            // Nothing to ask (`nothingToPromptReason` keeps a run from starting so): the run ends.
+            phase = .idle
+            open = nil
+            pendingBacking = [.stop]
+            return
+        }
         open = OpenChord(slot: slot, expected: expected, hinted: isHintShown)
     }
 
@@ -314,7 +329,8 @@ public struct ProgressionDrill<Rules: ProgressionRules>: Drill {
         chord.expected.accepted.contains { Array(self.pitches(of: $0).prefix(pitches.count)) == pitches }
     }
 
-    private func pitches(of voicing: TriadVoicing) -> [Pitch] { voicing.locations.map(fretboard.pitch) }
+    /// Low to high, as they are played.
+    private func pitches(of voicing: TriadVoicing) -> [Pitch] { fretboard.pitches(of: voicing) }
 
     private mutating func take(_ pitch: Pitch, onset: Duration) {
         guard let chord = open, onset >= start(ofSlot: chord.slot) - halfBeat else { return }
@@ -367,9 +383,9 @@ public struct ProgressionDrill<Rules: ProgressionRules>: Drill {
     /// The chord on the neck: the open one, or from half a beat before its window ends, the next.
     private var neck: (slot: Int, voicing: TriadVoicing, played: Int, chord: OpenChord?)? {
         guard let chord = open else { return nil }
-        if now >= end(ofSlot: chord.slot) - halfBeat {
-            let next = Rules.expected(for: turn(slot: chord.slot + 1, previousPlayed: chord.played,
-                                                previousDrawn: chord.played ?? chord.expected.drawn))
+        if now >= end(ofSlot: chord.slot) - halfBeat, let next = Rules.expected(
+            for: turn(slot: chord.slot + 1, previousPlayed: chord.played,
+                      previousDrawn: chord.played ?? chord.expected.drawn)) {
             return (chord.slot + 1, next.drawn, 0, nil)
         }
         let isDrawnBegun = Array(pitches(of: chord.expected.drawn).prefix(chord.match.count)) == chord.match
@@ -413,14 +429,14 @@ public struct ProgressionDrill<Rules: ProgressionRules>: Drill {
     /// The voicing's notes played so far solid, the last ringed; the rest as the stage shows (Shown during a hint).
     /// While the run is at Shown, the next chord's voicing is ghosted.
     private func markers(of voicing: TriadVoicing, played: Int, stage: FadeStage, slot: Int) -> [DrillDisplay.Marker] {
-        var markers = voicing.locations.enumerated().compactMap { index, location -> DrillDisplay.Marker? in
+        var markers = fretboard.locationsLowToHigh(of: voicing).enumerated().compactMap { index, location -> DrillDisplay.Marker? in
             let isPlayed = index < played
             guard isPlayed || stage != .hidden else { return nil }
             return marker(location, of: voicing.triad, isFaint: !isPlayed && stage == .faded,
                           isLast: isPlayed && index == played - 1)
         }
-        if self.stage == .shown {
-            let next = Rules.expected(for: turn(slot: slot + 1, previousPlayed: voicing, previousDrawn: voicing)).drawn
+        if self.stage == .shown,
+           let next = Rules.expected(for: turn(slot: slot + 1, previousPlayed: voicing, previousDrawn: voicing))?.drawn {
             markers += next.locations.filter { !voicing.locations.contains($0) }.map {
                 marker($0, of: next.triad, isFaint: true, isLast: false)
             }

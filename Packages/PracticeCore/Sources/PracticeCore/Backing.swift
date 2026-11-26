@@ -27,6 +27,17 @@ public enum BackingStyle: String, Hashable, Sendable, Codable, CaseIterable {
     case bluesShuffle
 }
 
+extension Progression {
+    /// The style its backing has until one is chosen for it: the shuffle for a progression with a shuffle feel (the
+    /// 12-bar blues), else rock.
+    public var defaultStyle: BackingStyle {
+        switch feel {
+        case .straight: .rock
+        case .shuffle: .bluesShuffle
+        }
+    }
+}
+
 /// Which instrument plays a note. Each is one sampler in the app.
 public enum BackingPart: String, Hashable, Sendable, CaseIterable {
     case bass, keys, drums
@@ -141,8 +152,8 @@ public struct Backing: Hashable, Sendable {
                                length: (self.time(ofTick: first + tick + ticks) - time) * held)
         }
         let beats = 0..<Self.beatsPerBar
-        let root = Self.lowest(triad.root.pitchClass, from: Self.bassLowest)
-        let voicing = triad.pitchClasses.map { Self.lowest($0, from: Self.keysLowest) }
+        let root = triad.root.pitchClass.lowestPitch(atOrAbove: Self.bassLowest)
+        let voicing = triad.pitchClasses.map { $0.lowestPitch(atOrAbove: Self.keysLowest) }
         /// The keys' chord on beats 1 and 3, held to the next.
         let halfBarKeys = [0, 2].flatMap { beat in
             voicing.map { note(.keys, $0, 70, tick: beat * Self.ticksPerBeat, ticks: 2 * Self.ticksPerBeat) }
@@ -172,7 +183,7 @@ public struct Backing: Hashable, Sendable {
                      ticks: Self.ticksPerEighth)
             }
             let bass = [note(.bass, root, 95, tick: 0, ticks: 2 * Self.ticksPerBeat),
-                        note(.bass, root + Interval(7), 85, tick: 2 * Self.ticksPerBeat, ticks: 2 * Self.ticksPerBeat)]
+                        note(.bass, root + .perfectFifth, 85, tick: 2 * Self.ticksPerBeat, ticks: 2 * Self.ticksPerBeat)]
             let keys = voicing.map { note(.keys, $0, 60, tick: 0, ticks: Self.ticksPerBar, held: 0.97) }
             return drums + hiHats + bass + keys
         case .bluesShuffle:
@@ -185,7 +196,7 @@ public struct Backing: Hashable, Sendable {
             let hiHats = beats.flatMap { beat in
                 shuffled(beat) { note(.drums, Drum.closedHiHat, $2 ? 80 : 55, tick: $0, ticks: $1) }
             }
-            let walk = [0, 7, 9, 7].map { root + Interval($0) }
+            let walk = [Interval.unison, .perfectFifth, .majorSixth, .perfectFifth].map { root + $0 }
             let bass = beats.flatMap { beat in
                 shuffled(beat) { note(.bass, walk[beat], $2 ? 100 : 80, tick: $0, ticks: $1) }
             }
@@ -198,9 +209,4 @@ public struct Backing: Hashable, Sendable {
     /// G3: each chord tone is the lowest from here up, so the keys keep to the middle, out of the guitar triads' way
     /// as far as they can.
     private static let keysLowest = Pitch(55)
-
-    /// The lowest pitch of a pitch class at or above another pitch.
-    private static func lowest(_ pitchClass: PitchClass, from floor: Pitch) -> Pitch {
-        floor + floor.pitchClass.interval(upTo: pitchClass)
-    }
 }

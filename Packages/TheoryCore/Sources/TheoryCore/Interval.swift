@@ -9,6 +9,8 @@ public struct Interval: Hashable, Comparable, Sendable, Codable {
     }
 
     public static let unison = Interval(0)
+    public static let perfectFifth = Interval(7)
+    public static let majorSixth = Interval(9)
     public static let octave = Interval(12)
 
     public static func < (lhs: Interval, rhs: Interval) -> Bool { lhs.semitones < rhs.semitones }

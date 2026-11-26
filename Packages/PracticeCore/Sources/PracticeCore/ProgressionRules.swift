@@ -39,12 +39,14 @@ public struct ChordTurn: Sendable {
 
 /// What a chord expects: the voicings that are clean, and the one drawn while Shown or Faded.
 public struct ExpectedVoicings: Hashable, Sendable {
-    /// Never empty: a progression drill doesn't start unless every chord has a voicing in the position.
+    /// Never empty.
     public let accepted: [TriadVoicing]
     /// One of `accepted`.
     public let drawn: TriadVoicing
 
-    public init(accepted: [TriadVoicing], drawn: TriadVoicing) {
+    /// Nil when nothing is accepted.
+    public init?(accepted: [TriadVoicing], drawn: TriadVoicing?) {
+        guard let drawn, !accepted.isEmpty else { return nil }
         precondition(accepted.contains(drawn))
         self.accepted = accepted
         self.drawn = drawn
@@ -59,8 +61,9 @@ public struct ExpectedVoicings: Hashable, Sendable {
 public protocol ProgressionRules: Sendable {
     static var kind: DrillKind { get }
 
-    /// The chord's expected voicings, worked out when it comes up, and again for the neck before then.
-    static func expected(for turn: ChordTurn) -> ExpectedVoicings
+    /// The chord's expected voicings, worked out when it comes up, and again for the neck before then; nil when it
+    /// has none (then the drill has nothing to prompt).
+    static func expected(for turn: ChordTurn) -> ExpectedVoicings?
 
     /// A melody on the top notes, one per chord, drawn over the timeline at every fade stage and handed to each
     /// chord's turn; nil (the default) for none.
@@ -71,48 +74,4 @@ public protocol ProgressionRules: Sendable {
 extension ProgressionRules {
     public static func topNotes(of progression: Progression, in key: Key, position: Position,
                                 on fretboard: Fretboard) -> [Pitch]? { nil }
-}
-
-extension DrillSetup {
-    /// Progressions only: the chosen position of the key's scale, or with a theme, the theme's. Nil when it isn't on
-    /// the neck.
-    public var progressionPosition: Position? {
-        if let theme { return theme.position(on: fretboard) }
-        let id = options.position
-        let positions = fretboard.positions(of: chosenKey.scale, system: options.positionSystem)
-        return positions.first { $0.id == id }
-            ?? positions.first { $0.system == id.system && $0.number == id.number && $0.octave == 0 }
-            ?? positions.first { $0.number == 1 && $0.octave == 0 }
-    }
-
-    /// Progressions only: why a run would have nothing to ask; nil when every chord has a voicing in the position.
-    public var progressionProblem: String? {
-        guard let progression = options.progression else { return "Choose a progression." }
-        let key = chosenKey
-        guard progression.mode == key.mode else { return "\(progression.name) isn’t in \(key)." }
-        guard let position = progressionPosition else { return "The position doesn’t fit the neck." }
-        let missing = Set(progression.chords(in: key)).filter { fretboard.voicings(of: $0, in: position).isEmpty }
-        guard !missing.isEmpty else { return nil }
-        let names = progression.chords(in: key).filter(missing.contains).map(\.shortName).uniqued()
-        return "\(names.joined(separator: ", ")) \(names.count == 1 ? "has" : "have") no voicing in the "
-            + "\(position.name): choose another position."
-    }
-}
-
-extension Triad {
-    /// "Em", "B♭".
-    public var shortName: String { "\(root)\(quality == .minor ? "m" : "")" }
-}
-
-extension Array where Element: Hashable {
-    /// Without repeats, in order.
-    func uniqued() -> [Element] {
-        var seen = Set<Element>()
-        return filter { seen.insert($0).inserted }
-    }
-}
-
-extension Progression {
-    /// The style its backing has until one is chosen for it: the shuffle for the 12-bar blues, else rock.
-    public var defaultStyle: BackingStyle { id == "12-bar blues" ? .bluesShuffle : .rock }
 }

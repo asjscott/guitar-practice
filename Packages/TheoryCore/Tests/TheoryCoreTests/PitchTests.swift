@@ -58,6 +58,17 @@ struct PitchTests {
         #expect(Interval(3) + Interval(4) == Interval(7))
     }
 
+    @Test func namedIntervals() {
+        #expect(Interval.perfectFifth == Interval(7))
+        #expect(Interval.majorSixth == Interval(9))
+    }
+
+    @Test func theLowestPitchOfAPitchClassAtOrAboveAnother() {
+        #expect(PitchClass(7).lowestPitch(atOrAbove: Pitch(28)) == Pitch(31))  // G from E1: G1
+        #expect(PitchClass(4).lowestPitch(atOrAbove: Pitch(28)) == Pitch(28))  // E from E1: E1 itself
+        #expect(PitchClass(3).lowestPitch(atOrAbove: Pitch(28)) == Pitch(39))  // E♭ from E1: E♭2
+    }
+
     @Test func pitchesOrderByHeight() {
         #expect(Pitch(40) < Pitch(41))
         #expect([Pitch(64), Pitch(40), Pitch(50)].sorted() == [Pitch(40), Pitch(50), Pitch(64)])
