@@ -70,6 +70,16 @@ P4 on branch `prototype/phase3-screens`.
 - Evenness, as "evenness 18 ms", follows how the pass went, until the next count-in ends.
 - Summary: a card per block that started, as now, with the scale and triad figures. Scales: clean passes out of complete ones, large, then the fastest clean tempo, and the median evenness. Triads: prompts, first-try accuracy per note, the median time per voicing ("3.10 s a voicing": only voicings played whole, and from Resume if it started one again) and skips. The slowest prompts leave scales out.
 
+## Progressions (Phase 4)
+
+B on branch `prototype/phase4-screens`, chosen provisionally: the player will judge it in use with the backing, and A (a row of chord cards under the neck) is the fallback.
+
+- Playing: a header line (the drill and the progression's chords, feedback, which time through and the fade stage), the tall zoomed neck, then a timeline of chord blocks (name and numeral, a tick per beat) that scrolls left past a fixed playhead, with the next time through coming in from the right.
+- The neck shows the current chord's voicing at the run's fade stage, with the notes played so far solid and the last one ringed. While Shown, the next chord's voicing is ghosted on it.
+- Past blocks are tinted by outcome: green clean, orange wrong, grey missed; the current one is outlined.
+- Target top note: the top notes as a line that rises and falls over the blocks, each named.
+- The count-in is a big number over the neck, as for scales.
+
 ## Settings
 
 - Persisted with `@AppStorage`, not SwiftData.

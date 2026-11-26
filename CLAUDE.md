@@ -6,7 +6,7 @@ Full spec and roadmap: Claude Docs `c1631de5-f295-4bd8-a9fe-f1c1948a980d`. Befor
 
 ## Current phase
 
-**Phase 4 · Backing and progressions.** Scope: MIDI backing via SoundFont (bass, keys, drums; tempo and style); progression library and Roman-numeral → key rendering; nearest voicing, stay in position and target top note drills; latency check; audio file import. Not yet specified: no spec issue or tickets.
+**Phase 4 · Backing and progressions.** Scope: MIDI backing via SoundFont (bass, keys, drums; tempo and style); progression library and Roman-numeral → key rendering; nearest voicing, stay in position and target top note drills; latency check. Spec #51 (audio file import moved to Phase 5); no tickets yet.
 
 Carried over from the Phase 3 gate (#48), to check on a guitar in Phase 4: a full Inversions climb on the theme's string set, with the triad fade.
 
@@ -18,7 +18,7 @@ Phase order: 0 Foundations → 1 Hear the guitar → 2 Session MVP → 3 Scales 
 
 - Swift 6 (strict concurrency), SwiftUI, macOS 14+, Apple silicon
 - SwiftData for persistence (app target only)
-- An input-only Core Audio unit for audio input (ADR 0004), with our own pitch detector in ListenCore (ADR 0002; onsets, ADR 0005); the metronome is made in code and scheduled on the app's output, and its clicks bypass the app-sound filter (ADR 0005); AudioKit for backing from Phase 4
+- An input-only Core Audio unit for audio input (ADR 0004), with our own pitch detector in ListenCore (ADR 0002; onsets, ADR 0005); the metronome is made in code and scheduled on the app's output, and its clicks bypass the app-sound filter (ADR 0005); backing is Apple's SoundFont sampler on the same output engine, scheduled from the click clock (ADR 0006); no AudioKit
 - XcodeGen: `project.yml` is the source of truth for the Xcode project
 - Personal use, run from Xcode; public GitHub repo (MIT licence)
 
