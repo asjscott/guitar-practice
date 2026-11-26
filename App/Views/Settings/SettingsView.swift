@@ -16,8 +16,10 @@ struct SettingsView: View {
 
 #Preview {
     let output = AppSoundOutput(isInert: true)
+    let metronome = Metronome(output: output)
     SettingsView()
         .environment(AudioInputService())
         .environment(output)
-        .environment(Metronome(output: output))
+        .environment(metronome)
+        .environment(BackingPlayer(output: output, metronome: metronome))
 }

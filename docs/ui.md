@@ -85,3 +85,4 @@ B on branch `prototype/phase4-screens`, chosen provisionally: the player will ju
 - Persisted with `@AppStorage`, not SwiftData.
 - Tuning picker with presets + Custom (per-string semitone stepper), capo 0–12, position system (CAGED/3NPS).
 - Metronome tab: the eight common time signatures as buttons, then beats in a bar (1–12) and the beat note (4 or 8); the bar's beats, each a button that turns its emphasis on or off; sound on or off (off, the beats still show), volume, Listen. Listen plays at 60 BPM, and stops on leaving the tab, sleep and losing the output; it is disabled while a drill has the click. The tab isn't locked during a session.
+- Metronome tab, Backing section: Listen plays I–V–vi–IV in G, rock, at 70 BPM, after a bar of drumsticks, with the click on top unless "With the click" is off. It stops as the metronome's Listen does, and the two exclude each other. Without the sounds fetched it is disabled, and the footer says to run `scripts/fetch-sounds`.
