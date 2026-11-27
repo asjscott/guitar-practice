@@ -14,6 +14,7 @@ public struct DrillKind: Identifiable, Sendable {
         .fromADegree,
         .triadPlayIt,
         .inversions,
+        .triadCircle,
         .nearestVoicing,
         .stayInPosition,
         .targetTopNote,

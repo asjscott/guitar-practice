@@ -141,7 +141,18 @@ struct DrillView: View {
         }
     }
 
-    private var triads: some View {
+    @ViewBuilder private var triads: some View {
+        if model.kind.goesRoundTheCircle {
+            TriadCirclePrompt(display: model.snapshot.display, frets: model.options.frets, fretboard: model.fretboard,
+                              now: .seconds(model.now)) {
+                DrillRestingText(model: model)
+            }
+        } else {
+            triadDrill
+        }
+    }
+
+    private var triadDrill: some View {
         TriadPrompt(display: model.snapshot.display, hasClimbs: model.kind.hasClimbs, frets: model.options.frets, fretboard: model.fretboard) {
             LiveCountdownRing { model.countdown }
         } resting: {
