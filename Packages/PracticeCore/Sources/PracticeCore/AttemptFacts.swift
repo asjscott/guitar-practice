@@ -103,16 +103,17 @@ public struct ChordFacts: Hashable, Sendable {
     public var played: TriadVoicing?
     /// Every voicing that would have been clean.
     public var accepted: [TriadVoicing]
-    public var style: BackingStyle
-    /// BPM.
-    public var tempo: Int
+    /// Nil when played without backing (Chords in position).
+    public var style: BackingStyle?
+    /// BPM; nil when played without backing.
+    public var tempo: Int?
     /// What the chord's voicing was played at.
     public var fadeLevel: FadeLevel
     /// Whether H was held during the chord.
     public var hinted: Bool
     public var outcome: ChordOutcome
-    /// The first note's onset, input delay taken off, less the chord's first beat: negative = early. Nil if nothing
-    /// was played in its window.
+    /// The first note's onset, input delay taken off, less the chord's first beat (without backing, less when the
+    /// chord came up): negative = early. Nil if nothing was played in its window.
     public var firstOnset: Duration?
     /// What was taken off the onsets.
     public var inputDelay: Duration
@@ -121,7 +122,7 @@ public struct ChordFacts: Hashable, Sendable {
     public var numeral: Progression.Numeral { progression.steps[place].numeral }
 
     public init(progression: Progression, key: Key, place: Int, triad: Triad, position: Position.ID,
-                played: TriadVoicing?, accepted: [TriadVoicing], style: BackingStyle, tempo: Int,
+                played: TriadVoicing?, accepted: [TriadVoicing], style: BackingStyle?, tempo: Int?,
                 fadeLevel: FadeLevel, hinted: Bool, outcome: ChordOutcome, firstOnset: Duration?,
                 inputDelay: Duration) {
         self.progression = progression
