@@ -232,6 +232,8 @@ enum Snapshots {
             triads.capo = 12
         }
 
+        try await saveProgressions()
+
         let climb = DrillViewModel()
         climb.kind = .inversions
         climb.options.stringSets = [.dGB]
@@ -305,7 +307,26 @@ enum Snapshots {
         try await save("settings-instrument-locked", InstrumentSettingsView().environment(activeSessions),
                        size: CGSize(width: 520, height: 700))
         try await save("settings-audio", AudioSettingsView(), size: CGSize(width: 520, height: 480))
+        try await saveLatencyCheck()
         try await saveMetronome()
+    }
+
+    /// Settings › Audio's latency check: under way, measured, and heard too few.
+    private static func saveLatencyCheck() async throws {
+        guard let device = audioInput.choice?.device else { return }
+        let size = CGSize(width: 520, height: 480)
+        let check = LatencyCheckModel(defaults: emptyDefaults)
+        defer { emptyDefaults.removeObject(forKey: AudioInputSettings.Key.inputDelay(ofDevice: device.uid)) }
+        try await save("settings-audio-checking", AudioSettingsView(check: check), size: size) {
+            check.showForSnapshot(.running(LatencyCheck(start: .zero), device: device.uid), progress: .click(3))
+        }
+        check.showForSnapshot(.idle)
+        try await save("settings-audio-measured", AudioSettingsView(check: check), size: size) {
+            check.storeForSnapshot(.milliseconds(18), ofDevice: device.uid)
+        }
+        try await save("settings-audio-try-again", AudioSettingsView(check: check), size: size) {
+            check.showForSnapshot(.tooFew(heard: 4))
+        }
     }
 
     private static func savePasses() async throws {
@@ -436,8 +457,78 @@ enum Snapshots {
         model.stop()
     }
 
+    /// Nearest voicing, then Stay in position and Target top note Shown and Hidden: I–V–vi–IV in G, E shape, at
+    /// 70 BPM, played along the drawn path.
+    private static func saveProgressions() async throws {
+        func model(_ kind: DrillKind = .nearestVoicing) -> DrillViewModel {
+            let model = DrillViewModel()
+            model.keepOptionsForSnapshot()
+            model.kind = kind
+            model.progressionKey = .major(.g)
+            model.progression = Progression.named("I–V–vi–IV")!
+            model.options.position = Position.ID(system: .caged, number: CAGEDShape.e.number)
+            return model
+        }
+        let idle = model()
+        try await save("progression-idle", DrillView(model: idle))
+        // The 12-bar blues, which starts on the shuffle.
+        let blues = model()
+        blues.progression = Progression.named("12-bar blues")!
+        try await save("progression-idle-blues", DrillView(model: blues))
+        let noSounds = model()
+        try await save("progression-no-sounds", DrillView(model: noSounds),
+                       sound: AppSoundOutput(isInert: true, hasBackingSounds: false)) {
+            noSounds.backingHearing.setInputBuiltInForSnapshot()
+        }
+        let countIn = model()
+        try await save("progression-count-in", DrillView(model: countIn)) {
+            countIn.start(seed: 1)
+            countIn.playProgressionForSnapshot(chords: 0, untilBeat: 1.5)
+        }
+        countIn.stop()
+        let shown = model()
+        try await save("progression-shown", DrillView(model: shown)) {
+            shown.start(seed: 1)
+            shown.playProgressionForSnapshot(chords: 1, partial: 2, untilBeat: 9.6)
+        }
+        shown.stop()
+        let faded = model()
+        try await save("progression-faded", DrillView(model: faded)) {
+            faded.start(seed: 1)
+            faded.playProgressionForSnapshot(chords: 8, partial: 2, untilBeat: 37.6)
+        }
+        faded.stop()
+        let hidden = model()
+        try await save("progression-hidden-wrong", DrillView(model: hidden)) {
+            hidden.start(seed: 1)
+            hidden.playProgressionForSnapshot(chords: 18, wrong: [16], partial: 1, untilBeat: 76.8)
+        }
+        hidden.stop()
+        let paused = model()
+        try await save("progression-paused", DrillView(model: paused)) {
+            paused.start(seed: 1)
+            paused.playProgressionForSnapshot(chords: 1, partial: 2, untilBeat: 9.6)
+            paused.togglePause()
+        }
+        paused.stop()
+        for (kind, name) in [(DrillKind.stayInPosition, "stay"), (.targetTopNote, "top")] {
+            let shown = model(kind)
+            try await save("progression-\(name)-shown", DrillView(model: shown)) {
+                shown.start(seed: 1)
+                shown.playProgressionForSnapshot(chords: 5, partial: 2, untilBeat: 25.6)
+            }
+            shown.stop()
+            let hidden = model(kind)
+            try await save("progression-\(name)-hidden", DrillView(model: hidden)) {
+                hidden.start(seed: 1)
+                hidden.playProgressionForSnapshot(chords: 18, partial: 1, untilBeat: 76.8)
+            }
+            hidden.stop()
+        }
+    }
+
     private static func saveMetronome() async throws {
-        let size = CGSize(width: 520, height: 600)
+        let size = CGSize(width: 520, height: 800)
         func choose(_ signature: String, _ emphasis: String) {
             emptyDefaults.set(signature, forKey: MetronomeSettings.Key.signature)
             emptyDefaults.set(emphasis, forKey: MetronomeSettings.Key.emphasis)
@@ -463,6 +554,20 @@ enum Snapshots {
                            MetronomeSettingsView().environment(metronome).environment(output),
                            size: size, settle: .milliseconds(settle)) { metronome.listen() }
         }
+
+        // Backing: without its sounds, and listening with the click on beat 2 of the count-in.
+        try await save("settings-metronome-no-backing-sounds", MetronomeSettingsView(), size: size,
+                       sound: AppSoundOutput(isInert: true, hasBackingSounds: false))
+        let metronome = Metronome(output: output, defaults: emptyDefaults)
+        let backing = BackingPlayer(output: output, metronome: metronome)
+        try await save("settings-metronome-backing", MetronomeSettingsView().environment(metronome).environment(backing)
+            .environment(output), size: size, settle: .milliseconds(1100)) { backing.listen(style: .rock, withClick: true) }
+        backing.stop()
+        // The shuffle chosen for Listen's progression.
+        emptyDefaults.set(BackingStyle.bluesShuffle.rawValue,
+                          forKey: MetronomeSettings.Key.backingStyle(of: BackingPlayer.listenProgression))
+        try await save("settings-metronome-backing-shuffle", MetronomeSettingsView(), size: size)
+        emptyDefaults.removeObject(forKey: MetronomeSettings.Key.backingStyle(of: BackingPlayer.listenProgression))
         try await save("beats-row", BeatsRow(meter: Meter(.fourFour, emphasis: [1, 3]), current: 4).padding(),
                        size: CGSize(width: 260, height: 80))
     }
@@ -533,6 +638,22 @@ enum Snapshots {
             reroll: nil, blocks: SessionPlanner.plan(DrillKind.all.filter { $0.module != .triads }, budget: .seconds(900), day: 1),
             problem: nil, noTriadsNotice: "Triads are left out: no voicing of the key’s chords on E-A-D fits these frets.",
             start: {}))
+        // The theme's progression, and what setup says about its backing.
+        let progressionTheme = Theme(key: .major(.g), position: Position.ID(system: .caged, number: CAGEDShape.e.number),
+                                     stringSet: .dGB, progression: Progression.named("I–V–vi–IV"))
+        try await save("session-progression-setup", SessionSetupView(
+            minutes: .constant(15), naturalsOnly: .constant(true), range: .constant(.first12),
+            theme: SessionTheme(progressionTheme, on: Fretboard(tuning: .standard)),
+            reroll: {}, blocks: SessionPlanner.plan(DrillKind.all, budget: .seconds(900), day: 1), problem: nil,
+            start: {}))
+        try await save("session-progression-setup-notices", SessionSetupView(
+            minutes: .constant(15), naturalsOnly: .constant(true), range: .constant(.first12),
+            theme: SessionTheme(progressionTheme, on: Fretboard(tuning: .standard)),
+            reroll: nil, blocks: SessionPlanner.plan(DrillKind.all, budget: .seconds(900), day: 1), problem: nil,
+            backingNotices: ["No backing sounds: Progressions plays clicks. " + BackingSounds.fetchHint,
+                             "The built-in microphone will hear the backing as notes: use the interface, or headphones."],
+            start: {}))
+
         let session = SessionViewModel()
         try await save("session-setup", SessionView(model: session))
         try await save("session-setup-short", SessionView(model: session), size: CGSize(width: 1100, height: 480))
@@ -739,6 +860,16 @@ enum Snapshots {
         }
         try await save("session-triad-ready", SessionView(model: session)) { ready(.triadPlayIt) }
 
+        try await save("session-progression-ready", SessionView(model: session)) { ready(.nearestVoicing) }
+        try await save("session-progression-count-in", SessionView(model: session)) {
+            play(.nearestVoicing)
+            session.playProgressionForSnapshot(chords: 0, untilBeat: 1.5)
+        }
+        try await save("session-progression-playing", SessionView(model: session)) {
+            play(.nearestVoicing)
+            session.playProgressionForSnapshot(chords: 5, wrong: [3], partial: 2, untilBeat: 25.6)
+        }
+
         let unheard = SessionViewModel()
         try await save("session-flash", SessionView(model: unheard), sound: silent, settle: .milliseconds(500)) {
             unheard.start(seed: 1)
@@ -797,9 +928,14 @@ enum Snapshots {
             while session.isActive {
                 session.passTimeForSnapshot(2)
                 session.next()
-                session.skip()
-                session.answerForSnapshot(right: false)
-                playPrompt()
+                if session.blockKind?.hasBacking == true {
+                    // Two times through clean, then one with a wrong chord: Faded from the third.
+                    session.playProgressionForSnapshot(chords: 12, wrong: [9], untilBeat: 4 + 48 + 0.5)
+                } else {
+                    session.skip()
+                    session.answerForSnapshot(right: false)
+                    playPrompt()
+                }
                 session.next()
             }
         }
@@ -854,8 +990,10 @@ enum Snapshots {
                              settle: Duration = .milliseconds(400), neededBy follower: String? = nil,
                              prepare: () -> Void = {}, check: () -> Void = {}) async throws {
         guard isWanted(name) || follower.map(isWanted) == true else { return }
+        let metronome = Metronome(output: sound, defaults: emptyDefaults)
         let host = NSHostingController(rootView: view.frame(width: size.width, height: size.height).environment(audioInput)
-            .environment(sound).environment(Metronome(output: sound, defaults: emptyDefaults)).environment(log).defaultAppStorage(emptyDefaults))
+            .environment(sound).environment(metronome).environment(BackingPlayer(output: sound, metronome: metronome))
+            .environment(log).defaultAppStorage(emptyDefaults))
         host.sceneBridgingOptions = [.title, .toolbars]
         let window = NSWindow(contentViewController: host)
         window.isReleasedWhenClosed = false

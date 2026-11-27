@@ -16,6 +16,12 @@ struct TriadTests {
         #expect(Triad(.minor, root: .bFlat).name == "B♭ minor")
     }
 
+    @Test func shortNames() {
+        #expect(Triad(.minor, root: .e).shortName == "Em")
+        #expect(Triad(.major, root: .bFlat).shortName == "B♭")
+        #expect(Triad(.minor, root: .dSharp).shortName == "D♯m")
+    }
+
     @Test func inversionsOrderTheTonesFromTheLowest() {
         let c = Triad(.major, root: .c)
         #expect(c.tones(in: .root) == [.c, .e, .g])

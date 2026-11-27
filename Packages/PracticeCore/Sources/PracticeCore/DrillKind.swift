@@ -13,6 +13,9 @@ public struct DrillKind: Identifiable, Sendable {
         .fromADegree,
         .triadPlayIt,
         .inversions,
+        .nearestVoicing,
+        .stayInPosition,
+        .targetTopNote,
     ]
 
     /// Saved in the attempt log: never change it.
@@ -41,6 +44,7 @@ public struct DrillKind: Identifiable, Sendable {
         public static let offersInversions = Traits(rawValue: 1 << 4)
         public static let hasPasses = Traits(rawValue: 1 << 5)
         public static let hasClimbs = Traits(rawValue: 1 << 6)
+        public static let hasBacking = Traits(rawValue: 1 << 7)
     }
 
     private let traits: Traits
@@ -64,7 +68,10 @@ public struct DrillKind: Identifiable, Sendable {
     public var hasPasses: Bool { traits.contains(.hasPasses) }
 
     /// What it shows fades as it is learned, and H shows it.
-    public var fades: Bool { hasPasses || module == .triads }
+    public var fades: Bool { hasPasses || module == .triads || hasBacking }
+
+    /// A progression drill: chords played over backing, round and round the progression.
+    public var hasBacking: Bool { traits.contains(.hasBacking) }
 
     /// Its prompts are climbs.
     public var hasClimbs: Bool { traits.contains(.hasClimbs) }
@@ -84,6 +91,13 @@ public struct DrillKind: Identifiable, Sendable {
     public init<Rules: PassRules>(id: String, title: String, instructions: String, symbol: String, rules: Rules.Type) {
         self.init(id: id, module: .scales, title: title, instructions: instructions, symbol: symbol, traits: .hasPasses,
                   repeatTitle: "Restart") { PassDrill<Rules>(setup: $0) }
+    }
+
+    /// A progression drill.
+    public init<Rules: ProgressionRules>(id: String, title: String, instructions: String, symbol: String,
+                                         rules: Rules.Type) {
+        self.init(id: id, module: .progressions, title: title, instructions: instructions, symbol: symbol,
+                  traits: .hasBacking, repeatTitle: nil) { ProgressionDrill<Rules>(setup: $0) }
     }
 
     private init(id: String, module: DrillModule, title: String, instructions: String, symbol: String, traits: Traits,

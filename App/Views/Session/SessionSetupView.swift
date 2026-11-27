@@ -23,6 +23,10 @@ struct SessionSetupView: View {
     var noSoundNotice: String?
     /// Nil with triads.
     var noTriadsNotice: String?
+    /// Nil with progressions.
+    var noProgressionsNotice: String?
+    /// How a progression block's backing will be heard.
+    var backingNotices: [String] = []
     let start: () -> Void
 
     /// What is stored could be anything.
@@ -57,6 +61,9 @@ struct SessionSetupView: View {
                 }
                 .font(.title3)
                 .frame(minHeight: 28)
+                if let progression = theme?.progressionText {
+                    Label(progression, systemImage: "music.note.list").font(.title3).foregroundStyle(.secondary)
+                }
             }
             if let neck {
                 FretboardView(diagram: neck, minHeight: 130).frame(maxHeight: 200).padding(.horizontal, 24)
@@ -81,6 +88,12 @@ struct SessionSetupView: View {
             }
             if let noTriadsNotice {
                 Label(noTriadsNotice, systemImage: "info.circle").foregroundStyle(.secondary)
+            }
+            if let noProgressionsNotice {
+                Label(noProgressionsNotice, systemImage: "info.circle").foregroundStyle(.secondary)
+            }
+            ForEach(backingNotices, id: \.self) {
+                Label($0, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
             }
             SessionBlocksByModule(blocks: blocks)
             HStack {

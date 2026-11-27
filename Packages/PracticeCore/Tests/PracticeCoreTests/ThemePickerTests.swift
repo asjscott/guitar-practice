@@ -84,9 +84,11 @@ struct ThemePickerTests {
 struct ThemeRepickTests {
     @Test func aPositionThatStillExistsIsKept() {
         let theme = Theme(key: .major(.f), position: caged(3), stringSet: .dGB)
-        #expect(picker().keepingKey(of: theme, on: standard, system: .caged) == theme)
+        let kept = picker().keepingKey(of: theme, on: standard, system: .caged)
+        #expect(kept.position == theme.position && kept.stringSet == theme.stringSet)
         let dadgad = Fretboard(tuning: TuningPreset.dadgad.tuning, capo: 2)
-        #expect(picker().keepingKey(of: theme, on: dadgad, system: .caged) == theme)
+        let keptOnDADGAD = picker().keepingKey(of: theme, on: dadgad, system: .caged)
+        #expect(keptOnDADGAD.position == theme.position && keptOnDADGAD.stringSet == theme.stringSet)
     }
 
     @Test func anotherPositionSystemKeepsTheKeyAndComesBackToTheSamePosition() {

@@ -158,7 +158,9 @@ struct DrillKindTests {
         #expect(!DrillKind.all.isEmpty)
         #expect(Set(DrillKind.all.map(\.id)).count == DrillKind.all.count)
         for kind in DrillKind.all {
-            var drill = kind.makeDrill(DrillSetup(fretboard: Fretboard(tuning: .standard), seed: 1))
+            var options = DrillOptions()
+            options.progression = Progression.named("I–IV–V")
+            var drill = kind.makeDrill(DrillSetup(fretboard: Fretboard(tuning: .standard), options: options, seed: 1))
             #expect(drill.kind == kind)
             #expect(drill.nothingToPromptReason == nil)
             drill.handle(.start(at: s(0)))

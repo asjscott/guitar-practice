@@ -1,7 +1,7 @@
 import TheoryCore
 
 /// The engine of the scale drills: passes to the metronome, one note per click, each after a count-in. Timing is logged
-/// but never judged. It records one attempt per note; the notes of a pass share a group, and a pass started again is a
+/// but never judged. Onsets have the input delay taken off first. It records one attempt per note; the notes of a pass share a group, and a pass started again is a
 /// new one.
 ///
 /// The phase is waiting or wrong from the count-in to the last note: a note played or revealed gives way at once to the
@@ -125,7 +125,8 @@ public struct PassDrill<Rules: PassRules>: Drill {
         case .stop(let now):
             stop(at: now)
         case .played(let pitch, let onset, let now):
-            // Up to the onset with no grace: a note played after the timeout doesn't count.
+            // When it was played. Up to then with no grace: a note played after the timeout doesn't count.
+            let onset = onset - setup.inputDelay
             advance(to: onset, grace: .zero)
             judge(pitch, onset: onset)
             advance(to: now)
@@ -156,7 +157,7 @@ public struct PassDrill<Rules: PassRules>: Drill {
             if passEnd != nil, end > countInStart { askForClicks(from: end) }
         case .tick(let now):
             advance(to: now)
-        case .typed, .soundStarted:
+        case .typed, .soundStarted, .backingStarted:
             break
         }
     }
@@ -288,7 +289,8 @@ public struct PassDrill<Rules: PassRules>: Drill {
         let facts = PassFacts(scale: pass.scale, position: pass.position.id, startDegree: pass.startDegree,
                               tempo: settings.tempo, signature: settings.meter.signature,
                               fadeStage: fadeStage, hinted: isHinted,
-                              clickOffset: onset.map { $0 - track.time(ofClick: track.nearestClick(to: $0)) })
+                              clickOffset: onset.map { $0 - track.time(ofClick: track.nearestClick(to: $0)) },
+                              inputDelay: setup.inputDelay)
         attempts.append(Attempt(prompt: prompt, outcome: outcome, responseTime: onset.map { max(.zero, $0 - timerStart) },
                                 wrongAnswers: wrongSoFar.map { .pitch($0) }, location: location,
                                 group: AttemptGroup(number: group, size: pass.locations.count, place: noteIndex),

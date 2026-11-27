@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import PracticeCore
+import TheoryCore
 
 /// The app's one metronome: plays a click track on the app's sound output, at the volume in Settings.
 ///
@@ -40,6 +41,9 @@ final class Metronome {
     /// The time signature and emphasis in Settings.
     var meter: Meter { MetronomeSettings.meters(in: defaults).meter }
 
+    /// Whether clicks can be heard: sound on, at some volume, in Settings.
+    var clicksSound: Bool { MetronomeSettings.clickVolume(in: defaults) > 0 }
+
     /// A scale drill's remembered tempo, Hold and ladder, in sessions and free practice alike, put in place of the settings' own.
     func loadTempo(of kind: DrillKind, into settings: inout PassSettings) {
         settings.tempo = defaults.object(forKey: MetronomeSettings.Key.tempo(of: kind)) as? Int ?? PassSettings().tempo
@@ -51,6 +55,18 @@ final class Metronome {
         defaults.set(settings.tempo, forKey: MetronomeSettings.Key.tempo(of: kind))
         defaults.set(settings.holdsTempo, forKey: MetronomeSettings.Key.holdsTempo(of: kind))
         defaults.set(settings.ladder.notClean, forKey: MetronomeSettings.Key.notClean(of: kind))
+    }
+
+    /// The progression drills' remembered tempo, and the progression's style, put in place of the settings' own.
+    func loadBacking(of progression: Progression, into settings: inout BackingSettings) {
+        settings.tempo = defaults.object(forKey: MetronomeSettings.Key.backingTempo) as? Int ?? BackingSettings.defaultTempo
+        settings.style = defaults.string(forKey: MetronomeSettings.Key.backingStyle(of: progression))
+            .flatMap(BackingStyle.init) ?? progression.defaultStyle
+    }
+
+    func storeBacking(of progression: Progression, from settings: BackingSettings) {
+        defaults.set(settings.tempo, forKey: MetronomeSettings.Key.backingTempo)
+        defaults.set(settings.style.rawValue, forKey: MetronomeSettings.Key.backingStyle(of: progression))
     }
 
     /// Does what a drill asks, and tells it when the clicks will be heard.

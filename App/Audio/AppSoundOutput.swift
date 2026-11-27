@@ -34,10 +34,18 @@ final class AppSoundOutput {
     @ObservationIgnored private var outputObserver: CoreAudioDevices.ChangeObserver?
     @ObservationIgnored private let isInert: Bool
 
-    /// Inert (in `Snapshots`): makes no sound and touches no device, but says it plays, unless given a problem.
-    init(isInert: Bool = false, problem: String? = nil) {
+    /// The backing's SoundFont, if it has been fetched (`scripts/fetch-sounds`).
+    let backingSoundFont: URL?
+
+    /// From `startBacking()` to `endBacking()`.
+    @ObservationIgnored private var hasBacking = false
+
+    /// Inert (in `Snapshots`): makes no sound and touches no device, but says it plays, unless given a problem, and
+    /// has the backing's sounds unless told not to.
+    init(isInert: Bool = false, problem: String? = nil, hasBackingSounds: Bool = true) {
         self.isInert = isInert
         self.problem = problem
+        backingSoundFont = isInert ? (hasBackingSounds ? URL(fileURLWithPath: "/dev/null") : nil) : BackingSounds.soundFont
         hasDevice = problem == nil
         guard !isInert else { return }
         checkForOutput()
@@ -62,6 +70,8 @@ final class AppSoundOutput {
             let engine = try Engine(device: device) { [weak self] in self?.engineChanged($0) }
             engine.clickVolume = clickVolume
             self.engine = engine
+            // Notes already scheduled on an engine before are lost; the backing goes on with those after.
+            if hasBacking, let backingSoundFont { engine.loadBacking(from: backingSoundFont) }
             return true
         } catch {
             problem = "Sound output couldn’t start (\((error as NSError).code))."
@@ -94,7 +104,7 @@ final class AppSoundOutput {
 
     private func stopIdleEngine() {
         lateRelease?.cancel()
-        guard !isPrepared, !hasClicks else { return }
+        guard !isPrepared, !hasClicks, !hasBacking else { return }
         guard chimeEnd > .now else { return engine = nil }
         lateRelease = Task { [weak self, chimeEnd] in
             try? await Task.sleep(until: chimeEnd)
@@ -124,6 +134,31 @@ final class AppSoundOutput {
         stopIdleEngine()
     }
 
+    // MARK: - Backing (for `BackingPlayer`)
+
+    /// Keeps the engine going for backing, with its samplers loaded. How long a note takes to be heard; nil if it
+    /// can't be, with a problem if there's no output.
+    func startBacking() -> Duration? {
+        guard let backingSoundFont else { return nil }
+        hasBacking = true
+        guard startEngine() else { return nil }
+        if isInert { return .zero }
+        guard let engine, engine.loadBacking(from: backingSoundFont) else { return nil }
+        return .seconds(engine.latency)
+    }
+
+    /// Schedules notes to be heard at their times (host time), each once. Left out while there is no output.
+    func schedule(_ notes: [BackingNote]) { engine?.scheduleBacking(notes) }
+
+    /// No backing heard at or after a time; what is sounding then stops.
+    func cancelBacking(from time: Duration) { engine?.cancelBacking(from: time) }
+
+    func endBacking() {
+        cancelBacking(from: .zero)
+        hasBacking = false
+        stopIdleEngine()
+    }
+
     private func checkForOutput() {
         hasDevice = CoreAudioDevices.defaultOutputID() != nil
         problem = hasDevice ? nil : "There’s no sound output device."
@@ -133,7 +168,7 @@ final class AppSoundOutput {
         checkForOutput()
         if let engine {
             if engine.device != CoreAudioDevices.defaultOutputID() { restart() }
-        } else if isPrepared || hasClicks {
+        } else if isPrepared || hasClicks || hasBacking {
             // Back after none. Clicks go on in time: the metronome schedules them whether or not they can be heard.
             _ = startEngine()
         }
@@ -241,6 +276,27 @@ final class AppSoundOutput {
                 let hostTime = AVAudioTime.hostTime(forSeconds: (click.time - latency) / .seconds(1))
                 clickSlots[index].player.scheduleBuffer(sound, at: AVAudioTime(hostTime: hostTime))
             }
+        }
+
+        // MARK: Backing
+
+        /// Nil until loaded. Not registered with `AppSoundFilter`, like clicks.
+        private var backing: BackingSamplers?
+
+        /// Loads the samplers if they aren't yet; false if they can't be.
+        @discardableResult
+        func loadBacking(from soundFont: URL) -> Bool {
+            if backing == nil { backing = BackingSamplers(soundFont: soundFont, on: engine) }
+            return backing != nil
+        }
+
+        func scheduleBacking(_ notes: [BackingNote]) {
+            guard engine.isRunning else { return }
+            backing?.schedule(notes, latency: .seconds(latency))
+        }
+
+        func cancelBacking(from time: Duration) {
+            backing?.cancel(from: time, latency: .seconds(latency))
         }
 
         func cancelClicks(from time: Duration) {

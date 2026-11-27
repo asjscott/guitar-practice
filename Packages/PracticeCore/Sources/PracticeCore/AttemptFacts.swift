@@ -21,6 +21,7 @@ public struct AttemptGroup: Hashable, Sendable {
 public enum AttemptFacts: Hashable, Sendable {
     case pass(PassFacts)
     case triad(TriadFacts)
+    case chord(ChordFacts)
 }
 
 /// The pass a note was in, and how it was played.
@@ -40,11 +41,15 @@ public struct PassFacts: Hashable, Sendable {
     /// Whether a hint had been used in the pass by the time this note was dealt with.
     public var hinted: Bool
 
-    /// The onset less the time the nearest click was heard: positive = late. Nil unless answered.
+    /// The onset, input delay taken off, less the time the nearest click was heard: positive = late. Nil unless
+    /// answered.
     public var clickOffset: Duration?
 
+    /// What was taken off the onsets.
+    public var inputDelay: Duration
+
     public init(scale: Scale, position: Position.ID, startDegree: Scale.Degree, tempo: Int, signature: TimeSignature,
-                fadeStage: FadeStage, hinted: Bool, clickOffset: Duration?) {
+                fadeStage: FadeStage, hinted: Bool, clickOffset: Duration?, inputDelay: Duration = .zero) {
         self.scale = scale
         self.position = position
         self.startDegree = startDegree
@@ -53,6 +58,7 @@ public struct PassFacts: Hashable, Sendable {
         self.fadeStage = fadeStage
         self.hinted = hinted
         self.clickOffset = clickOffset
+        self.inputDelay = inputDelay
     }
 }
 
@@ -72,6 +78,73 @@ public struct TriadFacts: Hashable, Sendable {
         self.triad = triad
         self.inversion = inversion
         self.stringSet = stringSet
+    }
+}
+
+/// How a chord of a time through went. The raw values are saved in the attempt log: never change them.
+public enum ChordOutcome: String, Hashable, Sendable, CaseIterable {
+    /// An accepted voicing, low to high, with no wrong note before it and no hint.
+    case clean
+    /// A wrong pitch, another voicing, or a hint.
+    case wrong
+    /// Not all three notes in the chord's window, and no wrong one.
+    case missed
+}
+
+/// A chord of a time through, as it was asked for and played: one attempt per chord.
+public struct ChordFacts: Hashable, Sendable {
+    public var progression: Progression
+    public var key: Key
+    /// Which chord of the progression, from 0.
+    public var place: Int
+    public var triad: Triad
+    public var position: Position.ID
+    /// Nil if no voicing of the chord was played.
+    public var played: TriadVoicing?
+    /// Every voicing that would have been clean.
+    public var accepted: [TriadVoicing]
+    public var style: BackingStyle
+    /// BPM.
+    public var tempo: Int
+    /// What the time through was played at.
+    public var fadeStage: FadeStage
+    /// Whether H was held during the chord.
+    public var hinted: Bool
+    public var outcome: ChordOutcome
+    /// The first note's onset, input delay taken off, less the chord's first beat: negative = early. Nil if nothing
+    /// was played in its window.
+    public var firstOnset: Duration?
+    /// What was taken off the onsets.
+    public var inputDelay: Duration
+
+    /// The chord's numeral, as the progression writes it.
+    public var numeral: Progression.Numeral { progression.steps[place].numeral }
+
+    public init(progression: Progression, key: Key, place: Int, triad: Triad, position: Position.ID,
+                played: TriadVoicing?, accepted: [TriadVoicing], style: BackingStyle, tempo: Int,
+                fadeStage: FadeStage, hinted: Bool, outcome: ChordOutcome, firstOnset: Duration?,
+                inputDelay: Duration) {
+        self.progression = progression
+        self.key = key
+        self.place = place
+        self.triad = triad
+        self.position = position
+        self.played = played
+        self.accepted = accepted
+        self.style = style
+        self.tempo = tempo
+        self.fadeStage = fadeStage
+        self.hinted = hinted
+        self.outcome = outcome
+        self.firstOnset = firstOnset
+        self.inputDelay = inputDelay
+    }
+}
+
+extension Attempt {
+    /// A chord's facts, in a progression drill.
+    public var chord: ChordFacts? {
+        if case .chord(let facts) = facts { facts } else { nil }
     }
 }
 

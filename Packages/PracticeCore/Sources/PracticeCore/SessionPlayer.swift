@@ -41,6 +41,8 @@ public enum SessionEvent: Hashable, Sendable {
     case typed(NoteName, at: Duration)
     /// The clicks just asked for, as they will be heard.
     case clicksStarted(ClickTrack)
+    /// The backing just asked for, as it will be heard.
+    case backingStarted(Backing)
     /// What the block's passes are played at, from the next one on: on its Ready card and while paused too.
     case passSettings(PassSettings, at: Duration)
     /// The fade stages reached by now, read again from the log, which has this session's passes too: from the next pass
@@ -56,7 +58,8 @@ public enum SessionEvent: Hashable, Sendable {
 /// A block ends only when the player moves on. The open prompt is then dropped, unrecorded.
 ///
 /// Chimes mark 30 s left and the planned end. Each waits for a gap between prompts (in triad drills, voicings), and the next prompt then waits for
-/// it to end, since a note played over it wouldn't count. Between passes, a chime also waits for the bar to end.
+/// it to end, since a note played over it wouldn't count. Between passes, a chime also waits for the bar to end, and in
+/// progression drills for the time through to end; the next pass or time through then counts in after it.
 public struct SessionPlayer: Sendable {
     /// How long a Ready card waits before its block starts by itself.
     public static let readyTime: Duration = .seconds(5)
@@ -98,6 +101,8 @@ public struct SessionPlayer: Sendable {
     private var chimeToPlay: AppSound?
     /// For the app to take.
     private var pendingClicks: [ClickRequest] = []
+    /// For the app to take.
+    private var pendingBacking: [BackingRequest] = []
     private var settingsByKind: [DrillKind: PassSettings] = [:]
     /// What has been reached, this session's passes included.
     private var fadeStages: FadeStages
@@ -179,6 +184,13 @@ public struct SessionPlayer: Sendable {
     public mutating func takeClicks() -> [ClickRequest] {
         defer { pendingClicks = [] }
         return pendingClicks
+    }
+
+    /// The backing asked for since the last call, to be done in order, each start answered with `backingStarted`. Call
+    /// it after every event.
+    public mutating func takeBacking() -> [BackingRequest] {
+        defer { pendingBacking = [] }
+        return pendingBacking
     }
 
     /// What the block's next pass will be played at, from its Ready card on; nil in blocks without passes.
@@ -265,6 +277,8 @@ public struct SessionPlayer: Sendable {
             if !isHeldForChime(at: now) { send(.typed(name, at: now)) }
         case .clicksStarted(let track):
             send(.clicksStarted(track))
+        case .backingStarted(let backing):
+            send(.backingStarted(backing))
         case .passSettings(let new, let now):
             passTime(to: now)
             guard passSettings != nil else { return }
@@ -408,6 +422,7 @@ public struct SessionPlayer: Sendable {
 
     private mutating func followDrill() {
         pendingClicks += drill?.takeClicks() ?? []
+        pendingBacking += drill?.takeBacking() ?? []
         if let settings = drill?.passSettings { settingsByKind[blocks[blockIndex].kind] = settings }
         if let reached = drill?.fadeStages { fadeStages = reached }
     }

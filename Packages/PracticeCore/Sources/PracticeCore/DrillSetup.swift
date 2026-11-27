@@ -55,7 +55,28 @@ public struct DrillOptions: Hashable, Sendable {
     /// Scales only: what passes are played at, at first.
     public var pass = PassSettings()
 
+    /// Progressions only: what is played, in the key, and in the position of the key's scale. Nil = none chosen yet,
+    /// so progression drills have nothing to prompt.
+    public var progression: Progression?
+
+    /// Progressions only: how the backing is played.
+    public var backing = BackingSettings()
+
     public init() {}
+}
+
+/// How a progression drill's backing is played.
+public struct BackingSettings: Hashable, Sendable {
+    public static let defaultTempo = 70
+
+    public var style = BackingStyle.rock
+    /// BPM.
+    public var tempo = defaultTempo
+
+    public init(style: BackingStyle = .rock, tempo: Int = defaultTempo) {
+        self.style = style
+        self.tempo = tempo
+    }
 }
 
 /// Notes to ask for more often, such as the theme key's.
@@ -81,6 +102,10 @@ public struct DrillSetup: Hashable, Sendable {
 
     /// Notes to ask for more often; nil = all alike.
     public var weighting: NoteWeighting?
+
+    /// Taken off every onset before it is compared with clicks or backing, in passes and progression drills (see
+    /// "Input delay" in GLOSSARY.md). The input device's, measured by the latency check; zero until it has run.
+    public var inputDelay = Duration.zero
 
     /// The session's: scale drills take turns through the scales of its mode, in its position. Nil in free practice.
     public var theme: Theme?
@@ -139,4 +164,38 @@ public struct DrillSetup: Hashable, Sendable {
 
     static let noFretsReason = "The capo leaves no frets to play in this range."
     static let noNaturalsReason = "No natural notes in these frets and strings. Choose All notes."
+}
+
+extension DrillSetup {
+    /// Progressions only: the chosen position of the key's scale, or with a theme, the theme's. Nil when it isn't on
+    /// the neck.
+    public var progressionPosition: Position? {
+        if let theme { return theme.position(on: fretboard) }
+        let id = options.position
+        let positions = fretboard.positions(of: chosenKey.scale, system: options.positionSystem)
+        return positions.first { $0.id == id }
+            ?? positions.first { $0.system == id.system && $0.number == id.number && $0.octave == 0 }
+            ?? positions.first { $0.number == 1 && $0.octave == 0 }
+    }
+
+    /// Progressions only: why a run would have nothing to ask; nil when every chord has a voicing in the position.
+    public var progressionProblem: String? {
+        guard let progression = options.progression else { return "Choose a progression." }
+        let key = chosenKey
+        guard progression.mode == key.mode else { return "\(progression.name) isn’t in \(key)." }
+        guard let position = progressionPosition else { return "The position doesn’t fit the neck." }
+        let missing = Set(progression.chords(in: key)).filter { fretboard.voicings(of: $0, in: position).isEmpty }
+        guard !missing.isEmpty else { return nil }
+        let names = progression.chords(in: key).filter(missing.contains).map(\.shortName).uniqued()
+        return "\(names.joined(separator: ", ")) \(names.count == 1 ? "has" : "have") no voicing in the "
+            + "\(position.name): choose another position."
+    }
+}
+
+extension Array where Element: Hashable {
+    /// Without repeats, in order.
+    fileprivate func uniqued() -> [Element] {
+        var seen = Set<Element>()
+        return filter { seen.insert($0).inserted }
+    }
 }

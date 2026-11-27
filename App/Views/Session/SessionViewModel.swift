@@ -17,8 +17,15 @@ struct SessionTheme: Equatable {
     /// "CAGED A shape · D-G-B".
     var detailText: String { [positionName, theme.stringSet?.name].compactMap { $0 }.joined(separator: " · ") }
 
-    /// "B♭ major · CAGED A shape · D-G-B".
-    var text: String { [key.description, detailText].filter { !$0.isEmpty }.joined(separator: " · ") }
+    /// The progression and its chords in the key, "I–V–vi–IV: G D Em C"; nil without one.
+    var progressionText: String? {
+        theme.progression.map { "\($0.name): \($0.chords(in: key).map(\.shortName).joined(separator: " "))" }
+    }
+
+    /// "B♭ major · CAGED A shape · D-G-B · I–V–vi–IV".
+    var text: String {
+        [key.description, detailText, theme.progression?.name ?? ""].filter { !$0.isEmpty }.joined(separator: " · ")
+    }
 
     init(_ theme: Theme, on fretboard: Fretboard) {
         self.theme = theme
@@ -86,6 +93,10 @@ final class SessionViewModel: MetronomePanelOwner {
         didSet { if stage == .paused { loadPassSettings() } }
     }
 
+    /// What progression blocks play over; the view sets it. None (in `LogCheck`), or none with its sounds fetched, plays
+    /// the backing's beats as clicks on the metronome.
+    @ObservationIgnored var backingPlayer: BackingPlayer?
+
     /// The time signature and emphasis in Settings.
     var meter = Meter(.fourFour) {
         didSet { if meter != oldValue { passSettings?.meter = meter } }
@@ -93,6 +104,9 @@ final class SessionViewModel: MetronomePanelOwner {
 
     /// The audio input, while the screen is open; nil (in `LogCheck`) is no problem.
     private var input: AudioInputState?
+
+    /// How the backing will be heard. Settable for snapshots, where there is no input.
+    var backingHearing = BackingHearing()
 
     private(set) var snapshot = Snapshot()
 
@@ -153,6 +167,11 @@ final class SessionViewModel: MetronomePanelOwner {
         let fretboard = Fretboard(tuning: tuning, capo: capo)
         var drillSetup = DrillSetup(fretboard: fretboard, options: setup.drillOptions(on: fretboard), seed: seed)
         if let theme { drillSetup.follow(theme.theme) }
+        // The tempo and the progression's style, as free practice left them.
+        if let progression = drillSetup.options.progression {
+            metronome?.loadBacking(of: progression, into: &drillSetup.options.backing)
+        }
+        drillSetup.inputDelay = AudioInputSettings.inputDelay(ofDevice: input?.device?.uid)
         return drillSetup
     }
 
@@ -165,6 +184,18 @@ final class SessionViewModel: MetronomePanelOwner {
     /// Why there are no triads; nil when there are, or nothing at all can be prompted.
     var noTriadsNotice: String? {
         nothingToPromptReason == nil ? SessionPlanner.noTriadsNotice(from: DrillKind.all, for: drillSetup(seed: 0)) : nil
+    }
+
+    /// Why there are no progressions; nil when there are, or nothing at all can be prompted.
+    var noProgressionsNotice: String? {
+        nothingToPromptReason == nil
+            ? SessionPlanner.noProgressionsNotice(from: DrillKind.all, for: drillSetup(seed: 0)) : nil
+    }
+
+    /// Whether a progression block is planned, and its backing would be heard as notes or not at all; for setup.
+    var backingNotices: [String] {
+        guard plan().contains(where: \.kind.hasBacking) else { return [] }
+        return backingHearing.notices(hasSounds: backingPlayer?.hasSounds, player: "Progressions")
     }
 
     /// The blocks a session would have, of the drills that have something to prompt, and can be heard if they need to be.
@@ -189,6 +220,7 @@ final class SessionViewModel: MetronomePanelOwner {
     /// The audio input changed. Losing it pauses.
     func inputChanged(_ new: AudioInputState) {
         defer { input = new }
+        backingHearing.inputChanged(from: input, to: new)
         if let notice = input.flatMap(new.lossNotice) { pause(notice: notice) }
     }
 
@@ -299,7 +331,7 @@ final class SessionViewModel: MetronomePanelOwner {
         } else if !hasSound, !wasPaused, stage == .paused {
             if losesPanelResume { resumesOnPanelClose = false }
             let resuming = blockKind?.needsSound == true ? "Resuming goes on without this drill."
-                : blockKind?.hasPasses == true ? "Resuming goes on by the beats shown, and chimes flash." : "Chimes will flash."
+                : blockKind?.hasPasses == true || blockKind?.hasBacking == true ? "Resuming goes on by the beats shown, and chimes flash." : "Chimes will flash."
             pauseNotice = [soundOutput?.problem, resuming].compactMap { $0 }.joined(separator: " ")
             isPausedForSound = true
         }
@@ -407,11 +439,13 @@ final class SessionViewModel: MetronomePanelOwner {
         self.player = player
 
         playClicks()
+        playBacking()
         playSounds(sounds, isNewPrompt: player.drill?.promptStart != before.promptStart)
         if let chime {
             play(chime)
             // The count-in waits for it.
             playClicks()
+            playBacking()
         }
         if let settings = player.passSettings, let old = before.settings, player.blockIndex == before.block,
            settings.tempo != old.tempo || settings.holdsTempo != old.holdsTempo || settings.ladder != old.ladder {
@@ -437,6 +471,17 @@ final class SessionViewModel: MetronomePanelOwner {
     private func playClicks() {
         let requests = player?.takeClicks() ?? []
         metronome?.perform(requests) { player?.handle(.clicksStarted($0)) }
+    }
+
+    /// The backing a progression block asks for: on the backing player with its sounds, or as clicks without them.
+    private func playBacking() {
+        let requests = player?.takeBacking() ?? []
+        BackingPlayer.perform(requests, on: backingPlayer, metronome: metronome) { heard in
+            #if DEBUG
+            backingForSnapshot = heard
+            #endif
+            player?.handle(.backingStarted(heard))
+        }
     }
 
     private func logAttempts(of player: SessionPlayer) {
@@ -555,6 +600,22 @@ final class SessionViewModel: MetronomePanelOwner {
             let pitch = fretboard.pitch(at: location)
             send(.played(right ? pitch : pitch + Interval(1), onset: now, at: now))
         }
+    }
+
+    /// The backing as last started, for snapshots to play in time with.
+    @ObservationIgnored private(set) var backingForSnapshot: Backing?
+
+    /// In a progression block, plays the drawn path in time with the backing as heard (see
+    /// `progressionNotesForSnapshot`); then moves the clock to `beat`, counted from the count-in's first.
+    func playProgressionForSnapshot(chords count: Int, wrong: Set<Int> = [], partial: Int = 0, untilBeat beat: Double) {
+        guard let backing = backingForSnapshot, let kind = blockKind, let theme = theme?.theme,
+              let progression = theme.progression, let position = theme.position(on: fretboard) else { return }
+        let notes = progressionNotesForSnapshot(kind, progression, in: theme.key, position: position, on: fretboard,
+                                                backing: backing, chords: count, wrong: wrong, partial: partial)
+        for note in notes { send(.played(note.pitch, onset: note.onset, at: note.onset + .milliseconds(50))) }
+        let end = backing.start + Duration.seconds(60) / backing.bpm * beat
+        skippedTime += max(0, end / .seconds(1) - hostTimeNow())
+        send(.tick(at: clockNow()))
     }
 
     /// Lets the current prompt's time run out.

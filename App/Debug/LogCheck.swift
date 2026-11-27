@@ -8,7 +8,8 @@ import TheoryCore
 /// Checks that what is logged survives a relaunch, when `GP_LOG_CHECK=<store file>` is set (see `scripts/log-check`).
 ///
 /// `GP_LOG_CHECK_STEP=write` runs drills against a new store there; `read`, in a second process, prints what it
-/// holds. `writeV1` instead makes a store with schema V1, and `readAll` prints all that one holds as V2. It never opens the player's own log, and shows no window.
+/// holds. `writeV1` and `writeV2` instead make a store with an older schema, and `readAll` prints all that one holds
+/// as the current one. It never opens the player's own log, and shows no window.
 @MainActor
 enum LogCheck {
     private static let environment = ProcessInfo.processInfo.environment
@@ -22,8 +23,8 @@ enum LogCheck {
             do {
                 let url = URL(fileURLWithPath: environment["GP_LOG_CHECK"] ?? "")
                 let step = environment["GP_LOG_CHECK_STEP"]
-                if step == "writeV1" {
-                    try writeV1(at: url)
+                if step == "writeV1" || step == "writeV2" {
+                    try step == "writeV1" ? writeV1(at: url) : writeV2(at: url)
                     _exit(EXIT_SUCCESS)
                 }
                 let log = try AttemptLog.stored(at: url)
@@ -84,6 +85,7 @@ enum LogCheck {
         let theme = Theme(key: .major(.bFlat), position: Position.ID(system: .caged, number: 3), stringSet: .eAD)
         let session = newSession()
         session.theme = theme
+        session.themeProgression = "I–V–vi–IV"
         // Still in progress when this process dies, so ended early when the log is next opened.
         var sessionDrill = newDrill()
         let run = log.run(session: session, blockIndex: 1)
@@ -114,14 +116,53 @@ enum LogCheck {
         // Passes and triads.
         let pass = PassFacts(scale: Scale(.blues, tonic: .a), position: Position.ID(system: .caged, number: 4, octave: 1),
                              startDegree: Scale.Degree(5, -1), tempo: 72, signature: TimeSignature(beats: 7, unit: 8) ?? .fourFour, fadeStage: .faded,
-                             hinted: true, clickOffset: .milliseconds(-125))
+                             hinted: true, clickOffset: .milliseconds(-125), inputDelay: .microseconds(12500))
         let triad = TriadFacts(triad: Triad(.minor, root: .bFlat), inversion: .second, stringSet: .dGB)
         for (place, facts) in [AttemptFacts.pass(pass), .triad(triad)].enumerated() {
             let attempt = Attempt(prompt: NotePrompt(name: .f, string: 2, target: target), outcome: .skipped,
                                   group: AttemptGroup(number: place, size: 3, place: place), facts: facts)
-            log.context.insert(LoggedAttempt(attempt, in: newDrill(), date: .now, source: .freePractice, groupID: UUID(),
-                                             blockIndex: nil))
+            let record = LoggedAttempt(attempt, in: newDrill(), date: .now, source: .freePractice, groupID: UUID(),
+                                       blockIndex: nil)
+            log.context.insert(record)
         }
+
+        // A time through's chords: one played as another voicing, one missed.
+        let timeThrough = UUID()
+        let played = VoicingRecord(notes: [.init(string: 2, fret: 2), .init(string: 3, fret: 0), .init(string: 4, fret: 0)])
+        let accepted = [VoicingRecord(notes: [.init(string: 3, fret: 2), .init(string: 4, fret: 0), .init(string: 5, fret: 0)]),
+                        VoicingRecord(notes: [.init(string: 1, fret: 2), .init(string: 2, fret: 2), .init(string: 3, fret: 0)])]
+        for (place, played) in [played, nil].enumerated() {
+            let chord = LoggedAttempt(date: .now, sourceRaw: AttemptSource.freePractice.rawValue, drill: "nearestVoicing",
+                                      tuning: Tuning.standard.openPitches.map(\.midi), capo: 0, targetName: "E",
+                                      targetPitchClass: 4, targetString: 2, targetFret: nil, targetPitch: nil,
+                                      outcomeRaw: Attempt.Outcome.answered.rawValue, firstRight: false, responseSeconds: nil,
+                                      wrongAnswers: [], groupID: timeThrough, blockIndex: nil)
+            (chord.groupSize, chord.groupPlace) = (4, place + 2)
+            (chord.progression, chord.keyTonic, chord.keyMode, chord.numeral) = ("I–V–vi–IV", 7, "major", "vi")
+            (chord.chordRootName, chord.chordRoot, chord.chordQuality) = ("E", 4, "minor")
+            (chord.positionSystem, chord.positionNumber, chord.positionOctave) = ("caged", 4, 0)
+            (chord.playedVoicing, chord.acceptedVoicings) = (played, accepted)
+            (chord.backingStyle, chord.tempo, chord.beatsPerBar, chord.beatUnit) = ("rock", 70, 4, 4)
+            (chord.fadeStageRaw, chord.hinted) = (FadeStage.hidden.rawValue, place == 1)
+            chord.chordOutcomeRaw = played == nil ? "missed" : "wrong"
+            chord.firstOnsetSeconds = played.map { _ in -0.25 }
+            chord.inputDelaySeconds = 0
+            log.context.insert(chord)
+        }
+
+        // Nearest voicing at 60 BPM: G clean on D-G-B, D with a wrong note, Em missed.
+        var progressionSetup = DrillSetup(fretboard: Fretboard(tuning: .standard), seed: 1)
+        progressionSetup.options.key = .major(.g)
+        progressionSetup.options.progression = Progression.named("I–V–vi–IV")
+        progressionSetup.options.backing = BackingSettings(tempo: 60)
+        var chords = DrillKind.nearestVoicing.makeDrill(progressionSetup)
+        let chordRun = log.run()
+        chords.handle(.start(at: .zero))
+        for (pitch, onset) in [(55, 3.75), (59, 4.25), (62, 4.75), (54, 8.0), (58, 8.5)] {
+            chords.handle(.played(Pitch(pitch), onset: .seconds(onset), at: .seconds(onset)))
+        }
+        chords.handle(.tick(at: .seconds(16.5)))
+        chordRun.update(from: chords)
 
         // Two clean passes and one cut short by a pause, so the next is played at Hidden.
         var passes = DrillKind.upAndDown.makeDrill(DrillSetup(fretboard: Fretboard(tuning: .standard), seed: 1))
@@ -161,7 +202,9 @@ enum LogCheck {
 
         var other = theme
         other.stringSet = .gBE
-        log.context.insert(DayTheme(day: "2026-07-25", theme: other, rerolls: 2))
+        let dayTheme = DayTheme(day: "2026-07-25", theme: other, rerolls: 2)
+        dayTheme.progression = "vi–IV–I–V"
+        log.context.insert(dayTheme)
         log.save()
     }
 
@@ -363,6 +406,15 @@ enum LogCheck {
         record?.theme = rerolled?.theme
         session.showTheme(on: evening)
         try require(before == given?.theme && session.theme == rerolled, "back to the first tuning")
+        // Saved before themes had a progression.
+        record?.progression = nil
+        session.showTheme(on: evening)
+        try require(session.theme?.theme.progression != nil && record?.progression == session.theme?.theme.progression?.id,
+                    "a theme without a progression gets one")
+        try require(session.theme?.theme.stringSet == rerolled?.theme.stringSet && session.theme?.key == rerolled?.key,
+                    "and keeps the rest")
+        record?.theme = rerolled?.theme
+        session.showTheme(on: evening)
 
         session.start(on: evening)
         session.next()
@@ -436,6 +488,54 @@ enum LogCheck {
         try context.save()
     }
 
+    /// A store as version 2 of the app left it: on top of version 1's, string sets, groups, passes and triads.
+    private static func writeV2(at url: URL) throws {
+        let schema = Schema(versionedSchema: PracticeSchemaV2.self)
+        let configuration = ModelConfiguration(schema: schema, url: url, cloudKitDatabase: .none)
+        let container = try ModelContainer(for: schema, configurations: configuration)
+        let context = container.mainContext
+        func id(_ number: Int) -> UUID { UUID(uuidString: String(format: "00000000-0000-0000-0000-%012d", number))! }
+        func date(_ seconds: Double) -> Date { Date(timeIntervalSinceReferenceDate: seconds) }
+
+        let session = PracticeSchemaV2.Session(
+            day: "2026-11-20", startedAt: date(3000), budgetMinutes: 20, naturalsOnly: false, wholeNeck: true,
+            blocks: [SessionBlockRecord(drill: "upAndDown", plannedSeconds: 300, extends: 1, spentSeconds: 400),
+                     SessionBlockRecord(drill: "triadPlayIt", plannedSeconds: 300, spentSeconds: 310.5)])
+        session.id = id(3)
+        session.endedAt = date(3800)
+        session.stateRaw = "completed"
+        session.totalSeconds = 800.25
+        (session.themeTonic, session.themeMode, session.themePositionSystem) = (9, "minor", "caged")
+        (session.themePositionNumber, session.themePositionOctave, session.themeStringSet) = (2, 0, "gBE")
+        context.insert(session)
+
+        func attempt(_ number: Int, drill: String, outcome: String, wrong: [WrongAnswerRecord] = [], group: Int,
+                     place: Int) -> PracticeSchemaV2.Attempt {
+            let record = PracticeSchemaV2.Attempt(
+                date: date(Double(number)), sourceRaw: "session", drill: drill, tuning: [40, 45, 50, 55, 59, 64], capo: 0,
+                targetName: "C", targetPitchClass: 0, targetString: 4, targetFret: 1, targetPitch: 60, outcomeRaw: outcome,
+                firstRight: wrong.isEmpty, responseSeconds: 0.75, wrongAnswers: wrong, groupID: id(group), blockIndex: place)
+            record.id = id(number)
+            (record.groupSize, record.groupPlace) = (6, place)
+            context.insert(record)
+            record.session = session
+            return record
+        }
+        let pass = attempt(21, drill: "upAndDown", outcome: "answered", wrong: [WrongAnswerRecord(pitch: 61)], group: 201, place: 0)
+        (pass.scaleKind, pass.scaleTonic, pass.positionSystem, pass.positionNumber, pass.positionOctave) = ("minorPentatonic", 9, "caged", 2, 0)
+        (pass.startDegree, pass.startDegreeAlteration, pass.tempo, pass.beatsPerBar, pass.beatUnit) = (3, -1, 80, 4, 4)
+        (pass.fadeStageRaw, pass.hinted, pass.clickOffsetSeconds) = ("shown", false, 0.03125)
+        let triad = attempt(22, drill: "triadPlayIt", outcome: "skipped", group: 202, place: 1)
+        (triad.chordRootName, triad.chordRoot, triad.chordQuality, triad.inversion, triad.stringSet) = ("A", 9, "minor", "root", "gBE")
+        (triad.fadeStageRaw, triad.hinted) = ("faded", true)
+
+        let theme = PracticeSchemaV2.DayTheme(day: "2026-11-20", rerolls: 1, tonic: 9, mode: "minor", positionSystem: "caged",
+                                              positionNumber: 2, positionOctave: 0)
+        theme.stringSet = "gBE"
+        context.insert(theme)
+        try context.save()
+    }
+
     /// Everything saved, one line a record.
     private static func readAll(_ log: AttemptLog) throws {
         func text<T>(_ value: T?) -> String { value.map { "\($0)" } ?? "-" }
@@ -446,6 +546,7 @@ enum LogCheck {
                   text(session.totalSeconds), session.budgetMinutes, session.naturalsOnly, session.wholeNeck,
                   "theme", text(session.themeTonic), text(session.themeMode), text(session.themePositionSystem),
                   text(session.themePositionNumber), text(session.themePositionOctave), text(session.themeStringSet),
+                  text(session.themeProgression),
                   "attempts", session.attempts.map { number($0.id) }.sorted())
             for block in session.blocks {
                 print("block", block.drill, block.plannedSeconds, block.extends, text(block.spentSeconds))
@@ -461,11 +562,11 @@ enum LogCheck {
         }
         for theme in try log.context.fetch(FetchDescriptor<DayTheme>(sortBy: [SortDescriptor(\.day)])) {
             print("theme", theme.day, theme.rerolls, theme.tonic, theme.mode, theme.positionSystem, theme.positionNumber,
-                  theme.positionOctave, text(theme.stringSet))
+                  theme.positionOctave, text(theme.stringSet), text(theme.progression))
         }
     }
 
-    /// An attempt's fields for groups, passes and triads, those that are set.
+    /// An attempt's fields for groups, passes, triads and chords, those that are set.
     private static func newFields(of attempt: LoggedAttempt) -> String {
         let fields: [(String, Any?)] = [
             ("size", attempt.groupSize), ("place", attempt.groupPlace), ("scale", attempt.scaleKind),
@@ -475,9 +576,18 @@ enum LogCheck {
             ("unit", attempt.beatUnit), ("fade", attempt.fadeStageRaw), ("hinted", attempt.hinted),
             ("offset", attempt.clickOffsetSeconds), ("root", attempt.chordRootName), ("rootClass", attempt.chordRoot),
             ("quality", attempt.chordQuality), ("inversion", attempt.inversion), ("set", attempt.stringSet),
+            ("delay", attempt.inputDelaySeconds), ("progression", attempt.progression), ("key", attempt.keyTonic),
+            ("mode", attempt.keyMode), ("numeral", attempt.numeral), ("played", attempt.playedVoicing.map(text)),
+            ("accepted", attempt.acceptedVoicings.map { $0.map(text).joined(separator: " ") }),
+            ("style", attempt.backingStyle), ("chord", attempt.chordOutcomeRaw), ("onset", attempt.firstOnsetSeconds),
         ]
         let set = fields.compactMap { name, value in value.map { "\(name) \($0)" } }
         return "facts [\(set.joined(separator: ", "))]"
+    }
+
+    /// "2:2/3:0/4:0": the string and fret of each note, low to high.
+    private static func text(_ voicing: VoicingRecord) -> String {
+        voicing.notes.map { "\($0.string):\($0.fret)" }.joined(separator: "/")
     }
 
     private static func read(_ log: AttemptLog) throws {
@@ -508,11 +618,11 @@ enum LogCheck {
                   "target \(attempt.targetName) \(target) group \(group(of: attempt)) first \(attempt.firstRight) wrong [\(wrong)] \(time) session \(session) \(newFields(of: attempt))")
         }
         for session in try log.context.fetch(FetchDescriptor<PracticeSession>()) {
-            print("session \(session.day) \(session.stateRaw) theme \(session.theme?.key.description ?? "none") set \(session.theme?.stringSet?.name ?? "none")",
+            print("session \(session.day) \(session.stateRaw) theme \(session.theme?.key.description ?? "none") set \(session.theme?.stringSet?.name ?? "none") progression \(session.themeProgression ?? "none")",
                   "blocks \(session.blocks.map(\.plannedSeconds)) attempts \(session.attempts.count)")
         }
         for theme in try log.context.fetch(FetchDescriptor<DayTheme>()) {
-            print("theme \(theme.day) \(theme.theme?.key.description ?? "none") position \(theme.positionSystem) \(theme.positionNumber) rerolls \(theme.rerolls) set \(theme.theme?.stringSet?.name ?? "none")")
+            print("theme \(theme.day) \(theme.theme?.key.description ?? "none") position \(theme.positionSystem) \(theme.positionNumber) rerolls \(theme.rerolls) set \(theme.theme?.stringSet?.name ?? "none") progression \(theme.progression ?? "none")")
         }
     }
 

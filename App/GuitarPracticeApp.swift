@@ -22,6 +22,9 @@ struct GuitarPracticeApp: App {
     /// The app's one metronome.
     @State private var metronome: Metronome
 
+    /// The app's one backing player.
+    @State private var backingPlayer: BackingPlayer
+
     /// The app's one attempt log.
     @State private var log = AttemptLog.live()
 
@@ -31,7 +34,9 @@ struct GuitarPracticeApp: App {
     init() {
         let soundOutput = AppSoundOutput()
         _soundOutput = State(initialValue: soundOutput)
-        _metronome = State(initialValue: Metronome(output: soundOutput))
+        let metronome = Metronome(output: soundOutput)
+        _metronome = State(initialValue: metronome)
+        _backingPlayer = State(initialValue: BackingPlayer(output: soundOutput, metronome: metronome))
     }
 
     var body: some Scene {
@@ -41,6 +46,7 @@ struct GuitarPracticeApp: App {
                 .environment(audioInput)
                 .environment(soundOutput)
                 .environment(metronome)
+                .environment(backingPlayer)
                 .environment(log)
                 .environment(activeSessions)
         }
@@ -57,6 +63,7 @@ struct GuitarPracticeApp: App {
                 .environment(audioInput)
                 .environment(soundOutput)
                 .environment(metronome)
+                .environment(backingPlayer)
                 .environment(activeSessions)
         }
     }

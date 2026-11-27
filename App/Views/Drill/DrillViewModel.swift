@@ -44,6 +44,7 @@ final class DrillViewModel: MetronomePanelOwner {
             guard kind != oldValue else { return }
             isPanelOpen = false
             loadTempo()
+            loadBacking()
         }
     }
 
@@ -56,8 +57,15 @@ final class DrillViewModel: MetronomePanelOwner {
     /// What scale drills are played to, and where their tempos are remembered; the view sets it before a run can start.
     /// None (in `LogCheck`) is silent.
     @ObservationIgnored var metronome: Metronome? {
-        didSet { loadTempo() }
+        didSet {
+            loadTempo()
+            loadBacking()
+        }
     }
+
+    /// What progression drills play over; the view sets it before a run can start. None (in `LogCheck`), or none with
+    /// its sounds fetched, plays the backing's beats as clicks on the metronome.
+    @ObservationIgnored var backingPlayer: BackingPlayer?
 
     /// The toolbar's options, shared by every drill. The view locks them during a run; a run uses the options it
     /// started with.
@@ -87,6 +95,83 @@ final class DrillViewModel: MetronomePanelOwner {
         metronome.loadTempo(of: kind, into: &options.pass)
         if isRunning { send(.passSettings(options.pass, at: clockNow())) }
     }
+
+    // MARK: - Progressions
+
+    /// The progression drills' progression: the chosen one, or the first of the key's mode when none is, or the
+    /// chosen one is of the other mode. Changing it takes up its remembered style.
+    var progression: Progression {
+        get {
+            options.progression.flatMap { $0.mode == options.key.mode ? $0 : nil }
+                ?? Progression.library(options.key.mode)[0]
+        }
+        set {
+            options.progression = newValue
+            loadBacking()
+        }
+    }
+
+    /// The practice day whose theme a progression drill's options last started from; nil before one has.
+    @ObservationIgnored private var themeDay: String?
+
+    /// Free practice of a progression drill starts from the day's theme: its key, progression and position, once a
+    /// day, from when a progression drill is first chosen or shown; changes after that are kept until the next day.
+    /// Not during a run. Picks and saves the day's theme if need be, as the session screen does.
+    func startFromDaysTheme(system: Position.System, on date: Date = .now) {
+        let day = Calendar.practiceDay(of: date)
+        guard kind.hasBacking, !isRunning, themeDay != day, let log else { return }
+        themeDay = day
+        let theme = log.theme(on: date, fretboard: fretboard, system: system)
+        options.key = theme.key
+        options.position = theme.position
+        if let themed = theme.progression { progression = themed }
+    }
+
+    #if DEBUG
+    /// For snapshots, which choose their own key, progression and position.
+    func keepOptionsForSnapshot(on date: Date = .now) { themeDay = Calendar.practiceDay(of: date) }
+    #endif
+
+    /// The key, for progression drills: changing its mode changes the progression too.
+    var progressionKey: Key {
+        get { options.key }
+        set {
+            let old = progression
+            options.key = newValue
+            if old.mode != newValue.mode { progression = Progression.library(newValue.mode)[0] }
+        }
+    }
+
+    /// Tempo and style; a change is remembered (the style for the progression).
+    var backingSettings: BackingSettings {
+        get { options.backing }
+        set {
+            options.backing = newValue
+            metronome?.storeBacking(of: progression, from: newValue)
+        }
+    }
+
+    /// Takes up the remembered tempo and the progression's style, but for a run that is going.
+    private func loadBacking() {
+        guard kind.hasBacking, !isRunning, let metronome else { return }
+        metronome.loadBacking(of: progression, into: &options.backing)
+    }
+
+    /// How the backing will be heard. Settable for snapshots, where there is no input.
+    var backingHearing = BackingHearing()
+
+    /// What a progression drill should know about how the backing will be heard: none fetched, or a built-in
+    /// microphone.
+    var backingNotices: [String] {
+        guard kind.hasBacking else { return [] }
+        return backingHearing.notices(hasSounds: backingPlayer?.hasSounds, player: "the drill")
+    }
+
+    /// The chosen position of the key's scale, for progression drills; nil if it isn't on the neck.
+    var progressionPosition: Position? { setup.progressionPosition }
+
+    /// The run's chords so far, and how they went.
+    var chordSummary: ChordSummary { ChordSummary(attempts: snapshot.attempts) }
 
     /// Those reached by now in what the drill goes through, a session's included.
     private func loggedFadeStages() -> FadeStages? {
@@ -151,7 +236,13 @@ final class DrillViewModel: MetronomePanelOwner {
     var soundProblem: String? { kind.needsSound ? soundOutput?.problem : nil }
 
     /// What a run would be made from, but for its seed.
-    var setup: DrillSetup { DrillSetup(fretboard: fretboard, options: options, seed: 0) }
+    var setup: DrillSetup {
+        var options = options
+        if kind.hasBacking { options.progression = progression }
+        var setup = DrillSetup(fretboard: fretboard, options: options, seed: 0)
+        setup.inputDelay = AudioInputSettings.inputDelay(ofDevice: input?.device?.uid)
+        return setup
+    }
 
     private func newDrill(seed: UInt64, fadeStages: FadeStages = FadeStages()) -> any Drill {
         var setup = setup
@@ -162,6 +253,7 @@ final class DrillViewModel: MetronomePanelOwner {
 
     func start(seed: UInt64 = .random(in: .min ... .max)) {
         loadTempo()
+        loadBacking()
         guard !isRunning, inputProblem == nil, nothingToPromptReason == nil, prepareSound() else { return }
         drill = newDrill(seed: seed, fadeStages: loggedFadeStages() ?? FadeStages())
         runLog = log?.run()
@@ -217,7 +309,7 @@ final class DrillViewModel: MetronomePanelOwner {
     /// on by the beats shown.
     func soundProblemChanged() {
         if soundProblem != nil { pause() }
-        if kind.hasPasses, let problem = soundOutput?.problem { pause(notice: problem) }
+        if kind.hasPasses || kind.hasBacking, let problem = soundOutput?.problem { pause(notice: problem) }
     }
 
     /// True unless the drill needs sound and there is none. Ready before the clock is read, so that the first sound
@@ -230,6 +322,7 @@ final class DrillViewModel: MetronomePanelOwner {
     /// The audio input changed. Losing it pauses.
     func inputChanged(_ new: AudioInputState) {
         defer { input = new }
+        backingHearing.inputChanged(from: input, to: new)
         if let notice = input.flatMap(new.lossNotice) { pause(notice: notice) }
     }
 
@@ -260,6 +353,7 @@ final class DrillViewModel: MetronomePanelOwner {
         let wasRunning = drill.isRunning
         drill.handle(event)
         playClicks()
+        playBacking()
         playSounds(isNewPrompt: drill.promptStart != oldStart)
         runLog?.update(from: drill)
         if wasRunning, let settings = drill.passSettings, settings != options.pass { setPassSettings(settings) }
@@ -307,6 +401,16 @@ final class DrillViewModel: MetronomePanelOwner {
         metronome?.perform(requests) { drill.handle(.clicksStarted($0)) }
     }
 
+    /// The backing the drill asks for: on the backing player with its sounds, or as clicks without them.
+    private func playBacking() {
+        BackingPlayer.perform(drill.takeBacking(), on: backingPlayer, metronome: metronome) { heard in
+            #if DEBUG
+            backingForSnapshot = heard
+            #endif
+            drill.handle(.backingStarted(heard))
+        }
+    }
+
     // MARK: - Listening
 
     /// The consumer for `.listensToAudioInput(_:)`.
@@ -322,6 +426,16 @@ final class DrillViewModel: MetronomePanelOwner {
     }
 
     #if DEBUG
+    /// The backing as last started, for snapshots to play in time with.
+    @ObservationIgnored private(set) var backingForSnapshot: Backing?
+
+    /// Plays notes at onsets on the drill's clock, then moves it to `time`, as if heard then (see `Snapshots`).
+    func playForSnapshot(_ notes: [(pitch: Pitch, onset: Duration)], until time: Duration) {
+        for note in notes { send(.played(note.pitch, onset: note.onset, at: note.onset + .milliseconds(50))) }
+        send(.tick(at: time))
+        ticker.stop()
+    }
+
     /// Answers the current prompt, as if a right or wrong note had been played now (see `Snapshots` and `LogCheck`).
     func playForSnapshot(right: Bool) {
         guard let location = drill.rightLocationForSnapshot else { return }

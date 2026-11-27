@@ -4,25 +4,30 @@ import SwiftData
 import TheoryCore
 
 // The current version's models. `LoggedAttempt` is the saved record; PracticeCore's `Attempt` is the drill's.
-typealias PracticeSession = PracticeSchemaV2.Session
-typealias LoggedAttempt = PracticeSchemaV2.Attempt
-typealias DayTheme = PracticeSchemaV2.DayTheme
+typealias PracticeSession = PracticeSchemaV3.Session
+typealias LoggedAttempt = PracticeSchemaV3.Attempt
+typealias DayTheme = PracticeSchemaV3.DayTheme
 
 enum PracticeMigrationPlan: SchemaMigrationPlan {
-    static var schemas: [any VersionedSchema.Type] { [PracticeSchemaV1.self, PracticeSchemaV2.self] }
+    static var schemas: [any VersionedSchema.Type] {
+        [PracticeSchemaV1.self, PracticeSchemaV2.self, PracticeSchemaV3.self]
+    }
     static var stages: [MigrationStage] {
-        [.lightweight(fromVersion: PracticeSchemaV1.self, toVersion: PracticeSchemaV2.self)]
+        [.lightweight(fromVersion: PracticeSchemaV1.self, toVersion: PracticeSchemaV2.self),
+         .lightweight(fromVersion: PracticeSchemaV2.self, toVersion: PracticeSchemaV3.self)]
     }
 }
 
 extension Theme {
     /// As `Session` and `DayTheme` save it; nil if that is unusable.
-    fileprivate init?(tonic: Int?, mode: String?, system: String?, number: Int?, octave: Int?, stringSet: String?) {
+    /// A progression that isn't in the library is as none: one is picked again when the theme is next shown.
+    fileprivate init?(tonic: Int?, mode: String?, system: String?, number: Int?, octave: Int?, stringSet: String?,
+                      progression: String?) {
         guard let tonic, let mode = mode.flatMap(Key.Mode.init), let system = system.flatMap(Position.System.init),
               let number, let octave else { return nil }
         self.init(key: .app(tonic: PitchClass(tonic), mode: mode),
                   position: Position.ID(system: system, number: number, octave: octave),
-                  stringSet: stringSet.flatMap(StringSet.init))
+                  stringSet: stringSet.flatMap(StringSet.init), progression: progression.flatMap(Progression.named))
     }
 }
 
@@ -32,13 +37,14 @@ extension DayTheme {
                   positionSystem: theme.position.system.rawValue, positionNumber: theme.position.number,
                   positionOctave: theme.position.octave)
         stringSet = theme.stringSet?.rawValue
+        progression = theme.progression?.id
     }
 
     /// Nil only if what is saved is unusable.
     var theme: Theme? {
         get {
             Theme(tonic: tonic, mode: mode, system: positionSystem, number: positionNumber, octave: positionOctave,
-                  stringSet: stringSet)
+                  stringSet: stringSet, progression: progression)
         }
         set {
             guard let newValue else { return }
@@ -48,6 +54,7 @@ extension DayTheme {
             positionNumber = newValue.position.number
             positionOctave = newValue.position.octave
             stringSet = newValue.stringSet?.rawValue
+            progression = newValue.progression?.id
         }
     }
 }
@@ -62,7 +69,7 @@ extension PracticeSession {
     var theme: Theme? {
         get {
             Theme(tonic: themeTonic, mode: themeMode, system: themePositionSystem, number: themePositionNumber,
-                  octave: themePositionOctave, stringSet: themeStringSet)
+                  octave: themePositionOctave, stringSet: themeStringSet, progression: themeProgression)
         }
         set {
             themeTonic = newValue?.key.tonic.pitchClass.value
@@ -71,6 +78,7 @@ extension PracticeSession {
             themePositionNumber = newValue?.position.number
             themePositionOctave = newValue?.position.octave
             themeStringSet = newValue?.stringSet?.rawValue
+            themeProgression = newValue?.progression?.id
         }
     }
 }
@@ -95,6 +103,7 @@ extension LoggedAttempt {
         switch attempt.facts {
         case .pass(let facts): setFacts(facts)
         case .triad(let facts): setFacts(facts)
+        case .chord(let facts): setFacts(facts)
         case nil: break
         }
     }
@@ -113,6 +122,7 @@ extension LoggedAttempt {
         fadeStageRaw = facts.fadeStage.rawValue
         hinted = facts.hinted
         clickOffsetSeconds = facts.clickOffset.map { $0 / .seconds(1) }
+        inputDelaySeconds = facts.inputDelay / .seconds(1)
     }
 
     private func setFacts(_ facts: TriadFacts) {
@@ -125,8 +135,37 @@ extension LoggedAttempt {
         hinted = facts.fadeStage.map { _ in facts.hinted }
     }
 
+    private func setFacts(_ facts: ChordFacts) {
+        progression = facts.progression.id
+        keyTonic = facts.key.tonic.pitchClass.value
+        keyMode = facts.key.mode.rawValue
+        numeral = facts.numeral.text
+        chordRootName = facts.triad.root.description
+        chordRoot = facts.triad.root.pitchClass.value
+        chordQuality = facts.triad.quality.rawValue
+        positionSystem = facts.position.system.rawValue
+        positionNumber = facts.position.number
+        positionOctave = facts.position.octave
+        playedVoicing = facts.played.map(VoicingRecord.init)
+        acceptedVoicings = facts.accepted.map(VoicingRecord.init)
+        backingStyle = facts.style.rawValue
+        tempo = facts.tempo
+        (beatsPerBar, beatUnit) = (4, 4)
+        fadeStageRaw = facts.fadeStage.rawValue
+        hinted = facts.hinted
+        chordOutcomeRaw = facts.outcome.rawValue
+        firstOnsetSeconds = facts.firstOnset.map { $0 / .seconds(1) }
+        inputDelaySeconds = facts.inputDelay / .seconds(1)
+    }
+
     var source: AttemptSource? { AttemptSource(rawValue: sourceRaw) }
     var outcome: Attempt.Outcome? { Attempt.Outcome(rawValue: outcomeRaw) }
+}
+
+extension VoicingRecord {
+    init(_ voicing: TriadVoicing) {
+        notes = voicing.locations.map { Location(string: $0.string, fret: $0.fret) }
+    }
 }
 
 extension WrongAnswerRecord {

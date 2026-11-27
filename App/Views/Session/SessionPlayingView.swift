@@ -3,7 +3,7 @@ import SwiftUI
 import TheoryCore
 
 /// A session that is going: the drills bar stays on top through Ready cards, drills and pauses, so nothing
-/// jumps. In scale and triad blocks it is at the bottom, so that the neck gets the top.
+/// jumps. In scale, triad and progression blocks it is at the bottom, so that the neck gets the top.
 struct SessionPlayingView: View {
     @Bindable var model: SessionViewModel
 
@@ -66,7 +66,8 @@ struct SessionPlayingView: View {
         let snapshot = model.snapshot
         if snapshot.stage == .ready {
             Spacer(minLength: 8)
-            SessionReadyCard(kind: kind, length: snapshot.blocks[snapshot.blockIndex].timeText, seconds: snapshot.readySeconds)
+            SessionReadyCard(kind: kind, length: snapshot.blocks[snapshot.blockIndex].timeText, seconds: snapshot.readySeconds,
+                             notices: kind.hasBacking ? model.backingNotices : [])
             Spacer(minLength: 8)
         } else if snapshot.stage == .paused {
             Spacer(minLength: 8)
@@ -95,6 +96,9 @@ struct SessionPlayingView: View {
             } resting: {
                 EmptyView()
             }
+        case .progressions:
+            ProgressionPrompt(display: display, position: model.theme?.theme.position(on: model.fretboard),
+                              fretboard: model.fretboard) {}
         }
     }
 
@@ -214,6 +218,8 @@ private struct SessionReadyCard: View {
     let kind: DrillKind
     let length: String
     let seconds: Int
+    /// How the backing will be heard, in a progression block.
+    var notices: [String] = []
 
     var body: some View {
         VStack(spacing: 10) {
@@ -222,6 +228,7 @@ private struct SessionReadyCard: View {
             Text(kind.instructions).font(.title2).foregroundStyle(.secondary)
             Text("\(seconds)").font(.system(size: 72, weight: .heavy, design: .rounded)).monospacedDigit()
             Text("\(length) · Space to start now").foregroundStyle(.secondary)
+            ForEach(notices, id: \.self) { Label($0, systemImage: "exclamationmark.triangle").foregroundStyle(.orange) }
         }
         .multilineTextAlignment(.center)
         .padding(.horizontal, 24)

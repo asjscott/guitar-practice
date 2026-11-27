@@ -1,0 +1,48 @@
+#!/bin/bash
+# Fetches the sounds listed in sounds.json into the git-ignored Sounds/ folder, checking each download and each file
+# against its checksum. Sounds already there with the right checksum are left alone. Never commit what it fetches.
+#   scripts/fetch-sounds          fetch what is missing
+#   scripts/fetch-sounds --force  fetch everything again
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+
+force=0
+case "${1:-}" in
+  "") ;;
+  --force) force=1 ;;
+  *) echo "usage: scripts/fetch-sounds [--force]" >&2; exit 2 ;;
+esac
+
+manifest=sounds.json
+field() { plutil -extract "sounds.$1.$2" raw -o - "$manifest"; }
+sha() { shasum -a 256 "$1" | cut -d' ' -f1; }
+
+mkdir -p Sounds
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
+
+count="$(plutil -extract sounds raw -o - "$manifest")"
+for ((i = 0; i < count; i++)); do
+  name="$(field "$i" name)"
+  file="Sounds/$(field "$i" file)"
+  if [ "$force" -eq 0 ] && [ -f "$file" ] && [ "$(sha "$file")" = "$(field "$i" sha256)" ]; then
+    echo "✓ $name: already in $file"
+    continue
+  fi
+
+  echo "Fetching $name ($(field "$i" licence)) from $(field "$i" url)…"
+  download="$work/download"
+  curl --fail --location --progress-bar --output "$download" "$(field "$i" url)"
+  [ "$(sha "$download")" = "$(field "$i" downloadSha256)" ] || { echo "✗ $name: the download's checksum is wrong" >&2; exit 1; }
+
+  # An archive member is taken out of it; otherwise the download is the file.
+  if member="$(field "$i" member 2>/dev/null)"; then
+    tar -xzf "$download" -C "$work" "$member"
+    mv "$work/$member" "$work/file"
+  else
+    mv "$download" "$work/file"
+  fi
+  [ "$(sha "$work/file")" = "$(field "$i" sha256)" ] || { echo "✗ $name: the file's checksum is wrong" >&2; exit 1; }
+  mv "$work/file" "$file"
+  echo "✓ $name: $file"
+done
