@@ -51,7 +51,7 @@ struct InversionsTests {
         #expect(DrillKind.all.contains(.inversions))
         #expect(DrillKind.inversions.id == "inversions")
         #expect(DrillKind.inversions.module == .triads)
-        #expect(DrillKind.all.filter(\.hasClimbs) == [.inversions])
+        #expect(DrillKind.all.filter(\.hasClimbs) == [.inversions, .triadCircle])
         #expect(DrillKind.inversions.repeatTitle == "Restart")
         #expect(!DrillKind.inversions.offersInversions)
         #expect(DrillKind.triadPlayIt.offersInversions)

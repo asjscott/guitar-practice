@@ -147,6 +147,7 @@ enum Snapshots {
 
         try await saveNoteCircle()
         try await saveScaleCircle()
+        try await saveTriadCircle()
 
         // Typed with real key events, so the key handling is exercised too.
         let naming = DrillViewModel()
@@ -661,6 +662,35 @@ enum Snapshots {
         let nut = circle(.major(.g), .e)
         try await save("scale-circle-nut", DrillView(model: nut)) { nut.start(seed: 1) }
         nut.stop()
+    }
+
+    /// Triad circle from E on D-G-B, in layout C, against a best set by a slower circle logged first: mid-climb at
+    /// level 0 (fully shown), and mid-fade at level 2, half way through the 3rd voicing's fade.
+    private static func saveTriadCircle() async throws {
+        let model = DrillViewModel()
+        let log = AttemptLog.inMemory()
+        model.kind = .triadCircle
+        model.options.key = .major(.e)
+        model.options.stringSets = [.dGB]
+        model.options.triadFade = .first
+        model.keepOptionsForSnapshot()
+        model.log = log
+        model.start(seed: 1)
+        model.playCircleForSnapshot(every: .seconds(2))
+        model.stop()
+        try await save("triad-circle-level-0", DrillView(model: model), log: log) {
+            model.start(seed: 1)
+            model.playCircleForSnapshot(7)
+        }
+        model.stop()
+        try await save("triad-circle-mid-fade", DrillView(model: model), log: log) {
+            model.options.triadFade = FadeLevel(2)
+            model.start(seed: 1)
+            model.playCircleForSnapshot(6)
+            // Level 2 fades by 68 % of 10 s.
+            model.waitForSnapshot(3.4)
+        }
+        model.stop()
     }
 
     private static func saveNecks() async throws {

@@ -15,6 +15,7 @@ public struct DrillKind: Identifiable, Sendable {
         .scaleCircle,
         .triadPlayIt,
         .inversions,
+        .triadCircle,
         .nearestVoicing,
         .stayInPosition,
         .targetTopNote,
