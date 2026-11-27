@@ -15,7 +15,7 @@ public struct SessionSummary: Hashable, Sendable {
 
         /// In progression blocks only.
         public var chords: ChordSummary? {
-            kind.hasBacking ? ChordSummary(attempts: stats.attempts) : nil
+            kind.module == .progressions && !kind.hasNoPrompts ? ChordSummary(attempts: stats.attempts) : nil
         }
 
         /// In triad blocks only.

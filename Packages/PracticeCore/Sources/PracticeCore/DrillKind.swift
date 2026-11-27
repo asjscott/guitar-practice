@@ -18,6 +18,8 @@ public struct DrillKind: Identifiable, Sendable {
         .nearestVoicing,
         .stayInPosition,
         .targetTopNote,
+        .chordsInPosition,
+        .freeTime,
     ]
 
     /// Saved in the attempt log: never change it.
@@ -48,6 +50,7 @@ public struct DrillKind: Identifiable, Sendable {
         public static let hasClimbs = Traits(rawValue: 1 << 6)
         public static let hasBacking = Traits(rawValue: 1 << 7)
         public static let goesRoundTheCircle = Traits(rawValue: 1 << 8)
+        public static let hasNoPrompts = Traits(rawValue: 1 << 9)
     }
 
     private let traits: Traits
@@ -71,10 +74,13 @@ public struct DrillKind: Identifiable, Sendable {
     public var hasPasses: Bool { traits.contains(.hasPasses) }
 
     /// What it shows fades as it is learned, and H shows it.
-    public var fades: Bool { hasPasses || module == .triads || hasBacking }
+    public var fades: Bool { (hasPasses || module == .triads || module == .progressions) && !hasNoPrompts }
 
-    /// A progression drill: chords played over backing, round and round the progression.
+    /// Plays backing: a progression drill over it, round and round the progression, or Free time.
     public var hasBacking: Bool { traits.contains(.hasBacking) }
+
+    /// Asks nothing and logs nothing: Free time.
+    public var hasNoPrompts: Bool { traits.contains(.hasNoPrompts) }
 
     /// A circle drill: once round the circle of fifths from the key, against the best (`CircleProgress`).
     public var goesRoundTheCircle: Bool { traits.contains(.goesRoundTheCircle) }
@@ -106,8 +112,9 @@ public struct DrillKind: Identifiable, Sendable {
                   traits: .hasBacking, repeatTitle: nil) { ProgressionDrill<Rules>(setup: $0) }
     }
 
-    private init(id: String, module: DrillModule, title: String, instructions: String, symbol: String, traits: Traits,
-                 repeatTitle: String?, make: @escaping @Sendable (DrillSetup) -> any Drill) {
+    /// A drill with an engine of its own.
+    init(id: String, module: DrillModule, title: String, instructions: String, symbol: String, traits: Traits,
+         repeatTitle: String?, make: @escaping @Sendable (DrillSetup) -> any Drill) {
         self.id = id
         self.module = module
         self.title = title

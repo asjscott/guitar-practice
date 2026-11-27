@@ -168,6 +168,17 @@ enum LogCheck {
         chords.handle(.tick(at: .seconds(16.5)))
         chordRun.update(from: chords)
 
+        // Chords in position: G clean, without backing, so its style and tempo are nil.
+        var inPosition = DrillKind.chordsInPosition.makeDrill(progressionSetup)
+        let inPositionRun = log.run()
+        inPosition.handle(.start(at: .zero))
+        for index in 1...3 {
+            guard let target = inPosition.prompt?.target else { break }
+            let onset = Duration.seconds(index)
+            inPosition.handle(.played(inPosition.fretboard.pitch(at: target), onset: onset, at: onset))
+        }
+        inPositionRun.update(from: inPosition)
+
         // Two clean passes and one cut short by a pause, so the next is played at level 2.
         var passes = DrillKind.upAndDown.makeDrill(DrillSetup(fretboard: Fretboard(tuning: .standard), seed: 1))
         let passRun = log.run()

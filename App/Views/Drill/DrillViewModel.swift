@@ -120,7 +120,7 @@ final class DrillViewModel: MetronomePanelOwner {
     func startFromDaysTheme(system: Position.System, on date: Date = .now) {
         let day = Calendar.practiceDay(of: date)
         // Circle drills too: they start from its key.
-        guard kind.hasBacking || kind.goesRoundTheCircle, !isRunning, themeDay != day, let log else { return }
+        guard kind.module == .progressions || kind.goesRoundTheCircle, !isRunning, themeDay != day, let log else { return }
         themeDay = day
         let theme = log.theme(on: date, fretboard: fretboard, system: system)
         options.key = theme.key
@@ -181,7 +181,7 @@ final class DrillViewModel: MetronomePanelOwner {
         guard kind.fades else { return nil }
         if kind.hasPasses { return log?.fadeLevels(in: setup.passPositions.map(\.id), on: []) }
         // A progression's voicings can be on any string set.
-        return log?.fadeLevels(in: [], on: kind.hasBacking ? Set(setup.fretboard.stringSets) : options.stringSets)
+        return log?.fadeLevels(in: [], on: kind.module == .progressions ? Set(setup.fretboard.stringSets) : options.stringSets)
     }
 
     /// The metronome panel. The view keeps the run's buttons and keys from acting while it is open.
@@ -242,7 +242,7 @@ final class DrillViewModel: MetronomePanelOwner {
     /// What a run would be made from, but for its seed.
     var setup: DrillSetup {
         var options = options
-        if kind.hasBacking { options.progression = progression }
+        if kind.module == .progressions { options.progression = progression }
         var setup = DrillSetup(fretboard: fretboard, options: options, seed: 0)
         setup.inputDelay = AudioInputSettings.inputDelay(ofDevice: input?.device?.uid)
         return setup

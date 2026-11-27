@@ -83,7 +83,9 @@ struct DrillView: View {
                 if model.kind.hasPasses {
                     Text("\(model.completePasses) \(model.completePasses == 1 ? "pass" : "passes")")
                     Text("\(model.cleanPasses) clean")
-                } else if model.kind.hasBacking {
+                } else if model.kind.hasNoPrompts {
+                    Text("Nothing is logged")
+                } else if model.kind.module == .progressions {
                     let summary = model.chordSummary
                     Text("\(summary.chords) \(summary.chords == 1 ? "chord" : "chords")")
                     Text("\(summary.clean) clean")
@@ -350,12 +352,14 @@ private struct DrillRestingText: View {
 
     private var hintText: String {
         let (shown, unclean) = model.kind.hasPasses ? ("position", "pass")
-            : model.kind.hasBacking ? ("voicing", "chord") : ("notes", "voicing")
+            : model.kind.module == .progressions ? ("voicing", "chord") : ("notes", "voicing")
         return " Hold H to see the \(shown): the \(unclean) then isn’t clean."
     }
 
     private var resumeText: String {
         if model.kind.hasPasses { return model.resumesSamePrompt ? "Resume (P) to restart the pass" : "Resume (P) for the next pass" }
+        if model.kind.hasNoPrompts { return "Resume (P) to count the backing in again" }
+        if model.kind == .chordsInPosition { return "Resume (P) to play the chord again" }
         if model.kind.hasBacking { return "Resume (P) to start the time through again, after a count-in" }
         return model.resumesSamePrompt ? "Resume (P) to carry on" : "Resume (P) for a new prompt"
     }
@@ -408,7 +412,7 @@ private struct DrillRunSummary: View {
                 if model.kind.hasPasses {
                     stat("Passes", "\(model.completePasses)")
                     stat("Clean", "\(model.cleanPasses)")
-                } else if model.kind.hasBacking {
+                } else if model.kind.module == .progressions {
                     let summary = model.chordSummary
                     stat("Chords", "\(summary.chords)")
                     stat("Clean", "\(summary.clean)")
@@ -418,7 +422,7 @@ private struct DrillRunSummary: View {
                     stat("First-try right", stats.firstTryText)
                     stat("Median time", stats.medianText)
                 }
-                if !model.kind.hasBacking {
+                if model.kind.module != .progressions {
                     stat("Timed out", "\(stats.timeouts)")
                     stat("Skipped", "\(stats.skips)")
                 }
@@ -426,7 +430,7 @@ private struct DrillRunSummary: View {
             if model.isCheckRun {
                 list("Misses", stats.misses, emptyText: "None: every location was right first time.")
                 list("Slowest onsets", stats.slowest(5).filter { $0.outcome == .answered })
-            } else if model.kind.hasBacking {
+            } else if model.kind.module == .progressions {
                 let summary = model.chordSummary
                 Text(summary.text).font(.callout).foregroundStyle(.secondary)
                 if !summary.hardest.isEmpty {

@@ -31,6 +31,12 @@ struct ProgressionPrompt<Resting: View>: View {
                 if let progress = display?.progression {
                     ProgressionTimeline(progress: progress)
                         .sessionCard()
+                } else if let display, !display.chips.isEmpty {
+                    ProgressionChordRow(chips: display.chips)
+                } else if display != nil {
+                    // Free time: nothing to ask.
+                    Text("The backing goes round until you stop. Nothing is logged.")
+                        .font(.title3).foregroundStyle(.secondary).frame(maxHeight: .infinity)
                 } else {
                     VStack(spacing: 4) { resting }.multilineTextAlignment(.center).frame(maxHeight: .infinity)
                 }
@@ -54,6 +60,36 @@ struct ProgressionPrompt<Resting: View>: View {
             for index in diagram.markers.indices { diagram.markers[index].isFaint = true }
         }
         return diagram
+    }
+}
+
+/// Chords in position: the progression's chords in a row, each with its numeral, the one up outlined and those clean
+/// twice ticked.
+private struct ProgressionChordRow: View {
+    let chips: [DrillDisplay.Chip]
+
+    var body: some View {
+        HStack(spacing: 16) {
+            ForEach(Array(chips.enumerated()), id: \.offset) { _, chip in
+                VStack(spacing: 4) {
+                    HStack(spacing: 4) {
+                        Text(chip.text).font(.title.bold())
+                        if chip.state == .found { Image(systemName: "checkmark").foregroundStyle(.green) }
+                    }
+                    Text(chip.title).font(.callout).foregroundStyle(.secondary)
+                }
+                .frame(width: 96, height: 72)
+                .background(RoundedRectangle(cornerRadius: 10).fill(chip.state.fill))
+                .overlay {
+                    if chip.state == .current {
+                        RoundedRectangle(cornerRadius: 10).strokeBorder(Color.accentColor, lineWidth: 2)
+                    }
+                }
+                .accessibilityElement()
+                .accessibilityLabel(chip.spokenTitle)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
@@ -211,15 +247,17 @@ struct ProgressionOptions: View {
             }
         }
         .help("Position")
-        Picker("Style", selection: $model.backingSettings.style) {
-            ForEach(BackingStyle.allCases, id: \.self) { Text($0.title).tag($0) }
+        if model.kind.hasBacking {
+            Picker("Style", selection: $model.backingSettings.style) {
+                ForEach(BackingStyle.allCases, id: \.self) { Text($0.title).tag($0) }
+            }
+            .help("Backing style")
+            HStack(spacing: 4) {
+                Text("♩ = \(model.backingSettings.tempo)").monospacedDigit()
+                Stepper("Tempo", value: $model.backingSettings.tempo, in: 40...160, step: 2).labelsHidden()
+            }
+            .help("Tempo (BPM)")
         }
-        .help("Backing style")
-        HStack(spacing: 4) {
-            Text("♩ = \(model.backingSettings.tempo)").monospacedDigit()
-            Stepper("Tempo", value: $model.backingSettings.tempo, in: 40...160, step: 2).labelsHidden()
-        }
-        .help("Tempo (BPM)")
     }
 
     private var positions: [Position] {

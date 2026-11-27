@@ -165,7 +165,7 @@ struct SessionPlannerDrillsTests {
         #expect(kinds == [.notePlayIt, .allInstances, .fretNameIt, .upAndDown, .fromADegree, .triadPlayIt, .inversions])
         #expect(plan(15, day: 1, kinds: kinds.filter { $0.module == .notes }).map(\.length) == [s(300), s(300), s(300)])
         #expect(SessionPlanner.noSoundNotice(from: DrillKind.all)
-                == "No sound: Hear → find it is left out, and chimes flash.")
+                == "No sound: Hear → find it, Free time are left out, and chimes flash.")
     }
 
     @Test func withoutSoundAndNoDrillThatNeedsItOnlyChimesChange() {
