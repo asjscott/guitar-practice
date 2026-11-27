@@ -79,7 +79,7 @@ struct P4bVariantA: View {
                     if m.scene == .triadCircle { Text(m.triadText) }
                     else if m.scene != .noteCircle { Text(m.fadeText) }
                     Spacer()
-                    if m.scene != .noteCircle && m.scene != .triadCircle { Text(m.nextText).foregroundStyle(m.showsNext ? .primary : .secondary) }
+                    if m.scene != .noteCircle && m.scene != .triadCircle { Text(m.nextText).foregroundStyle(.secondary) }
                 }.font(.title3)
             }
         }.padding(28)
@@ -200,7 +200,7 @@ struct P4bVariantB: View {
                     Text(m.scene == .triadCircle ? m.triadText : m.fadeText).font(.title3)
                 }
                 Spacer()
-                if m.scene != .noteCircle && m.scene != .triadCircle { Text(m.nextText).font(.title3).foregroundStyle(m.showsNext ? .primary : .secondary) }
+                if m.scene != .noteCircle && m.scene != .triadCircle { Text(m.nextText).font(.title3).foregroundStyle(.secondary) }
             }
         }.padding(20)
     }
@@ -297,26 +297,12 @@ struct P4bVariantC: View {
                         Text("Fade over this pass").font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(m.nextText).font(.headline)
-                        FretboardView(diagram: nextNeck).frame(width: 380, height: 150).clipped().opacity(m.showsNext ? 1 : 0.5)
-                    }.fixedSize()
+                    Text(m.nextText).font(.title3).foregroundStyle(.secondary)
                 }
             } else if m.scene == .triadCircle {
                 Text(m.triadText + " · " + m.fadeText).font(.title3)
             }
         }.padding(20)
-    }
-
-    private var nextNeck: FretboardDiagram {
-        let n = m.walk[min(11, m.circleIndex + 1)]
-        var d = FretboardDiagram(stringNames: m.fretboard.stringNames(in: n.key).map(\.description))
-        d.fretWindow = n.position.fretWindow
-        d.markers = n.position.locations.map { l in
-            let root = m.fretboard.pitch(at: l).pitchClass == n.key.tonic.pitchClass
-            return .init(location: l, label: root ? n.key.tonic.description : "", role: root ? .root : .tone, isFaint: !root)
-        }
-        return d
     }
 
     private var summary: some View {

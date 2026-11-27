@@ -20,7 +20,7 @@ enum P4bVariant: String, CaseIterable {
 
 enum P4bScene: String, CaseIterable {
     case setup = "Setup", noteCircle = "Note circle", scaleStart = "Scale: start", scaleFading = "Scale: fading",
-         scaleRoots = "Scale: roots only", scaleNext = "Scale: next key", triadCircle = "Triad circle", summary = "Summary"
+         scaleRoots = "Scale: roots only", scaleNext = "Scale: key change", triadCircle = "Triad circle", summary = "Summary"
 }
 
 struct P4bStep: Identifiable {
@@ -110,7 +110,7 @@ struct P4bWalkStep: Identifiable {
     /// Which key of the circle is up.
     var circleIndex: Int {
         switch scene {
-        case .noteCircle: 3
+        case .noteCircle, .scaleNext: 3
         case .triadCircle: 1
         default: 2
         }
@@ -119,9 +119,8 @@ struct P4bWalkStep: Identifiable {
     var circleKeys: [Key] { walk.map(\.key) }
     func keyName(_ k: Key) -> String { "\(k.tonic)\(k.mode == .minor ? "m" : "")" }
     var current: P4bWalkStep { walk[circleIndex] }
-    var showsNext: Bool { scene == .scaleNext }
-    var effectiveLevel: Int { scene == .scaleRoots ? 6 : scene == .scaleStart ? 0 : level }
-    var effectiveProgress: Double { scene == .scaleNext ? 0.97 : scene == .scaleStart ? 0.1 : progress }
+        var effectiveLevel: Int { scene == .scaleRoots ? 6 : scene == .scaleStart ? 0 : level }
+    var effectiveProgress: Double { scene == .scaleNext ? 0 : scene == .scaleStart ? 0.1 : progress }
     var fadeText: String {
         let l = effectiveLevel
         guard let share = Self.fadeShares[l] else { return "Level 0 · shown" }
@@ -155,25 +154,16 @@ struct P4bWalkStep: Identifiable {
     private func scaleNeck(compact: Bool) -> FretboardDiagram {
         let k = current.key
         var d = FretboardDiagram(stringNames: fretboard.stringNames(in: k).map(\.description))
-        let next = walk[min(11, circleIndex + 1)]
-        let lo = min(current.position.frets.lowerBound, showsNext ? next.position.frets.lowerBound : 99)
-        let hi = max(current.position.frets.upperBound, showsNext ? next.position.frets.upperBound : 0)
-        d.fretWindow = (lo - 2...hi + 2).clamped(to: Fretboard.frets)
+        d.fretWindow = current.position.fretWindow
         let order = passOrder
         let fade = opacity(fadeAt: effectiveProgress)
         for (i, l) in order.enumerated() {
             let isRoot = fretboard.pitch(at: l).pitchClass == k.tonic.pitchClass
             let played = i < notesPlayed
             d.markers.append(.init(location: l, label: fretboard.name(at: l, in: k).description,
-                                   role: isRoot ? .root : .tone, isLastPlayed: played && i == notesPlayed - 1,
+                                   role: isRoot ? .root : .tone,
+                                   isLastPlayed: notesPlayed == 0 ? i == 0 : played && i == notesPlayed - 1,
                                    opacity: played || isRoot ? 1 : fade))
-        }
-        if showsNext {
-            for l in next.position.locations where !order.contains(l) || fretboard.pitch(at: l).pitchClass == next.key.tonic.pitchClass {
-                let isRoot = fretboard.pitch(at: l).pitchClass == next.key.tonic.pitchClass
-                d.markers.removeAll { $0.location == l && !isRoot && $0.opacity < 1 }
-                d.markers.append(.init(location: l, label: "", role: isRoot ? .root : .tone, isFaint: true))
-            }
         }
         return d
     }
