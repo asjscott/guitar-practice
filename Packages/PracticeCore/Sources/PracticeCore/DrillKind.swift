@@ -12,6 +12,7 @@ public struct DrillKind: Identifiable, Sendable {
         .fretNameIt,
         .upAndDown,
         .fromADegree,
+        .scaleCircle,
         .triadPlayIt,
         .inversions,
         .triadCircle,
@@ -74,7 +75,9 @@ public struct DrillKind: Identifiable, Sendable {
     public var hasPasses: Bool { traits.contains(.hasPasses) }
 
     /// What it shows fades as it is learned, and H shows it.
-    public var fades: Bool { (hasPasses || module == .triads || module == .progressions) && !hasNoPrompts }
+    public var fades: Bool {
+        (hasPasses || module == .scales || module == .triads || module == .progressions) && !hasNoPrompts
+    }
 
     /// Plays backing: a progression drill over it, round and round the progression, or Free time.
     public var hasBacking: Bool { traits.contains(.hasBacking) }

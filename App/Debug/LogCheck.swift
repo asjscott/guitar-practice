@@ -40,6 +40,7 @@ enum LogCheck {
                     try checkThemes()
                     try checkFreePractice()
                     try checkNoteCircle()
+                    try checkScaleCircle()
                     try checkResume()
                     try await write(log)
                 }
@@ -351,6 +352,35 @@ enum LogCheck {
         try require(circles.map(\.time) == [.seconds(2 * locations), .seconds(locations), .seconds(5)], "times")
         try require(log.circleBest(of: .noteCircle, on: drill.fretboard) == circles[1], "the best")
         try require(log.circleBest(of: .noteCircle, on: Fretboard(tuning: .standard, capo: 2)) == nil, "best per capo")
+    }
+
+    /// A Scale circle logs its passes one way each, taking turns from up, with no tempo, and one circle id per run; a
+    /// clean run moves the fade levels of the positions it went through, and the log reads its circle back. In memory.
+    private static func checkScaleCircle() throws {
+        func require(_ condition: Bool, _ what: String) throws {
+            if !condition { throw LogCheckError.freePractice("Scale circle: " + what) }
+        }
+        let log = AttemptLog.inMemory()
+        let drill = DrillViewModel()
+        drill.kind = .scaleCircle
+        drill.keepOptionsForSnapshot()
+        drill.options.key = .major(.e)
+        drill.options.position = Position.ID(system: .caged, number: CAGEDShape.c.number)
+        drill.log = log
+        drill.start(seed: 1)
+        drill.playCircleForSnapshot()
+        drill.stop()
+        let attempts = try log.context.fetch(FetchDescriptor<LoggedAttempt>(sortBy: [SortDescriptor(\.date)]))
+        try require(attempts.allSatisfy { $0.drill == "scaleCircle" && $0.tempo == nil && $0.groupSize != nil }, "attempts")
+        try require(Set(attempts.compactMap(\.circleID)).count == 1, "one circle id")
+        var directions: [String] = []
+        for attempt in attempts where attempt.groupPlace == 0 { directions.append(attempt.passDirection ?? "-") }
+        try require(directions == (0..<6).flatMap { _ in ["up", "down"] }, "directions")
+        try require(log.circles(of: .scaleCircle).map(\.isClean) == [true], "the circle")
+        let levels = log.fadeLevels(in: drill.setup.scaleCirclePositions.map(\.id), on: [])
+        let theme = FadeLevels.Subject(tuning: drill.fretboard.tuning, scaleKind: .major,
+                                       position: Position.ID(system: .caged, number: CAGEDShape.c.number))
+        try require(levels.level(of: theme) > .first, "fade levels")
     }
 
     /// Resuming a scale drill takes up the tempo and the fade level that a session has moved meanwhile. In memory.
