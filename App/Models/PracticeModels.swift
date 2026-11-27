@@ -87,7 +87,7 @@ extension PracticeSession {
 extension LoggedAttempt {
     /// The record of an attempt at a drill, ending now.
     convenience init(_ attempt: Attempt, in drill: any Drill, date: Date, source: AttemptSource, groupID: UUID?,
-                     blockIndex: Int?) {
+                     circleID: UUID? = nil, blockIndex: Int?) {
         let fretboard = drill.fretboard
         let location = attempt.prompt.target ?? attempt.location
         self.init(date: date, sourceRaw: source.rawValue, drill: drill.kind.id,
@@ -101,6 +101,7 @@ extension LoggedAttempt {
                   blockIndex: blockIndex)
         groupSize = attempt.group?.size
         groupPlace = attempt.group?.place
+        self.circleID = circleID
         switch attempt.facts {
         case .pass(let facts): setFacts(facts)
         case .triad(let facts): setFacts(facts)
