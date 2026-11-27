@@ -52,8 +52,8 @@ struct TargetTopNoteTests {
         }
     }
 
-    @Test func theLineIsDrawnNamedAtEveryFadeStage() throws {
-        var run = ProgressionRun(.targetTopNote)
+    @Test func theLineIsDrawnNamedAtEveryFadeLevel() throws {
+        var run = ProgressionRun(.targetTopNote, override: .last)
         run.start()
         for time: Double in [5, 37, 69] {
             run.tick(time)
@@ -61,8 +61,8 @@ struct TargetTopNoteTests {
             #expect(progress.topNotes?.map(\.name) == ["G", "F♯", "G", "G"])
             #expect(progress.topNotes?.map(\.pitch.midi) == [67, 66, 67, 67])
         }
-        #expect(run.drill.display?.progression?.fadeStage == .hidden)
-        #expect(run.drill.display?.markers.isEmpty == true)
+        #expect(run.drill.display?.progression?.fadeLevel == .last)
+        #expect(run.drill.display?.markers.map(\.isAnswer) == [true])
     }
 
     @Test func theNeckDrawsAVoicingWithTheTopNote() throws {

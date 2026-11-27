@@ -60,6 +60,9 @@ public protocol DrillRules: Sendable {
     /// H held or let go; pausing and stopping let go. Default: nothing.
     mutating func hint(isShown: Bool)
 
+    /// The current prompt's timer starts, or is put off by its sounds or a hold, at `time`. Default: nothing.
+    mutating func timerStarted(at time: Duration)
+
     /// The fade levels reached, read again from the log, are set; nil in drills that don't fade. Default: nil.
     var fadeLevels: FadeLevels? { get set }
 
@@ -145,6 +148,7 @@ extension DrillRules {
     public var isPartWay: Bool { false }
     public var isTimed: Bool { true }
     public mutating func hint(isShown: Bool) {}
+    public mutating func timerStarted(at time: Duration) {}
     public var fadeLevels: FadeLevels? { get { nil } set {} }
     public func display(of moment: DrillMoment) -> DrillDisplay { DrillDisplay(standard: moment, in: setup) }
 }

@@ -144,7 +144,7 @@ struct TriadOptions: View {
             .help("Inversions")
         }
         FretsPicker(frets: $options.frets)
-        FadePicker(stage: $options.triadFade, unit: "voicings")
+        FadeLevelPicker(level: $options.triadFade, unit: "voicings")
     }
 
     /// "Sets: all", or the only one, or how many.

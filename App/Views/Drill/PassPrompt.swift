@@ -139,30 +139,17 @@ struct ScaleOptions: View {
     }
 }
 
-/// Follow, or a stage that overrides it.
-struct FadePicker: View {
-    @Binding var stage: FadeStage?
-    /// What moves it, "passes".
-    let unit: String
-
-    var body: some View {
-        Picker("Fade", selection: $stage) {
-            Text("Follow").tag(FadeStage?.none)
-            ForEach(FadeStage.allCases, id: \.self) { Text($0.rawValue.capitalizedFirst).tag(Optional($0)) }
-        }
-        .help("Fade stage (Follow: the one your clean \(unit) have reached)")
-    }
-}
-
 /// Follow, or a fade level that overrides it.
 struct FadeLevelPicker: View {
     @Binding var level: FadeLevel?
+    /// What moves it, "passes".
+    var unit = "passes"
 
     var body: some View {
         Picker("Fade", selection: $level) {
             Text("Follow").tag(FadeLevel?.none)
             ForEach(FadeLevel.all, id: \.self) { Text($0.description).tag(Optional($0)) }
         }
-        .help("Fade level (Follow: the one your clean passes have reached)")
+        .help("Fade level (Follow: the one your clean \(unit) have reached)")
     }
 }

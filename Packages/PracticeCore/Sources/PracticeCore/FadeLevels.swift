@@ -27,8 +27,6 @@ extension FadeLevel {
 
 /// The fade levels reached in the scale and triad drills, from the logged passes and voicings: each scale kind in
 /// each position, and each shape of triad voicing, voicing by voicing. Passes that aren't complete don't count.
-///
-/// Triads still play at fade stages, so their levels move only between Shown, Faded and Hidden (0, 2 and 6).
 public struct FadeLevels: Hashable, Sendable {
     /// What a pass's level belongs to, whatever the key, capo and octave.
     public struct Subject: Hashable, Sendable {
@@ -109,9 +107,6 @@ public struct FadeLevels: Hashable, Sendable {
 
     public func level(of shape: VoicingShape) -> FadeLevel { voicings.level(of: shape) }
 
-    /// The stage a triad's voicing is played at.
-    public func stage(of shape: VoicingShape) -> FadeStage { FadeStage(level(of: shape)) }
-
     /// Counts the next voicing, given all that was logged of it: played whole, or to where the time ran out. One skipped
     /// or cut short counts neither way.
     public mutating func add(voicing notes: [VoicingNote]) {
@@ -119,7 +114,7 @@ public struct FadeLevels: Hashable, Sendable {
               last.result.outcome == .timedOut || last.result.outcome == .answered && notes.count == first.shape.noteCount
         else { return }
         let isClean = notes.allSatisfy { $0.result.firstRight && !$0.result.hinted }
-        voicings.count(first.shape, playedAt: FadeLevel(first.stage), isClean: isClean, steps: FadeLevel.stageSteps)
+        voicings.count(first.shape, playedAt: first.level, isClean: isClean, steps: first.steps)
     }
 
     /// Counts a run's passes.
@@ -185,38 +180,56 @@ extension FadeLevels {
     public struct VoicingNote: Hashable, Sendable {
         public let shape: VoicingShape
         /// What the voicing was played at.
-        public let stage: FadeStage
+        public let level: FadeLevel
         /// Which of the voicing's notes it is (0 = lowest).
         public let place: Int
         let result: NoteResult
+        /// The levels the voicing moves between.
+        let steps: [FadeLevel]
 
         /// `hinted`: whether a hint had been used in the voicing by then.
-        public init(shape: VoicingShape, stage: FadeStage, hinted: Bool, place: Int, outcome: Attempt.Outcome, firstRight: Bool) {
+        public init(shape: VoicingShape, level: FadeLevel, hinted: Bool, place: Int, outcome: Attempt.Outcome,
+                    firstRight: Bool) {
+            self.init(shape: shape, level: level, steps: FadeLevel.all, hinted: hinted, place: place, outcome: outcome,
+                      firstRight: firstRight)
+        }
+
+        /// Logged before fade levels, at a stage: it moves between Shown, Faded and Hidden, as the stages did, so that
+        /// no progress is lost.
+        public init(shape: VoicingShape, stage: FadeStage, hinted: Bool, place: Int, outcome: Attempt.Outcome,
+                    firstRight: Bool) {
+            self.init(shape: shape, level: FadeLevel(stage), steps: FadeLevel.stageSteps, hinted: hinted, place: place,
+                      outcome: outcome, firstRight: firstRight)
+        }
+
+        /// With its place in the group, which can be a climb: at a level, or logged before levels at a stage.
+        public init?(shape: VoicingShape, level: FadeLevel?, stage: FadeStage?, hinted: Bool, groupPlace: Int,
+                    outcome: Attempt.Outcome, firstRight: Bool) {
+            let place = groupPlace % shape.noteCount
+            if let level {
+                self.init(shape: shape, level: level, hinted: hinted, place: place, outcome: outcome, firstRight: firstRight)
+            } else if let stage {
+                self.init(shape: shape, stage: stage, hinted: hinted, place: place, outcome: outcome, firstRight: firstRight)
+            } else {
+                return nil
+            }
+        }
+
+        private init(shape: VoicingShape, level: FadeLevel, steps: [FadeLevel], hinted: Bool, place: Int,
+                     outcome: Attempt.Outcome, firstRight: Bool) {
             self.shape = shape
-            self.stage = stage
+            self.level = level
+            self.steps = steps
             self.place = place
             result = NoteResult(outcome: outcome, firstRight: firstRight, hinted: hinted)
         }
 
-        /// With its place in the group, which can be a climb.
-        public init(shape: VoicingShape, stage: FadeStage, hinted: Bool, groupPlace: Int, outcome: Attempt.Outcome,
-                    firstRight: Bool) {
-            self.init(shape: shape, stage: stage, hinted: hinted, place: groupPlace % shape.noteCount, outcome: outcome,
-                      firstRight: firstRight)
-        }
-
-        /// Nil unless the attempt was in a triad, with its stage.
+        /// Nil unless the attempt was in a triad, with its level.
         public init?(_ attempt: Attempt, in tuning: Tuning) {
-            guard case .triad(let facts) = attempt.facts, let stage = facts.fadeStage, let place = attempt.group?.place else { return nil }
-            self.init(shape: VoicingShape(facts, in: tuning), stage: stage, hinted: facts.hinted, groupPlace: place,
-                      outcome: attempt.outcome, firstRight: attempt.firstRight)
+            guard case .triad(let facts) = attempt.facts, let level = facts.fadeLevel, let place = attempt.group?.place
+            else { return nil }
+            self.init(shape: VoicingShape(facts, in: tuning), level: level, stage: nil, hinted: facts.hinted,
+                      groupPlace: place, outcome: attempt.outcome, firstRight: attempt.firstRight)
         }
-    }
-}
-
-extension FadeStage {
-    /// What a triad is played at, at a level reached: Faded between Shown and Hidden.
-    init(_ level: FadeLevel) {
-        self = level == .first ? .shown : level == .last ? .hidden : .faded
     }
 }

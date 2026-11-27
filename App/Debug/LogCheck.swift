@@ -146,7 +146,7 @@ enum LogCheck {
             (chord.positionSystem, chord.positionNumber, chord.positionOctave) = ("caged", 4, 0)
             (chord.playedVoicing, chord.acceptedVoicings) = (played, accepted)
             (chord.backingStyle, chord.tempo, chord.beatsPerBar, chord.beatUnit) = ("rock", 70, 4, 4)
-            (chord.fadeStageRaw, chord.hinted) = (FadeStage.hidden.rawValue, place == 1)
+            (chord.fadeLevel, chord.hinted) = (FadeLevel.last.number, place == 1)
             chord.chordOutcomeRaw = played == nil ? "missed" : "wrong"
             chord.firstOnsetSeconds = played.map { _ in -0.25 }
             chord.inputDelaySeconds = 0
@@ -188,7 +188,7 @@ enum LogCheck {
         passes.handle(.resume(at: .seconds(400)))
         playPass(3)
 
-        // A clean voicing, so that its shape is Faded, then one with only its first note.
+        // A clean voicing, so that its shape is at level 1, then one with only its first note.
         var triadSetup = DrillSetup(fretboard: Fretboard(tuning: .standard), seed: 1)
         triadSetup.options.stringSets = [.dGB]
         var triads = DrillKind.triadPlayIt.makeDrill(triadSetup)
@@ -665,7 +665,8 @@ enum LogCheck {
                 FadeLevels.VoicingShape(tuning: .standard, quality: quality, inversion: $0, stringSet: .dGB)
             }
         }
-        print("triads faded on D-G-B \(shapes.filter { stages.stage(of: $0) == .faded }.count), hidden \(shapes.filter { stages.stage(of: $0) == .hidden }.count)")
+        let levels = shapes.map { stages.level(of: $0).number }
+        print("triads on D-G-B at level 1 \(levels.filter { $0 == 1 }.count), above \(levels.filter { $0 > 1 }.count)")
         var groups: [UUID] = []
         func group(of attempt: LoggedAttempt) -> String {
             guard let id = attempt.groupID else { return "none" }

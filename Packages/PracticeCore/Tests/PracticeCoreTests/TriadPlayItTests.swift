@@ -7,7 +7,7 @@ private func at(_ string: Int, _ fret: Int) -> FretboardLocation { FretboardLoca
 private func setup(_ preset: TuningPreset = .standard, capo: Int = 0, seed: UInt64 = 1,
                    _ change: (inout DrillOptions) -> Void = { _ in }) -> DrillSetup {
     var options = DrillOptions()
-    options.triadFade = .hidden
+    options.triadFade = .last
     options.frets = 0...22
     change(&options)
     return DrillSetup(fretboard: Fretboard(tuning: preset.tuning, capo: capo), options: options, seed: seed)
@@ -45,15 +45,15 @@ struct TriadPlayItTests {
         #expect(DrillKind.triadPlayIt.repeatTitle == nil)
     }
 
-    @Test func waitingNamesTheChordAndLightsTheSetButNoNotes() throws {
+    @Test func waitingNamesTheChordAndLightsTheSetAndTheRootAlone() throws {
         let display = try #require(aMinorSecond().display)
         #expect(display.headline == "A minor · 2nd inversion")
         #expect(display.subline == "D-G-B")
         #expect(display.highlightedStrings == [2, 3, 4])
-        #expect(display.markers.isEmpty)
+        #expect(display.markers == [.init(location: at(3, 2), label: "A", isAnswer: true)])
         #expect(display.chips.map(\.title) == ["4", "3", "2"])
         #expect(display.chips.map(\.spokenTitle) == ["string 4 (D)", "string 3 (G)", "string 2 (B)"])
-        #expect(display.chips.map(\.text) == ["?", "?", "?"])
+        #expect(display.chips.map(\.text) == ["?", "A", "?"])
         #expect(display.chips.map(\.state) == [.current, .waiting, .waiting])
         #expect(display.feedback == "Listening…")
     }
@@ -97,18 +97,19 @@ struct TriadPlayItTests {
         play(57, at: 2, &drill)
         #expect(drill.phase == .wrong(PitchClass(9)))
         // What was played stays up.
-        #expect(drill.display?.chips.map(\.text) == ["E", "?", "?"])
+        #expect(drill.display?.chips.map(\.text) == ["E", "A", "?"])
         play(69, at: 3, &drill)
         #expect(drill.attempts.map(\.wrongAnswers) == [[], [.pitch(Pitch(57))]])
         #expect(drill.attempts[1].responseTime == s(2))
     }
 
-    @Test func onlyTheLastNotePlayedIsOnTheNeckUntilTheVoicingIsDone() throws {
+    @Test func theNotesPlayedAndTheRootAreOnTheNeckUntilTheVoicingIsDone() throws {
         var drill = aMinorSecond()
         play(52, at: 1, &drill)
         play(57, at: 2, &drill)
         let display = try #require(drill.display)
-        #expect(display.markers == [.init(location: at(3, 2), label: "A", isAnswer: true, isLastPlayed: true)])
+        #expect(display.markers == [.init(location: at(2, 2), label: "E", isAnswer: false),
+                                    .init(location: at(3, 2), label: "A", isAnswer: true, isLastPlayed: true)])
         #expect(display.chips.map(\.text) == ["E", "A", "?"])
         #expect(display.chips.map(\.state) == [.found, .found, .current])
         #expect(display.highlightedStrings == [2, 3, 4])
@@ -137,7 +138,7 @@ struct TriadPlayItTests {
         drill.handle(.tick(at: s(4)))
         drill.handle(.skip(at: s(5)))
         var facts = TriadFacts(triad: Triad(.minor, root: .a), inversion: .second, stringSet: .dGB)
-        facts.fadeStage = .hidden
+        facts.fadeLevel = .last
         #expect(drill.attempts.prefix(3).map(\.facts) == Array(repeating: .triad(facts), count: 3))
         #expect(drill.attempts.map { $0.group?.place } == [0, 1, 2, 0])
         #expect(drill.attempts.allSatisfy { $0.group?.size == 3 })
@@ -186,7 +187,7 @@ struct TriadPlayItTests {
         #expect(drill.attempts.map(\.outcome) == [.answered, .skipped])
         #expect(drill.prompt?.string == 2)
         #expect(drill.display?.headline != "A minor · 2nd inversion")
-        #expect(drill.display?.chips.map(\.text) == ["?", "?", "?"])
+        #expect(drill.display?.chips.filter { $0.text == "?" }.count == 2)
     }
 
     @Test func repeatDoesNothing() {

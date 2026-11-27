@@ -181,14 +181,26 @@ enum Snapshots {
             triads.playForSnapshot(right: true)
         }
         triads.stop()
-        for stage in [FadeStage.faded, .hidden] {
-            try await save("triad-\(stage.rawValue)", DrillView(model: triads)) {
-                triads.options.triadFade = stage
-                triads.start(seed: 1)
-                triads.playForSnapshot(right: true)
-            }
-            triads.stop()
+        // Level 1 fades over 9 s: 4.5 s in, the notes left are half gone. At level 6 only the root is shown.
+        try await save("triad-fade-level-1-mid", DrillView(model: triads)) {
+            triads.options.triadFade = FadeLevel(1)
+            triads.start(seed: 1)
+            triads.playForSnapshot(right: true)
+            triads.waitForSnapshot(4.5)
         }
+        triads.stop()
+        try await save("triad-fade-level-6", DrillView(model: triads)) {
+            triads.options.triadFade = .last
+            triads.start(seed: 1)
+        }
+        triads.stop()
+        try await save("triad-fade-level-6-one-note", DrillView(model: triads)) {
+            triads.options.triadFade = .last
+            triads.start(seed: 1)
+            triads.playForSnapshot(right: true)
+        }
+        triads.stop()
+        triads.options.triadFade = nil
         try await save("triad-hint", DrillView(model: triads)) {
             triads.start(seed: 1)
             triads.hint(isShown: true)
@@ -242,7 +254,7 @@ enum Snapshots {
         climb.stop()
         try await save("inversions-shown", DrillView(model: climb)) { climb.start(seed: 1) }
         climb.stop()
-        climb.options.triadFade = .hidden
+        climb.options.triadFade = .last
         try await save("inversions-waiting", DrillView(model: climb)) { climb.start(seed: 1) }
         climb.stop()
         try await save("inversions-climbing", DrillView(model: climb)) {
@@ -498,14 +510,17 @@ enum Snapshots {
             shown.playProgressionForSnapshot(chords: 1, partial: 2, untilBeat: 9.6)
         }
         shown.stop()
+        // Level 1 fades a chord of a bar over 3.6 beats: D, from beat 8, is half gone by 9.8.
         let faded = model()
-        try await save("progression-faded", DrillView(model: faded)) {
+        faded.options.triadFade = FadeLevel(1)
+        try await save("progression-fade-level-1-mid", DrillView(model: faded)) {
             faded.start(seed: 1)
-            faded.playProgressionForSnapshot(chords: 8, partial: 2, untilBeat: 37.6)
+            faded.playProgressionForSnapshot(chords: 1, partial: 1, untilBeat: 9.8)
         }
         faded.stop()
         let hidden = model()
-        try await save("progression-hidden-wrong", DrillView(model: hidden)) {
+        hidden.options.triadFade = .last
+        try await save("progression-fade-level-6-wrong", DrillView(model: hidden)) {
             hidden.start(seed: 1)
             hidden.playProgressionForSnapshot(chords: 18, wrong: [16], partial: 1, untilBeat: 76.8)
         }
@@ -525,7 +540,8 @@ enum Snapshots {
             }
             shown.stop()
             let hidden = model(kind)
-            try await save("progression-\(name)-hidden", DrillView(model: hidden)) {
+            hidden.options.triadFade = .last
+            try await save("progression-\(name)-fade-level-6", DrillView(model: hidden)) {
                 hidden.start(seed: 1)
                 hidden.playProgressionForSnapshot(chords: 18, partial: 1, untilBeat: 76.8)
             }

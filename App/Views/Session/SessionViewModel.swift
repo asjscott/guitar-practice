@@ -263,7 +263,8 @@ final class SessionViewModel: MetronomePanelOwner {
         let blocks = plan(on: date)
         var drillSetup = drillSetup(seed: seed)
         passPositions = drillSetup.passPositions.map(\.id)
-        stringSets = drillSetup.options.stringSets
+        // The progression blocks' voicings can be on any string set.
+        stringSets = Set(drillSetup.fretboard.stringSets)
         drillSetup.fadeLevels = log?.fadeLevels(in: passPositions, on: stringSets) ?? FadeLevels()
         fretboard = drillSetup.fretboard
         frets = drillSetup.options.frets

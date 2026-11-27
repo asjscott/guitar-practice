@@ -132,8 +132,8 @@ extension LoggedAttempt {
         chordQuality = facts.triad.quality.rawValue
         inversion = facts.inversion.rawValue
         stringSet = facts.stringSet.rawValue
-        fadeStageRaw = facts.fadeStage?.rawValue
-        hinted = facts.fadeStage.map { _ in facts.hinted }
+        fadeLevel = facts.fadeLevel?.number
+        hinted = facts.fadeLevel.map { _ in facts.hinted }
     }
 
     private func setFacts(_ facts: ChordFacts) {
@@ -152,7 +152,7 @@ extension LoggedAttempt {
         backingStyle = facts.style.rawValue
         tempo = facts.tempo
         (beatsPerBar, beatUnit) = (4, 4)
-        fadeStageRaw = facts.fadeStage.rawValue
+        fadeLevel = facts.fadeLevel.number
         hinted = facts.hinted
         chordOutcomeRaw = facts.outcome.rawValue
         firstOnsetSeconds = facts.firstOnset.map { $0 / .seconds(1) }

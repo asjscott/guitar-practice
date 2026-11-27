@@ -129,8 +129,7 @@ enum PracticeSchemaV4: VersionedSchema {
         /// The time signature: 6 and 8 in 6/8.
         var beatsPerBar: Int?
         var beatUnit: Int?
-        /// A `FadeStage` raw value: what the pass was played at, before fade levels. Triads and chords still save it
-        /// until they fade by time.
+        /// A `FadeStage` raw value: what the pass, voicing or chord was played at, before fade levels.
         var fadeStageRaw: String?
         /// The fade level the pass, voicing or chord was played at, 0–6; nil in older versions' attempts, whose
         /// `fadeStageRaw` reads as a level (Shown 0, Faded 2, Hidden 6).
@@ -158,7 +157,7 @@ enum PracticeSchemaV4: VersionedSchema {
 
         // Chords only: one attempt per chord of a time through, whose chords share a group. The group's size is the
         // progression's chord count and the place the chord's (0 = first). The chord in the key is in the triad
-        // fields above, the position in the pass fields, and tempo, time signature, fade stage and hint too.
+        // fields above, the position in the pass fields, and tempo, time signature, fade level and hint too.
         /// The progression's id in TheoryCore's library ("I–V–vi–IV").
         var progression: String?
         /// The key's tonic pitch class and `Key.Mode` raw value: one of the app's keys.

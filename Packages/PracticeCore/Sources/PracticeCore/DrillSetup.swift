@@ -40,8 +40,8 @@ public struct DrillOptions: Hashable, Sendable {
     /// Triads only.
     public var inversions = Set(Triad.Inversion.allCases)
 
-    /// Triads only: what they are played at; nil follows the stage reached (`DrillSetup.fadeLevels`).
-    public var triadFade: FadeStage?
+    /// Triads and progressions: what voicings are played at; nil follows the level reached (`DrillSetup.fadeLevels`).
+    public var triadFade: FadeLevel?
 
     /// Scales only. The key moves to its mode.
     public var scaleKind: Scale.Kind = .major
