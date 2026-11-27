@@ -179,15 +179,16 @@ struct SessionPlannerDrillsTests {
         #expect(SessionPlanner.nothingToPromptReason(from: [.hearFindIt, kind("in")], for: setup, hasSound: true) == nil)
     }
 
-    @Test func withSoundEveryDrillIsIn() {
+    @Test func withSoundEveryDrillIsInButTheCircleDrills() {
         var setup = setup
         setup.options.progression = Progression.named("I–IV–V")
-        #expect(SessionPlanner.drills(from: DrillKind.all, for: setup, hasSound: true) == DrillKind.all)
+        #expect(SessionPlanner.drills(from: DrillKind.all, for: setup, hasSound: true)
+                == DrillKind.all.filter { !$0.goesRoundTheCircle })
     }
 
     @Test func progressionDrillsAreLeftOutWithoutAProgression() {
         #expect(SessionPlanner.drills(from: DrillKind.all, for: setup, hasSound: true)
-                == DrillKind.all.filter { $0.module != .progressions })
+                == DrillKind.all.filter { $0.module != .progressions && !$0.goesRoundTheCircle })
     }
 
     @Test func triadsWithNoVoicingInRangeAreLeftOutAndSetupSaysWhy() {
@@ -258,7 +259,7 @@ struct SessionSetupTests {
 struct DrillModuleTests {
     @Test func everyDrillSoFarIsInFretboardNotesWithItsSavedID() {
         let notes = DrillKind.all.filter { $0.module == .notes }
-        #expect(notes.map(\.id) == ["notePlayIt", "allInstances", "hearFindIt", "fretNameIt"])
+        #expect(notes.map(\.id) == ["notePlayIt", "allInstances", "noteCircle", "hearFindIt", "fretNameIt"])
         #expect(DrillModule.allCases.map(\.title) == ["Fretboard notes", "Scales in position", "Triads", "Progressions"])
     }
 

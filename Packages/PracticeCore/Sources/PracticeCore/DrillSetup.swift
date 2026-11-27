@@ -113,6 +113,10 @@ public struct DrillSetup: Hashable, Sendable {
     /// Scales and triads only: the fade levels reached before the run.
     public var fadeLevels = FadeLevels()
 
+    /// Circle drills only: the best circle so far of this drill, in this tuning and capo (`CircleResult.best(of:)`);
+    /// nil before there is one.
+    public var circleBest: CircleResult?
+
     public var seed: UInt64
 
     public init(fretboard: Fretboard, options: DrillOptions = .init(), key: Key? = nil,

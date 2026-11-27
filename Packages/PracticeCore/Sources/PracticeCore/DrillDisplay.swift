@@ -18,6 +18,9 @@ public struct DrillMoment: Hashable, Sendable {
 
     /// The locations that answer the prompt.
     public let correctLocations: [FretboardLocation]
+
+    /// When the prompt's timer started; nil until it has.
+    public var promptStart: Duration? = nil
 }
 
 /// What the target card and the neck show for a prompt, worked out here so it can be tested.
@@ -99,6 +102,9 @@ public struct DrillDisplay: Hashable, Sendable {
 
     /// The time through, in progression drills.
     public var progression: ProgressionProgress?
+
+    /// Where the circle of fifths has got to, in circle drills.
+    public var circle: CircleProgress?
 
     /// Waiting for a typed name: what is typed so far replaces the headline.
     public var acceptsTypedName = false

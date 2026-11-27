@@ -5,15 +5,20 @@ public struct AttemptGroup: Hashable, Sendable {
     /// Tells the run's groups apart.
     public let number: Int
 
-    /// How many attempts the whole group has, and which this is (0 = first); nil in sweeps. With them the log shows
-    /// whether a group is complete.
+    /// How many attempts the whole group has, and which this is (0 = first); nil in All instances' sweeps. With them
+    /// the log shows whether a group is complete.
     public let size: Int?
     public let place: Int?
 
-    public init(number: Int, size: Int? = nil, place: Int? = nil) {
+    /// Which of the run's circles of fifths the group is in (`CircleResult`); nil outside one. The log gives each
+    /// circle an id.
+    public let circle: Int?
+
+    public init(number: Int, size: Int? = nil, place: Int? = nil, circle: Int? = nil) {
         self.number = number
         self.size = size
         self.place = place
+        self.circle = circle
     }
 }
 

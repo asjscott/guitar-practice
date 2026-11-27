@@ -7,6 +7,7 @@ public struct DrillKind: Identifiable, Sendable {
     public static let all: [DrillKind] = [
         .notePlayIt,
         .allInstances,
+        .noteCircle,
         .hearFindIt,
         .fretNameIt,
         .upAndDown,
@@ -45,6 +46,7 @@ public struct DrillKind: Identifiable, Sendable {
         public static let hasPasses = Traits(rawValue: 1 << 5)
         public static let hasClimbs = Traits(rawValue: 1 << 6)
         public static let hasBacking = Traits(rawValue: 1 << 7)
+        public static let goesRoundTheCircle = Traits(rawValue: 1 << 8)
     }
 
     private let traits: Traits
@@ -72,6 +74,9 @@ public struct DrillKind: Identifiable, Sendable {
 
     /// A progression drill: chords played over backing, round and round the progression.
     public var hasBacking: Bool { traits.contains(.hasBacking) }
+
+    /// A circle drill: once round the circle of fifths from the key, against the best (`CircleProgress`).
+    public var goesRoundTheCircle: Bool { traits.contains(.goesRoundTheCircle) }
 
     /// Its prompts are climbs.
     public var hasClimbs: Bool { traits.contains(.hasClimbs) }
