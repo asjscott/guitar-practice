@@ -2,82 +2,120 @@ import PracticeCore
 import SwiftUI
 import TheoryCore
 
-/// After a session: its total time, a card per block that started (narrowing to fit the window), and the slowest prompts.
+/// After a session, layout C (prototype/phase4b-screens): the rail with each step's result, and beside it the headline,
+/// the circles' times against your best, the Scale circle's time per key and the fade levels that moved. A session
+/// ended early shows only the blocks played.
 struct SessionSummaryView: View {
     let summary: SessionSummary
-    let tuning: Tuning
-    /// The theme's, for spelling.
-    let key: Key?
+    /// The rail's steps, as the session left them.
+    let steps: [RailStep]
     let done: () -> Void
 
     var body: some View {
-        VStack(spacing: 24) {
-            Text(clockText(summary.totalTime)).font(.system(size: 84, weight: .bold, design: .rounded)).monospacedDigit()
-            HStack(spacing: summary.blocks.count > 5 ? 8 : 16) {
-                ForEach(Array(summary.blocks.enumerated()), id: \.offset) { _, block in card(block) }
+        HStack(spacing: 0) {
+            SessionRail(title: "Done", steps: summary.endedEarly ? steps.filter { $0.state == .done } : steps)
+            Divider()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    Text(summary.headline).font(.system(size: 34, weight: .bold))
+                    if summary.endedEarly {
+                        played
+                    } else {
+                        circles
+                        scaleCircleKeys
+                        fadeMoves
+                    }
+                    if summary.hasNoAttempts {
+                        Text("No prompts done, so nothing was saved.").foregroundStyle(.secondary)
+                    } else {
+                        AttemptLogNotice()
+                    }
+                }
+                .padding(28)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            if summary.hasNoAttempts {
-                Text("No prompts done, so nothing was saved.").foregroundStyle(.secondary)
-            } else {
-                slowest
-                AttemptLogNotice()
+            .safeAreaInset(edge: .bottom) {
+                HStack {
+                    Spacer()
+                    Button("Done ↩", action: done).controlSize(.large)
+                }
+                .padding(.horizontal, 28)
+                .padding(.vertical, 14)
             }
-            Button("Done ↩", action: done).controlSize(.large)
         }
-        .padding(24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    @ViewBuilder private var slowest: some View {
-        let attempts = summary.slowest(3)
-        if !attempts.isEmpty {
-            VStack {
-                Text("Slowest").font(.headline)
-                ForEach(Array(attempts.enumerated()), id: \.offset) { _, attempt in
-                    Text(attempt.summaryLine(in: tuning, key: key)).foregroundStyle(.secondary)
+    /// Ended early: each block played and how it went.
+    private var played: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(summary.blocks, id: \.step) { block in
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    Text(block.kind.title).font(.title3.weight(.semibold)).frame(width: 190, alignment: .leading)
+                    Text(block.resultText).font(.title3).monospacedDigit()
+                    if let circle = block.circle, circle.isComplete {
+                        Text(circle.comparison(with: block.circleBest))
+                            .foregroundStyle(circle.isBetter(than: block.circleBest) ? .green : .secondary)
+                    }
                 }
             }
         }
     }
 
-    private func promptsText(_ stats: RunStats) -> String {
-        "\(stats.prompts) \(stats.prompts == 1 ? "prompt" : "prompts") · \(stats.skips) skipped"
-    }
-
-    /// The big number, the line under it, and the details under the drill's name.
-    private func lines(of block: SessionSummary.Block) -> (main: String, sub: String?, detail: String) {
-        if let chords = block.chords {
-            // "31 of 40" chords clean; the times through; the two hardest chords.
-            let through = "\(chords.timesThrough) \(chords.timesThrough == 1 ? "time" : "times") through"
-            let hardest = chords.hardest.isEmpty ? nil : "Hardest: " + chords.hardest.map(\.text).joined(separator: ", ")
-            return (chords.chords == 0 ? "–" : "\(chords.clean) of \(chords.chords)", "chords clean",
-                    [through, hardest].compactMap { $0 }.joined(separator: "\n"))
+    @ViewBuilder private var circles: some View {
+        if !summary.circles.isEmpty {
+            Text("Circles against your best").font(.headline)
+            HStack(spacing: 20) {
+                ForEach(summary.circles, id: \.step) { block in
+                    if let circle = block.circle { card(block.kind, circle, best: block.circleBest) }
+                }
+            }
         }
-        if let passes = block.passes { return (passes.cleanText, passes.tempoText, passes.detailText) }
-        return (block.stats.firstTryText, block.speedText, promptsText(block.stats))
     }
 
-    /// So many blocks that the cards are narrower.
-    private var isCrowded: Bool { summary.blocks.count > 8 }
-
-    private func card(_ block: SessionSummary.Block) -> some View {
-        let lines = lines(of: block)
-        return VStack(spacing: 4) {
-            Image(systemName: block.kind.symbol).font(.title2).foregroundStyle(.secondary)
-            Text(lines.main).font(.system(size: isCrowded ? 30 : 40, weight: .bold, design: .rounded))
-            Text(lines.sub ?? " ").font(.title3.monospacedDigit())
-            Text(block.kind.title).font(.callout)
-            Text(lines.detail).font(.caption).foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
+    private func card(_ kind: DrillKind, _ circle: CircleResult, best: CircleResult?) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(kind.title).foregroundStyle(.secondary)
+            Text(circle.time.clockText).font(.system(size: 36, weight: .bold).monospacedDigit())
+            Text("\(circle.wrongNotes) wrong" + (circle.skips > 0 ? " · \(circle.skips) skipped" : ""))
+                .monospacedDigit()
+            Text(circle.comparison(with: best))
+                .foregroundStyle(circle.isBetter(than: best) ? .green : .secondary)
         }
         .lineLimit(1)
-        .minimumScaleFactor(0.6)
-        .padding(.horizontal, 6)
-        // Narrower with many blocks, so that eleven fit a 920-point window.
-        .frame(minWidth: isCrowded ? 64 : 84, maxWidth: 190)
-        .frame(height: 180)
-        .sessionCard()
+        .minimumScaleFactor(0.7)
+        .padding(14)
+        .frame(width: 190, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 10).fill(.secondary.opacity(0.08)))
         .accessibilityElement(children: .combine)
+    }
+
+    @ViewBuilder private var scaleCircleKeys: some View {
+        let keys = summary.scaleCircleKeys
+        if !keys.isEmpty {
+            Text("Scale circle per key").font(.headline)
+            HStack(spacing: 6) {
+                ForEach(Array(keys.enumerated()), id: \.offset) { _, key in
+                    VStack {
+                        Text(key.key.shortName).font(.headline)
+                        Text(key.time.clockText).font(.caption.monospacedDigit())
+                    }
+                    .frame(width: 52)
+                    .accessibilityElement(children: .combine)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private var fadeMoves: some View {
+        Text("Fade levels").font(.headline)
+        if summary.fadeMoves.isEmpty {
+            Text("None moved today.").foregroundStyle(.secondary)
+        } else {
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(summary.fadeMoves, id: \.self) { move in
+                    Text(move.text).foregroundStyle(move.to > move.from ? .primary : .secondary)
+                }
+            }
+        }
     }
 }

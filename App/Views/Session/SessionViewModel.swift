@@ -692,15 +692,14 @@ extension SessionViewModel.Snapshot {
         display = player.display
         passSettings = player.passSettings
         elapsedText = clockText(player.elapsed)
+        let results = Dictionary(player.summary.blocks.map { ($0.step, $0.resultText) }) { first, _ in first }
         steps = player.blocks.indices.map { index in
             let kind = player.blocks[index].kind
             if player.isLeftOut(block: index) { return RailStep(kind: kind, state: .leftOut, detail: "Left out") }
             if index == player.blockIndex, player.stage != .finished {
                 return RailStep(kind: kind, state: .current, detail: Self.place(in: player, details: details))
             }
-            if let spent = player.spent(inBlock: index) {
-                return RailStep(kind: kind, state: .done, detail: Self.result(of: player, block: index, spent: spent))
-            }
+            if let result = results[index] { return RailStep(kind: kind, state: .done, detail: result) }
             return RailStep(kind: kind, state: .toCome, detail: details.indices.contains(index) ? details[index] : "")
         }
     }
@@ -718,12 +717,5 @@ extension SessionViewModel.Snapshot {
         }
         if drill.kind.hasNoPrompts { return "Until you end the session" }
         return clockText(player.spent(inBlock: index) ?? .zero)
-    }
-
-    /// How a block that is over went: a circle's time and wrong notes, or the time spent.
-    @MainActor private static func result(of player: SessionPlayer, block index: Int, spent: Duration) -> String {
-        guard player.blocks[index].kind.goesRoundTheCircle,
-              let circle = CircleResult(attempts: player.attempts(inBlock: index)) else { return clockText(spent) }
-        return "\(clockText(circle.time)) · \(circle.wrongNotes) wrong" + (circle.isComplete ? "" : " · not finished")
     }
 }

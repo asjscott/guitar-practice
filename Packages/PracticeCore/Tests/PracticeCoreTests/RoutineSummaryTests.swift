@@ -231,6 +231,16 @@ struct RoutineSummaryFromSessionTests {
         #expect(player.summary.fadeMoves.map(\.text) == ["E shape, major: 1 → 2", "Root position on D-G-B, major: 0 → 1"])
     }
 
+    @Test func triadVoicingsMoveToo() {
+        var player = routine()
+        player.play(step: 5)
+        player.playRight(6)
+        // Through the steps after it.
+        while player.stage != .finished { player.handle(.next(at: s(1000))) }
+        #expect(player.summary.fadeMoves.map(\.text)
+                == ["Root position on D-G-B, major: 0 → 1", "2nd inversion on D-G-B, major: 0 → 1"])
+    }
+
     @Test func promptsRightFirstTimeAndTheirMedianTime() {
         var player = SessionPlayer(blocks: [SessionBlock(kind: kind("a"), length: s(180))],
                                    setup: DrillSetup(fretboard: Fretboard(tuning: .standard), seed: 1))
