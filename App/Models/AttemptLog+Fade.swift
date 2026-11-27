@@ -62,15 +62,16 @@ extension FadeLevels.Note {
 }
 
 extension FadeLevels.VoicingNote {
-    /// Nil unless the attempt was in a triad and saved its stage, or if what is saved is unusable.
+    /// Nil unless the attempt was in a triad and saved its level, or before levels its stage, or if what is saved is
+    /// unusable.
     fileprivate init?(_ attempt: LoggedAttempt) {
         guard let quality = attempt.chordQuality.flatMap(Triad.Quality.init), let set = attempt.stringSet.flatMap(StringSet.init),
-              let inversion = attempt.inversion.flatMap(Triad.Inversion.init),
-              let stage = attempt.fadeStageRaw.flatMap(FadeStage.init), let place = attempt.groupPlace,
+              let inversion = attempt.inversion.flatMap(Triad.Inversion.init), let place = attempt.groupPlace,
               let outcome = attempt.outcome, !attempt.tuning.isEmpty else { return nil }
         let shape = FadeLevels.VoicingShape(tuning: Tuning(attempt.tuning.map { Pitch($0) }), quality: quality,
                                             inversion: inversion, stringSet: set)
-        self.init(shape: shape, stage: stage, hinted: attempt.hinted ?? false, groupPlace: place, outcome: outcome,
-                  firstRight: attempt.firstRight)
+        self.init(shape: shape, level: attempt.fadeLevel.map(FadeLevel.init),
+                  stage: attempt.fadeStageRaw.flatMap(FadeStage.init), hinted: attempt.hinted ?? false, groupPlace: place,
+                  outcome: outcome, firstRight: attempt.firstRight)
     }
 }

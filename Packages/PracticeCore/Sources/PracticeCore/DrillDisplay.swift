@@ -18,6 +18,12 @@ public struct DrillMoment: Hashable, Sendable {
 
     /// The locations that answer the prompt.
     public let correctLocations: [FretboardLocation]
+
+    /// On the drill's clock.
+    public var now: Duration = .zero
+
+    /// When the prompt's timer started.
+    public var promptStart: Duration = .zero
 }
 
 /// What the target card and the neck show for a prompt, worked out here so it can be tested.

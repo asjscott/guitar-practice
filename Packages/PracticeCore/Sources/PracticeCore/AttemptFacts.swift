@@ -69,7 +69,7 @@ public struct TriadFacts: Hashable, Sendable {
     public var stringSet: StringSet
 
     /// What the voicing was played at; nil where it isn't being played.
-    public var fadeStage: FadeStage?
+    public var fadeLevel: FadeLevel?
 
     /// Whether a hint had been used in the voicing by the time this note was dealt with.
     public var hinted = false
@@ -106,8 +106,8 @@ public struct ChordFacts: Hashable, Sendable {
     public var style: BackingStyle
     /// BPM.
     public var tempo: Int
-    /// What the time through was played at.
-    public var fadeStage: FadeStage
+    /// What the chord's voicing was played at.
+    public var fadeLevel: FadeLevel
     /// Whether H was held during the chord.
     public var hinted: Bool
     public var outcome: ChordOutcome
@@ -122,7 +122,7 @@ public struct ChordFacts: Hashable, Sendable {
 
     public init(progression: Progression, key: Key, place: Int, triad: Triad, position: Position.ID,
                 played: TriadVoicing?, accepted: [TriadVoicing], style: BackingStyle, tempo: Int,
-                fadeStage: FadeStage, hinted: Bool, outcome: ChordOutcome, firstOnset: Duration?,
+                fadeLevel: FadeLevel, hinted: Bool, outcome: ChordOutcome, firstOnset: Duration?,
                 inputDelay: Duration) {
         self.progression = progression
         self.key = key
@@ -133,7 +133,7 @@ public struct ChordFacts: Hashable, Sendable {
         self.accepted = accepted
         self.style = style
         self.tempo = tempo
-        self.fadeStage = fadeStage
+        self.fadeLevel = fadeLevel
         self.hinted = hinted
         self.outcome = outcome
         self.firstOnset = firstOnset
@@ -148,9 +148,8 @@ extension Attempt {
     }
 }
 
-/// How much of a triad's voicing is shown while it is played, and in the progression drills a time through's. Passes
-/// were played at one before fade levels, and the log keeps it, read as a level (`FadeLevel.init(_:)`). The raw values
-/// are saved in the attempt log: never change them.
+/// How much of a position or a triad's voicing was shown while it was played, before fade levels. The log keeps it,
+/// read as a level (`FadeLevel.init(_:)`). The raw values are saved in the attempt log: never change them.
 public enum FadeStage: String, Hashable, Sendable, CaseIterable {
     case shown, faded, hidden
 }

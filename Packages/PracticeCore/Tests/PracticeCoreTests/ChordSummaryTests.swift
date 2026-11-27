@@ -37,20 +37,18 @@ struct ChordSummaryTests {
         return drill.attempts
     }
 
-    @Test func cleanChordsTimesThroughWhenHiddenAndTheHardest() {
+    @Test func cleanChordsTimesThroughAndTheHardest() {
         let summary = ChordSummary(attempts: run(timesThrough: 6))
         #expect(summary.chords == 24)
         #expect(summary.clean == 23)
         #expect(summary.timesThrough == 6)
-        #expect(summary.firstHidden == 5)
         // Only chords that weren't always clean, fewest clean first, at most two.
         #expect(summary.hardest.map(\.text) == ["D (5 of 6)"])
-        #expect(summary.text == "23 of 24 chords clean · 6 times through · Hidden from the 5th")
+        #expect(summary.text == "23 of 24 chords clean · 6 times through")
     }
 
-    @Test func nothingHiddenYet() {
+    @Test func oneTimeThrough() {
         let summary = ChordSummary(attempts: run(timesThrough: 1))
-        #expect(summary.firstHidden == nil)
         #expect(summary.hardest.isEmpty)
         #expect(summary.text == "4 of 4 chords clean · 1 time through")
     }

@@ -176,8 +176,9 @@ final class DrillViewModel: MetronomePanelOwner {
     /// Those reached by now in what the drill goes through, a session's included.
     private func loggedFadeLevels() -> FadeLevels? {
         guard kind.fades else { return nil }
-        return kind.hasPasses ? log?.fadeLevels(in: setup.passPositions.map(\.id), on: [])
-            : log?.fadeLevels(in: [], on: options.stringSets)
+        if kind.hasPasses { return log?.fadeLevels(in: setup.passPositions.map(\.id), on: []) }
+        // A progression's voicings can be on any string set.
+        return log?.fadeLevels(in: [], on: kind.hasBacking ? Set(setup.fretboard.stringSets) : options.stringSets)
     }
 
     /// The metronome panel. The view keeps the run's buttons and keys from acting while it is open.
@@ -453,6 +454,13 @@ final class DrillViewModel: MetronomePanelOwner {
             let onset = index == 0 ? start : start + .seconds(1)
             send(.played(fretboard.pitch(at: location), onset: onset, at: onset))
         }
+    }
+
+    /// Moves the drill's clock to `seconds` after the current prompt's timer started, and leaves it there.
+    func waitForSnapshot(_ seconds: Double) {
+        ticker.stop()
+        guard let start = drill.promptStart else { return }
+        send(.tick(at: start + .seconds(seconds)))
     }
 
     /// Lets the current prompt's time run out now.

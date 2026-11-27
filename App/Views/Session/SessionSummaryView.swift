@@ -47,9 +47,8 @@ struct SessionSummaryView: View {
     /// The big number, the line under it, and the details under the drill's name.
     private func lines(of block: SessionSummary.Block) -> (main: String, sub: String?, detail: String) {
         if let chords = block.chords {
-            // "31 of 40" chords clean; the times through and when it went Hidden; the two hardest chords.
-            var through = "\(chords.timesThrough) \(chords.timesThrough == 1 ? "time" : "times") through"
-            if let firstHidden = chords.firstHidden { through += " · Hidden from the \(firstHidden.ordinal)" }
+            // "31 of 40" chords clean; the times through; the two hardest chords.
+            let through = "\(chords.timesThrough) \(chords.timesThrough == 1 ? "time" : "times") through"
             let hardest = chords.hardest.isEmpty ? nil : "Hardest: " + chords.hardest.map(\.text).joined(separator: ", ")
             return (chords.chords == 0 ? "–" : "\(chords.clean) of \(chords.chords)", "chords clean",
                     [through, hardest].compactMap { $0 }.joined(separator: "\n"))

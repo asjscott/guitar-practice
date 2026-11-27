@@ -10,12 +10,13 @@ private struct Run {
     let progression = Progression.named("I–V–vi–IV")!
     let key = Key.major(.g)
 
-    init(inputDelay: Duration = .zero, tuning: Tuning = .standard) {
+    init(inputDelay: Duration = .zero, tuning: Tuning = .standard, override: FadeLevel? = nil) {
         var options = DrillOptions()
         options.key = .major(.g)
         options.progression = Progression.named("I–V–vi–IV")
         options.position = Position.ID(system: .caged, number: CAGEDShape.e.number)
         options.backing = BackingSettings(tempo: 60)
+        options.triadFade = override
         var setup = DrillSetup(fretboard: Fretboard(tuning: tuning), options: options, seed: 1)
         setup.inputDelay = inputDelay
         drill = DrillKind.nearestVoicing.makeDrill(setup)
@@ -230,38 +231,13 @@ struct NearestVoicingRunTests {
         }
     }
 
-    @Test func shownForTwoTimesThroughFadedForTwoThenHidden() {
-        var run = Run()
-        run.start()
-        var previous: TriadVoicing?
-        for index in 0..<5 { playTimeThrough(&run, from: 4 + Double(index) * 16, after: &previous) }
-        run.tick(84.3)
-        let stages = run.chordFacts.map(\.fadeStage)
-        #expect(stages.count == 20)
-        #expect(stages == Array(repeating: .shown, count: 8) + Array(repeating: .faded, count: 8)
-                + Array(repeating: .hidden, count: 4))
-        #expect(run.chordFacts.allSatisfy { $0.outcome == .clean })
-    }
-
-    @Test func aHiddenTimeThroughThatIsntCleanBringsBackOneFaded() {
-        var run = Run()
-        run.start()
-        var previous: TriadVoicing?
-        for index in 0..<7 {
-            playTimeThrough(&run, from: 4 + Double(index) * 16, after: &previous, wrong: index == 4 ? [2] : [])
-        }
-        run.tick(116.3)
-        let byTimeThrough = stride(from: 0, to: 28, by: 4).map { run.chordFacts[$0].fadeStage }
-        #expect(byTimeThrough == [.shown, .shown, .faded, .faded, .hidden, .faded, .hidden])
-    }
-
     @Test func holdingHShowsTheVoicingAndTheChordIsntClean() throws {
-        var run = Run()
+        var run = Run(override: .last)
         run.start()
         var previous: TriadVoicing?
         for index in 0..<4 { playTimeThrough(&run, from: 4 + Double(index) * 16, after: &previous) }
         run.tick(68.3)
-        #expect(run.drill.display?.markers.isEmpty == true)
+        #expect(run.drill.display?.markers.map(\.isAnswer) == [true])
         run.drill.handle(.hint(isShown: true, at: s(69)))
         #expect(run.drill.display?.markers.count == 3)
         run.drill.handle(.hint(isShown: false, at: s(69.5)))
@@ -355,7 +331,7 @@ struct NearestVoicingDisplayTests {
         #expect(progress.current == nil)
         #expect(progress.blocks.map(\.name) == ["G", "D", "Em", "C"])
         #expect(progress.blocks.map(\.numeral) == ["I", "V", "vi", "IV"])
-        #expect(progress.timeThroughText == "1st time through · Shown")
+        #expect(progress.timeThroughText == "1st time through · Level 0")
         let solid = display.markers.filter { !$0.isFaint }
         #expect(solid.map(\.location.fret) == [5, 4, 3])
         #expect(solid.map(\.label) == ["G", "B", "D"])

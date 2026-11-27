@@ -26,7 +26,8 @@ public struct ProgressionProgress: Hashable, Sendable {
     /// The run's time through, from 1.
     public var timeThrough: Int
 
-    public var fadeStage: FadeStage
+    /// What the chord on the neck is played at.
+    public var fadeLevel: FadeLevel
 
     /// The count-in's beat, 1–4, while it counts in.
     public var countIn: Int?
@@ -47,20 +48,9 @@ public struct ProgressionProgress: Hashable, Sendable {
     /// In Target top note, the line's note for each chord, at every fade stage; else nil.
     public var topNotes: [TopNote]?
 
-    /// "3rd time through · Faded".
+    /// "3rd time through · Level 2".
     public var timeThroughText: String {
-        "\(timeThrough.ordinal) time through · \(fadeStage.title)"
-    }
-}
-
-extension FadeStage {
-    /// "Shown".
-    public var title: String {
-        switch self {
-        case .shown: "Shown"
-        case .faded: "Faded"
-        case .hidden: "Hidden"
-        }
+        "\(timeThrough.ordinal) time through · \(fadeLevel)"
     }
 }
 
