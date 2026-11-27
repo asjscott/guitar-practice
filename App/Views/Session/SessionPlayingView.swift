@@ -2,35 +2,29 @@ import PracticeCore
 import SwiftUI
 import TheoryCore
 
-/// A session that is going: the drills bar stays on top through Ready cards, drills and pauses, so nothing
-/// jumps. In scale, triad and progression blocks it is at the bottom, so that the neck gets the top.
+/// A session that is going, layout C: the rail down the left through Ready cards, drills and pauses, so nothing jumps;
+/// the drill beside it.
 struct SessionPlayingView: View {
     @Bindable var model: SessionViewModel
 
-    private var kind: DrillKind { model.snapshot.blocks[model.snapshot.blockIndex].kind }
-
-    private var isBarOnTop: Bool { kind.module == .notes }
+    private var step: RailStep { model.snapshot.steps[model.snapshot.blockIndex] }
+    private var kind: DrillKind { step.kind }
 
     var body: some View {
-        VStack(spacing: 0) {
-            VStack(spacing: 0) {
-                if isBarOnTop {
-                    drillsBar
-                    Divider()
-                }
-                content
-                if !isBarOnTop {
-                    Divider()
-                    drillsBar
-                }
-            }
-            .disabled(model.isPanelOpen)
-            .metronomePanel(isOpen: $model.isPanelOpen, isAvailable: kind.hasPasses, settings: passSettings,
-                            alignment: .bottomTrailing)
+        HStack(spacing: 0) {
+            SessionRail(title: "Session · \(model.snapshot.elapsedText)", steps: model.snapshot.steps)
             Divider()
-            ViewThatFits(in: .horizontal) {
-                statusBar(theme: model.theme?.text)
-                statusBar(theme: nil)       // in a narrow window
+            VStack(spacing: 0) {
+                VStack(spacing: 0) { content }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .disabled(model.isPanelOpen)
+                    .metronomePanel(isOpen: $model.isPanelOpen, isAvailable: kind.hasPasses, settings: passSettings,
+                                    alignment: .bottomTrailing)
+                Divider()
+                ViewThatFits(in: .horizontal) {
+                    statusBar(theme: model.theme?.text)
+                    statusBar(theme: nil)       // in a narrow window
+                }
             }
         }
         .overlay { SessionFlash(chime: model.flash) }
@@ -58,15 +52,11 @@ struct SessionPlayingView: View {
         .sessionStatusBar()
     }
 
-    private var drillsBar: some View {
-        SessionDrillsBar(blocks: model.snapshot.blocks, current: model.snapshot.blockIndex, finish: model.snapshot.finish)
-    }
-
     @ViewBuilder private var content: some View {
         let snapshot = model.snapshot
         if snapshot.stage == .ready {
             Spacer(minLength: 8)
-            SessionReadyCard(kind: kind, length: snapshot.blocks[snapshot.blockIndex].timeText, seconds: snapshot.readySeconds,
+            SessionReadyCard(kind: kind, detail: step.detail, seconds: snapshot.readySeconds,
                              notices: kind.hasBacking ? model.backingNotices : [])
             Spacer(minLength: 8)
         } else if snapshot.stage == .paused {
@@ -79,7 +69,16 @@ struct SessionPlayingView: View {
     }
 
     @ViewBuilder private func drill(_ display: DrillDisplay?) -> some View {
+        let now = Duration.seconds(model.now)
         switch kind.module {
+        case .notes where kind.goesRoundTheCircle:
+            NoteCirclePrompt(display: display, fretboard: model.fretboard, now: now) {}
+                .padding(.top, 8)
+        case .scales where kind.goesRoundTheCircle:
+            ScaleCirclePrompt(display: display, position: model.theme?.theme.position(on: model.fretboard),
+                              restingMarkers: [], fretboard: model.fretboard, now: now) {}
+        case .triads where kind.goesRoundTheCircle:
+            TriadCirclePrompt(display: display, frets: model.frets, fretboard: model.fretboard, now: now) {}
         case .notes:
             DrillNeck(display: display, fretboard: model.fretboard, height: 190)
                 .padding(.horizontal, 24)
@@ -105,8 +104,8 @@ struct SessionPlayingView: View {
     @ViewBuilder private func keys(of stage: SessionStage) -> some View {
         if stage != .paused { SessionKey(key: "Space", action: spaceAction) }
         if stage == .playing {
-            SessionKey(key: "S", action: "skip")
-            SessionKey(key: "+", action: "2 min")
+            if !kind.hasNoPrompts { SessionKey(key: "S", action: "skip") }
+            if model.hasPlannedLength { SessionKey(key: "+", action: "2 min") }
             if kind.fades { SessionKey(key: "H", action: "show") }
             if let repeatTitle = kind.repeatTitle { SessionKey(key: "R", action: repeatTitle.lowercased()) }
         }
@@ -127,7 +126,8 @@ struct SessionPlayingView: View {
 
     private var spaceAction: String {
         if model.stage == .ready { return "start" }
-        return model.snapshot.blockIndex + 1 < model.snapshot.blocks.count ? "next block" : "finish"
+        let isLast = !model.snapshot.steps.indices.contains { $0 > model.snapshot.blockIndex && model.snapshot.steps[$0].state == .toCome }
+        return isLast ? "finish" : "next step"
     }
 }
 
@@ -168,55 +168,10 @@ private struct SessionKey: View {
     }
 }
 
-/// One column per block: its drill, its time left (or over, or spent) and how far through it is. Then when
-/// the session will end.
-private struct SessionDrillsBar: View {
-    let blocks: [SessionViewModel.BlockProgress]
-    let current: Int
-    let finish: SessionViewModel.Finish
-
-    var body: some View {
-        HStack(spacing: 12) {
-            ForEach(Array(blocks.enumerated()), id: \.offset) { index, block in
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Label(block.kind.title, systemImage: block.kind.symbol).lineLimit(1)
-                        Spacer(minLength: 4)
-                        Text(block.timeText).monospacedDigit()
-                            .foregroundStyle(block.isOvertime ? .orange : .primary)
-                    }
-                    .font(.caption.weight(index == current ? .semibold : .regular))
-                    GeometryReader { geo in
-                        Capsule().fill(.secondary.opacity(0.2))
-                            .overlay(alignment: .leading) {
-                                Capsule().fill(block.isOvertime ? Color.orange : .accentColor).frame(width: geo.size.width * block.fraction)
-                            }
-                    }
-                    .frame(height: 6)
-                }
-                .opacity(index == current ? 1 : 0.6)
-                .accessibilityElement(children: .combine)
-                .accessibilityAddTraits(index == current ? .isSelected : [])
-            }
-            finishText.font(.caption).foregroundStyle(.secondary).monospacedDigit().padding(.leading, 8)
-        }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 10)
-    }
-
-    /// Later and later while paused.
-    @ViewBuilder private var finishText: some View {
-        if let afterResuming = finish.afterResuming {
-            TimelineView(.periodic(from: .now, by: 1)) { Text(sessionFinishText(afterResuming, after: $0.date)) }
-        } else {
-            Text(finish.timeText)
-        }
-    }
-}
-
 private struct SessionReadyCard: View {
     let kind: DrillKind
-    let length: String
+    /// What the step does today.
+    let detail: String
     let seconds: Int
     /// How the backing will be heard, in a progression block.
     var notices: [String] = []
@@ -227,7 +182,8 @@ private struct SessionReadyCard: View {
             Text(kind.title).font(.system(size: 56, weight: .bold, design: .rounded))
             Text(kind.instructions).font(.title2).foregroundStyle(.secondary)
             Text("\(seconds)").font(.system(size: 72, weight: .heavy, design: .rounded)).monospacedDigit()
-            Text("\(length) · Space to start now").foregroundStyle(.secondary)
+            Text(detail).font(.title3)
+            Text("Space to start now").foregroundStyle(.secondary)
             ForEach(notices, id: \.self) { Label($0, systemImage: "exclamationmark.triangle").foregroundStyle(.orange) }
         }
         .multilineTextAlignment(.center)
