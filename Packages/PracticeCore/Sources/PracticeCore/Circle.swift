@@ -86,6 +86,8 @@ public struct CircleProgress: Hashable, Sendable {
     public let result: CircleResult?
     /// The best before this run.
     public let best: CircleResult?
+    /// What the next key is played in, where it says more than the key: "G shape · down". Nil at the last key.
+    public var nextDetail: String?
 
     public init(keys: [Key], place: Int, wrongNotes: Int, skips: Int, elapsed: Duration, runningSince: Duration?,
                 result: CircleResult?, best: CircleResult?) {

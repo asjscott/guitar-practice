@@ -119,8 +119,9 @@ extension LoggedAttempt {
         startDegree = facts.startDegree.number
         startDegreeAlteration = facts.startDegree.alteration
         tempo = facts.tempo
-        beatsPerBar = facts.signature.beats
-        beatUnit = facts.signature.unit
+        beatsPerBar = facts.signature?.beats
+        beatUnit = facts.signature?.unit
+        passDirection = facts.direction?.rawValue
         fadeLevel = facts.fadeLevel.number
         hinted = facts.hinted
         clickOffsetSeconds = facts.clickOffset.map { $0 / .seconds(1) }

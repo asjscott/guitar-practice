@@ -35,10 +35,13 @@ public struct PassFacts: Hashable, Sendable {
     public var position: Position.ID
     public var startDegree: Scale.Degree
 
-    /// BPM, counting clicks.
-    public var tempo: Int
+    /// BPM, counting clicks; nil in a pass without clicks (Scale circle).
+    public var tempo: Int?
 
-    public var signature: TimeSignature
+    public var signature: TimeSignature?
+
+    /// Which way a one-way pass went; nil where a pass goes up and down.
+    public var direction: PassDirection?
 
     /// What the pass was played at.
     public var fadeLevel: FadeLevel
@@ -53,13 +56,15 @@ public struct PassFacts: Hashable, Sendable {
     /// What was taken off the onsets.
     public var inputDelay: Duration
 
-    public init(scale: Scale, position: Position.ID, startDegree: Scale.Degree, tempo: Int, signature: TimeSignature,
-                fadeLevel: FadeLevel, hinted: Bool, clickOffset: Duration?, inputDelay: Duration = .zero) {
+    public init(scale: Scale, position: Position.ID, startDegree: Scale.Degree, tempo: Int?, signature: TimeSignature?,
+                direction: PassDirection? = nil, fadeLevel: FadeLevel, hinted: Bool, clickOffset: Duration?,
+                inputDelay: Duration = .zero) {
         self.scale = scale
         self.position = position
         self.startDegree = startDegree
         self.tempo = tempo
         self.signature = signature
+        self.direction = direction
         self.fadeLevel = fadeLevel
         self.hinted = hinted
         self.clickOffset = clickOffset

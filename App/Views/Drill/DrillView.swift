@@ -80,7 +80,7 @@ struct DrillView: View {
             }
             Divider()
             HStack(spacing: 18) {
-                if model.kind.hasPasses {
+                if model.kind.module == .scales {
                     Text("\(model.completePasses) \(model.completePasses == 1 ? "pass" : "passes")")
                     Text("\(model.cleanPasses) clean")
                 } else if model.kind.hasBacking {
@@ -127,7 +127,19 @@ struct DrillView: View {
         Spacer(minLength: 12)
     }
 
-    private var scales: some View {
+    @ViewBuilder private var scales: some View {
+        if model.kind.goesRoundTheCircle {
+            ScaleCirclePrompt(display: model.snapshot.display, position: model.position,
+                              restingMarkers: model.restingMarkers, fretboard: model.fretboard,
+                              now: .seconds(model.now)) {
+                DrillRestingText(model: model)
+            }
+        } else {
+            passPrompt
+        }
+    }
+
+    private var passPrompt: some View {
         PassPrompt(display: model.snapshot.display, position: model.position, restingMarkers: model.restingMarkers,
                    settings: model.passSettings, fretboard: model.fretboard) {
             DrillRestingText(model: model)

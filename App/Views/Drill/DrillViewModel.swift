@@ -125,6 +125,11 @@ final class DrillViewModel: MetronomePanelOwner {
         let theme = log.theme(on: date, fretboard: fretboard, system: system)
         options.key = theme.key
         options.position = theme.position
+        if kind.module == .scales {
+            // The Scale circle plays the theme's own scale.
+            options.scaleKind = theme.key.scale.kind
+            options.positionSystem = theme.position.system
+        }
         if let themed = theme.progression { progression = themed }
     }
 
@@ -178,6 +183,7 @@ final class DrillViewModel: MetronomePanelOwner {
     private func loggedFadeLevels() -> FadeLevels? {
         guard kind.fades else { return nil }
         if kind.hasPasses { return log?.fadeLevels(in: setup.passPositions.map(\.id), on: []) }
+        if kind == .scaleCircle { return log?.fadeLevels(in: setup.scaleCirclePositions.map(\.id), on: []) }
         // A progression's voicings can be on any string set.
         return log?.fadeLevels(in: [], on: kind.hasBacking ? Set(setup.fretboard.stringSets) : options.stringSets)
     }
@@ -525,7 +531,8 @@ final class DrillViewModel: MetronomePanelOwner {
     var cleanPasses: Int { PassResult.passes(in: snapshot.attempts).filter(\.isClean).count }
 
     /// The chosen position, for scale drills; nil if it isn't on the neck.
-    var position: Position? { setup.position }
+    /// The Scale circle's is where its circle starts, which may be 12 frets up.
+    var position: Position? { kind == .scaleCircle ? setup.scaleCirclePositions.first : setup.position }
 
     /// Before Start, the chosen position. Pausing hides it.
     var restingMarkers: [FretboardDiagram.Marker] {

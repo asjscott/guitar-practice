@@ -26,8 +26,8 @@ public struct TempoLadder: Hashable, Sendable {
 extension PassResult {
     /// Whether it took, from first to last onset, at most a tenth more than its clicks did.
     var keptUp: Bool {
-        guard let gaps, case .pass(let facts) = attempts.first?.facts else { return false }
+        guard let gaps, case .pass(let facts) = attempts.first?.facts, let tempo = facts.tempo else { return false }
         let time = gaps.reduce(.zero, +)
-        return time * 10 * facts.tempo <= .seconds(60) * 11 * gaps.count
+        return time * 10 * tempo <= .seconds(60) * 11 * gaps.count
     }
 }

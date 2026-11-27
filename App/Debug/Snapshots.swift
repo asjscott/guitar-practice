@@ -146,6 +146,7 @@ enum Snapshots {
         }
 
         try await saveNoteCircle()
+        try await saveScaleCircle()
 
         // Typed with real key events, so the key handling is exercised too.
         let naming = DrillViewModel()
@@ -626,6 +627,40 @@ enum Snapshots {
             model.playCircleForSnapshot()
         }
         model.stop()
+    }
+
+    /// Scale circle from E major's C shape, in layout C: idle; a pass mid-fade at level 1 (three notes in, seven seconds
+    /// into a fade of about fifteen); the key change to B, shown whole with its first note ringed; and G major's E shape
+    /// at the nut, played 12 frets up.
+    private static func saveScaleCircle() async throws {
+        func circle(_ key: Key = .major(.e), _ shape: CAGEDShape = .c, level: FadeLevel? = nil) -> DrillViewModel {
+            let model = DrillViewModel()
+            model.kind = .scaleCircle
+            model.options.key = key
+            model.options.scaleKind = key.scale.kind
+            model.options.position = Position.ID(system: .caged, number: shape.number)
+            model.options.pass.fadeLevel = level
+            model.keepOptionsForSnapshot()
+            return model
+        }
+        try await save("scale-circle-idle", DrillView(model: circle()))
+        let fading = circle(level: FadeLevel(1))
+        try await save("scale-circle-fading", DrillView(model: fading)) {
+            fading.start(seed: 1)
+            fading.playCircleForSnapshot(3)
+            fading.waitForSnapshot(4)
+        }
+        fading.stop()
+        let change = circle()
+        try await save("scale-circle-key-change", DrillView(model: change)) {
+            change.start(seed: 1)
+            let first = change.position.map { change.fretboard.passOrder(of: $0, going: .up).count } ?? 0
+            change.playCircleForSnapshot(first)
+        }
+        change.stop()
+        let nut = circle(.major(.g), .e)
+        try await save("scale-circle-nut", DrillView(model: nut)) { nut.start(seed: 1) }
+        nut.stop()
     }
 
     private static func saveNecks() async throws {

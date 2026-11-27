@@ -1,7 +1,7 @@
 import Foundation
 
 extension Fretboard {
-    /// The Scale circle's positions (GLOSSARY.md): the theme's scale in the theme's position, then the same scale in
+    /// The Scale circle's positions (spec #64): the theme's scale in the theme's position, then the same scale in
     /// each next key round the circle of fifths, each in the position of the same system nearest where the last pass
     /// ended. Passes take turns going up and down, the first going `direction`. Twelve, unless a key has no root in
     /// range that a position holds, where it stops (the probe in #64 found none in any app key, position or tuning).
