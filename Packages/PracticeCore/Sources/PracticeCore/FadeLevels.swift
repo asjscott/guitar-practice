@@ -10,6 +10,9 @@ public struct FadeLadder<Subject: Hashable & Sendable>: Hashable, Sendable {
 
     public func level(of subject: Subject) -> FadeLevel { levels[subject] ?? .first }
 
+    /// Every subject counted so far; any other is at the first level.
+    var subjects: Dictionary<Subject, FadeLevel>.Keys { levels.keys }
+
     /// Counts a complete prompt. `steps` are the levels it moves between: all of them, unless it was logged at a fade
     /// stage (`FadeLevel.stageSteps`).
     public mutating func count(_ subject: Subject, playedAt played: FadeLevel, isClean: Bool,
@@ -65,8 +68,8 @@ public struct FadeLevels: Hashable, Sendable {
         }
     }
 
-    private var passes = FadeLadder<Subject>()
-    private var voicings = FadeLadder<VoicingShape>()
+    private(set) var passes = FadeLadder<Subject>()
+    private(set) var voicings = FadeLadder<VoicingShape>()
 
     public init() {}
 

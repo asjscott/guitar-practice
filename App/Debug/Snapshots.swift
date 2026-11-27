@@ -1088,21 +1088,64 @@ enum Snapshots {
             focusSidebar()
             type("\r s\u{1b}\r")
         }
-        try await save("session-summary", SessionView(model: session)) {
+        /// Plays the block that is playing to its end, each note `seconds` after the last: the circles and Chords in
+        /// position until they end by themselves. In the Triad circle, a wrong note first before
+        /// each note after the first `triadRightFor`, so that its last voicings drop a level.
+        func playBlock(noteEvery seconds: Double, triadRightFor: Int = .max) {
+            let block = session.snapshot.blockIndex
+            func isPlaying() -> Bool { session.stage == .playing && session.snapshot.blockIndex == block }
+            switch session.blockKind {
+            case let kind? where kind.hasBacking:
+                // Two times through clean, then one with a wrong chord.
+                session.playProgressionForSnapshot(chords: 12, wrong: [9], untilBeat: 4 + 48 + 0.5)
+            case let kind? where kind.goesRoundTheCircle || kind == .chordsInPosition:
+                for note in 1...600 where isPlaying() {
+                    session.passTimeForSnapshot(seconds)
+                    if kind == .triadCircle, note > triadRightFor {
+                        session.answerForSnapshot(right: false)
+                    }
+                    session.answerForSnapshot(right: true)
+                }
+            case .upAndDown?:
+                playNotes()
+            default:
+                // Six prompts, the second after a wrong note.
+                for index in 0..<6 {
+                    session.passTimeForSnapshot(1.5)
+                    if index == 1 { session.answerForSnapshot(right: false) }
+                    session.answerForSnapshot(right: true)
+                    session.passTimeForSnapshot(1)
+                }
+            }
+            if isPlaying() { session.next() }
+        }
+        /// A whole routine session, from its first Ready card.
+        func playSession(noteEvery seconds: Double, triadRightFor: Int = .max) {
             ready(.noteCircle)
             while session.isActive {
                 session.passTimeForSnapshot(2)
                 session.next()
-                if session.blockKind?.hasBacking == true {
-                    // Two times through clean, then one with a wrong chord.
-                    session.playProgressionForSnapshot(chords: 12, wrong: [9], untilBeat: 4 + 48 + 0.5)
-                } else {
-                    session.skip()
-                    session.answerForSnapshot(right: false)
-                    playPrompt()
-                }
-                session.next()
+                playBlock(noteEvery: seconds, triadRightFor: triadRightFor)
             }
+        }
+        // The second of the day, against the first's bests, with the fade levels it moved.
+        try await save("session-summary", SessionView(model: session), settle: .milliseconds(600)) {
+            playSession(noteEvery: 1)
+            playSession(noteEvery: 0.8, triadRightFor: 140)
+        } check: {
+            precondition(session.summary?.endedEarly == false && session.summary?.circles.count == 3)
+        }
+        try await save("session-summary-ended-early", SessionView(model: session)) {
+            ready(.noteCircle)
+            session.passTimeForSnapshot(2)
+            session.next()
+            playBlock(noteEvery: 1)
+            session.passTimeForSnapshot(2)
+            session.next()
+            for _ in 0..<3 { session.answerForSnapshot(right: true) }
+            session.end()
+        } check: {
+            precondition(session.summary?.endedEarly == true)
         }
         try await save("session-summary-nothing-done", SessionView(model: session)) {
             play(.notePlayIt)

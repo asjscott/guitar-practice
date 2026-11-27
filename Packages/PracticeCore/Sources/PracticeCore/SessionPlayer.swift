@@ -174,11 +174,16 @@ public struct SessionPlayer: Sendable {
 
     /// What has been done so far.
     public var summary: SessionSummary {
-        SessionSummary(totalTime: elapsed, blocks: zip(blocks, progress).compactMap { block, progress in
-            progress.spent.map {
-                SessionSummary.Block(kind: block.kind, time: $0, stats: RunStats(attempts: progress.attempts))
-            }
-        })
+        SessionSummary(
+            totalTime: elapsed,
+            blocks: blocks.indices.compactMap { index in
+                progress[index].spent.map {
+                    SessionSummary.Block(kind: blocks[index].kind, step: index, time: $0,
+                                         stats: RunStats(attempts: progress[index].attempts),
+                                         circleBest: blocks[index].setup?.circleBest)
+                }
+            },
+            steps: blocks.count, endedEarly: endedEarly, fadeMoves: fadeLevels.moves(since: setup.fadeLevels))
     }
 
     /// The sounds the drill asked for since the last call: call it after every event, as for a drill.

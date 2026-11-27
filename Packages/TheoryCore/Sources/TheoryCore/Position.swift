@@ -28,6 +28,17 @@ public struct Position: Hashable, Sendable, Identifiable {
             self.number = number
             self.octave = octave
         }
+
+        /// "A shape", or where CAGED names don't apply (tunings without standard intervals) "Position 4"; "Pattern 3".
+        public func name(in tuning: Tuning) -> String {
+            switch system {
+            case .caged:
+                guard tuning.hasStandardIntervals, let shape = CAGEDShape(number: number) else { return "Position \(number)" }
+                return "\(shape.letter) shape"
+            case .threeNotesPerString:
+                return "Pattern \(number)"
+            }
+        }
     }
 
     public let id: ID
