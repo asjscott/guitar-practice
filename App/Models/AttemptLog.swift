@@ -98,6 +98,7 @@ final class RunLog {
     private let blockIndex: Int?
     private var count = 0
     private var groupIDs: [Int: UUID] = [:]
+    private var circleIDs: [Int: UUID] = [:]
 
     fileprivate init(log: AttemptLog, session: PracticeSession?, blockIndex: Int?) {
         self.log = log
@@ -111,7 +112,8 @@ final class RunLog {
         guard !new.isEmpty else { return }
         for attempt in new {
             let record = LoggedAttempt(attempt, in: drill, date: .now, source: session == nil ? .freePractice : .session,
-                                       groupID: (attempt.group?.number).map(groupID), blockIndex: blockIndex)
+                                       groupID: (attempt.group?.number).map(groupID),
+                                       circleID: (attempt.group?.circle).map(circleID), blockIndex: blockIndex)
             log.context.insert(record)
             record.session = session
         }
@@ -123,6 +125,14 @@ final class RunLog {
         if let id = groupIDs[group] { return id }
         let id = UUID()
         groupIDs[group] = id
+        return id
+    }
+
+    /// One per circle of fifths in the run (`AttemptGroup.circle`).
+    private func circleID(_ circle: Int) -> UUID {
+        if let id = circleIDs[circle] { return id }
+        let id = UUID()
+        circleIDs[circle] = id
         return id
     }
 }

@@ -119,7 +119,8 @@ final class DrillViewModel: MetronomePanelOwner {
     /// Not during a run. Picks and saves the day's theme if need be, as the session screen does.
     func startFromDaysTheme(system: Position.System, on date: Date = .now) {
         let day = Calendar.practiceDay(of: date)
-        guard kind.hasBacking, !isRunning, themeDay != day, let log else { return }
+        // Circle drills too: they start from its key.
+        guard kind.hasBacking || kind.goesRoundTheCircle, !isRunning, themeDay != day, let log else { return }
         themeDay = day
         let theme = log.theme(on: date, fretboard: fretboard, system: system)
         options.key = theme.key
@@ -245,18 +246,24 @@ final class DrillViewModel: MetronomePanelOwner {
         return setup
     }
 
-    private func newDrill(seed: UInt64, fadeLevels: FadeLevels = FadeLevels()) -> any Drill {
+    private func newDrill(seed: UInt64, fadeLevels: FadeLevels = FadeLevels(), circleBest: CircleResult? = nil) -> any Drill {
         var setup = setup
         setup.seed = seed
         setup.fadeLevels = fadeLevels
+        setup.circleBest = circleBest
         return kind.makeDrill(setup)
+    }
+
+    /// A circle drill's best so far on this tuning and capo; nil in other drills.
+    private func loggedCircleBest() -> CircleResult? {
+        kind.goesRoundTheCircle ? log?.circleBest(of: kind, on: fretboard) : nil
     }
 
     func start(seed: UInt64 = .random(in: .min ... .max)) {
         loadTempo()
         loadBacking()
         guard !isRunning, inputProblem == nil, nothingToPromptReason == nil, prepareSound() else { return }
-        drill = newDrill(seed: seed, fadeLevels: loggedFadeLevels() ?? FadeLevels())
+        drill = newDrill(seed: seed, fadeLevels: loggedFadeLevels() ?? FadeLevels(), circleBest: loggedCircleBest())
         runLog = log?.run()
         send(.start(at: clockNow()))
         startTicking()
@@ -463,6 +470,20 @@ final class DrillViewModel: MetronomePanelOwner {
         send(.tick(at: start + .seconds(seconds)))
     }
 
+    /// Plays up to `count` prompts right, each `interval` after its timer starts, past any pause between them, until a
+    /// circle drill's circle is over; the drill's clock is left half a second after the last.
+    func playCircleForSnapshot(_ count: Int = .max, every interval: Duration = .seconds(1)) {
+        ticker.stop()
+        var played = 0
+        while played < count, drill.display?.circle?.result == nil, let location = drill.rightLocationForSnapshot,
+              let start = drill.promptStart {
+            let onset = start + interval
+            send(.played(fretboard.pitch(at: location), onset: onset, at: onset))
+            send(.tick(at: onset + .milliseconds(500)))
+            played += 1
+        }
+    }
+
     /// Lets the current prompt's time run out now.
     func timeOutForSnapshot() {
         guard let start = drill.promptStart else { return }
@@ -491,7 +512,13 @@ final class DrillViewModel: MetronomePanelOwner {
     var key: Key? { drill.setup.key }
 
     /// The run's sweeps, in All instances.
-    var sweeps: [SweepResult] { drill.sweeps }
+    var sweeps: [SweepResult] { kind.goesRoundTheCircle ? [] : drill.sweeps }
+
+    /// The run's circle of fifths so far, in circle drills; nil before an attempt.
+    var circle: CircleResult? { kind.goesRoundTheCircle ? CircleResult(attempts: snapshot.attempts) : nil }
+
+    /// The circle's best before the run, in circle drills.
+    var circleBest: CircleResult? { drill.setup.circleBest }
 
     /// The run's passes that were complete, and those that were clean.
     var completePasses: Int { PassResult.passes(in: snapshot.attempts).filter(\.isComplete).count }

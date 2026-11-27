@@ -160,7 +160,7 @@ struct ThemedDrillTests {
         return (Double(names.filter(keyNotes.contains).count) / 1000, Set(names))
     }
 
-    @Test(arguments: DrillKind.all.filter { $0.module == .notes })
+    @Test(arguments: DrillKind.all.filter { $0.module == .notes && !$0.goesRoundTheCircle })
     func spelledInTheKeyWithSeventyPercentKeyNotes(kind: DrillKind) {
         let all = prompts(kind, notes: .all)
         #expect((0.65...0.75).contains(all.keyShare))

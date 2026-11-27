@@ -47,8 +47,9 @@ public enum SessionPlanner {
         return reasons.contains(nil) ? nil : reasons.compactMap { $0 }.first
     }
 
+    /// Circle drills aren't timed blocks: they wait for the daily routine (spec #64).
     private static func canUse(_ kind: DrillKind, hasSound: Bool) -> Bool {
-        hasSound || !kind.needsSound
+        (hasSound || !kind.needsSound) && !kind.goesRoundTheCircle
     }
 
     /// Modules in order, with time by weight; each takes as many of its drills as fit its minimum, at least one, in

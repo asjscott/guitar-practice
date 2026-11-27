@@ -104,6 +104,16 @@ struct DrillView: View {
     }
 
     @ViewBuilder private var notes: some View {
+        if model.kind.goesRoundTheCircle {
+            NoteCirclePrompt(display: model.snapshot.display, fretboard: model.fretboard, now: .seconds(model.now)) {
+                DrillRestingText(model: model)
+            }
+        } else {
+            noteDrill
+        }
+    }
+
+    @ViewBuilder private var noteDrill: some View {
         DrillNeck(display: model.snapshot.display, fretboard: model.fretboard)
             .padding(.horizontal, 24)
             .padding(.top, 20)
@@ -165,7 +175,8 @@ private struct DrillOptionsBar: View {
     var body: some View {
         DrillPicker(kind: $model.kind)
         switch model.kind.module {
-        case .notes: NoteOptions(model: model)
+        // A circle drill's frets and strings are its own, and it starts from the day's key.
+        case .notes: if !model.kind.goesRoundTheCircle { NoteOptions(model: model) }
         // Gone during a run, when the header names them: its buttons need the room.
         case .scales: if !model.isRunning { ScaleOptions(setup: model.setup, options: $model.options) }
         case .triads: if !model.isRunning { TriadOptions(kind: model.kind, options: $model.options) }
@@ -414,6 +425,9 @@ private struct DrillRunSummary: View {
             } else if !model.kind.hasPasses {
                 list("Slowest", stats.slowest(3))
                 if !model.sweeps.isEmpty { lines("Sweeps", model.sweeps.suffix(6).map(\.summaryLine)) }
+                if let circle = model.circle {
+                    lines("Circle of fifths", [circle.summaryText + " · " + circle.comparison(with: model.circleBest)])
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

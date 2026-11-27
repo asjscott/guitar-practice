@@ -145,6 +145,8 @@ enum Snapshots {
             sweep.togglePause()
         }
 
+        try await saveNoteCircle()
+
         // Typed with real key events, so the key handling is exercised too.
         let naming = DrillViewModel()
         naming.kind = .fretNameIt
@@ -595,6 +597,37 @@ enum Snapshots {
     }
 
     /// The neck by itself: zoomed, and at each fade stage.
+    /// Note circle from E, in layout C: idle, part way (a wrong note in the third key) and at its end, each against a
+    /// best set by a slower circle logged first.
+    private static func saveNoteCircle() async throws {
+        func circle() -> (DrillViewModel, AttemptLog) {
+            let model = DrillViewModel()
+            let log = AttemptLog.inMemory()
+            model.kind = .noteCircle
+            model.options.key = .major(.e)
+            model.keepOptionsForSnapshot()
+            model.log = log
+            model.start(seed: 1)
+            model.playCircleForSnapshot(every: .seconds(2))
+            model.stop()
+            return (model, log)
+        }
+        let (idle, idleLog) = circle()
+        try await save("note-circle-idle", DrillView(model: idle), log: idleLog)
+        let (model, log) = circle()
+        try await save("note-circle-playing", DrillView(model: model), log: log) {
+            model.start(seed: 1)
+            model.playCircleForSnapshot(18)
+            model.playForSnapshot(right: false)
+        }
+        model.stop()
+        try await save("note-circle-end", DrillView(model: model), log: log) {
+            model.start(seed: 1)
+            model.playCircleForSnapshot()
+        }
+        model.stop()
+    }
+
     private static func saveNecks() async throws {
         let names = Fretboard(tuning: .standard).stringNames(in: nil).map(\.description)
         func save(_ name: String, _ diagram: FretboardDiagram) async throws {
