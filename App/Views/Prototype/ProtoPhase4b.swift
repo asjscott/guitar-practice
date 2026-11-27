@@ -1,3 +1,6 @@
+// VERDICT (26 Nov 2026): C, session rail. The whole session down the side, the current key huge, the clock and best at the
+// top right. No preview of the next position: the neck changes to the next key, fully shown, first note ringed. Necks
+// showing a long fret range (Note circle 0–12) keep a real guitar's proportions, not stretched to fill the height.
 // PROTOTYPE, throwaway. Three variants of the Phase 4b daily routine screens (spec #64) on one Prototype screen:
 // A circle dial, B progress strip, C session rail. Each covers setup, the three circle drills and the summary.
 // ← → variant · 1–8 scene · F steps the fade through the pass · L fade level. No audio, nothing saved.

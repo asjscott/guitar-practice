@@ -288,7 +288,7 @@ struct P4bVariantC: View {
                 Spacer()
                 P4bClock(m: m)
             }
-            FretboardView(diagram: m.neck())
+            neck
             if m.scene != .noteCircle && m.scene != .triadCircle {
                 HStack(alignment: .top, spacing: 16) {
                     VStack(alignment: .leading) {
@@ -302,7 +302,20 @@ struct P4bVariantC: View {
             } else if m.scene == .triadCircle {
                 Text(m.triadText + " · " + m.fadeText).font(.title3)
             }
+            if m.scene == .noteCircle || m.scene == .triadCircle { Spacer(minLength: 0) }
         }.padding(20)
+    }
+
+    /// The neck at a real guitar's proportions: as many frets as it shows, at the scale views' string spacing, so a
+    /// 12-fret neck is long and narrow rather than stretched to fill the height.
+    @ViewBuilder private var neck: some View {
+        let d = m.neck()
+        if m.scene == .noteCircle || m.scene == .triadCircle {
+            // Matched by eye to the scale views: about 9 frets in a frame of width / height ≈ 1.95, ruler included.
+            FretboardView(diagram: d).aspectRatio(CGFloat(d.frets.count) / 9 * 1.95, contentMode: .fit)
+        } else {
+            FretboardView(diagram: d)
+        }
     }
 
     private var summary: some View {
