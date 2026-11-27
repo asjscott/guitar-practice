@@ -120,34 +120,3 @@ struct CircleEnd: View {
         }
     }
 }
-
-extension CircleResult {
-    /// "9:12 · 1 wrong", plus " · 2 skipped".
-    var summaryText: String {
-        var text = "\(time.clockText) · \(wrongNotes) wrong"
-        if skips > 0 { text += " · \(skips) skipped" }
-        return text
-    }
-
-    /// "New best: −46 s", "First clean circle", "Best 9:58", or why it can't be the best.
-    func comparison(with best: CircleResult?) -> String {
-        if !isComplete { return "Not finished" }
-        if !isClean { return "Not clean: \(skips) skipped" }
-        guard let best else { return "First clean circle" }
-        if isBetter(than: best) {
-            let gain = best.time - time
-            return gain >= .seconds(1) ? "New best: −\(Int((gain / .seconds(1)).rounded())) s" : "New best"
-        }
-        return "Best \(best.time.clockText)"
-    }
-}
-
-extension Duration {
-    /// A stopwatch's reading, whole seconds: "0:42", "9:12", "1:02:05".
-    var clockText: String {
-        let seconds = Int(max(.zero, self) / .seconds(1))
-        let (hours, minutes) = (seconds / 3600, seconds / 60 % 60)
-        let rest = String(format: "%02d", seconds % 60)
-        return hours > 0 ? "\(hours):\(String(format: "%02d", minutes)):\(rest)" : "\(minutes):\(rest)"
-    }
-}

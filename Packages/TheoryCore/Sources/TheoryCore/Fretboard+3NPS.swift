@@ -19,7 +19,7 @@ extension Fretboard {
                 .enumerated().map { octave, locations in
                     Position(id: .init(system: .threeNotesPerString, number: number, octave: octave),
                              scale: scale,
-                             name: "Pattern \(number)",
+                             name: Position.ID(system: .threeNotesPerString, number: number).name(in: tuning),
                              locations: locations)
                 }
         }

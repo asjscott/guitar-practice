@@ -69,6 +69,64 @@ public struct CircleResult: Hashable, Sendable {
     }
 }
 
+extension CircleResult {
+    /// "9:12 · 1 wrong", plus " · 2 skipped".
+    public var summaryText: String {
+        var text = "\(time.clockText) · \(wrongNotes) wrong"
+        if skips > 0 { text += " · \(skips) skipped" }
+        return text
+    }
+
+    /// "New best: −46 s", "First clean circle", "Best 9:58", or why it can't be the best.
+    public func comparison(with best: CircleResult?) -> String {
+        if !isComplete { return "Not finished" }
+        if !isClean { return "Not clean: \(skips) skipped" }
+        guard let best else { return "First clean circle" }
+        if isBetter(than: best) {
+            let gain = best.time - time
+            return gain >= .seconds(1) ? "New best: −\(Int((gain / .seconds(1)).rounded())) s" : "New best"
+        }
+        return "Best \(best.time.clockText)"
+    }
+}
+
+/// One key of a circle: how long its prompts took, added up as for the circle's time.
+public struct CircleKeyTime: Hashable, Sendable {
+    public let key: Key
+    public let time: Duration
+
+    public init(key: Key, time: Duration) {
+        self.key = key
+        self.time = time
+    }
+
+    /// A Scale circle's keys, in the order played, from its attempts: each pass's key and time.
+    public static func times(in attempts: [Attempt]) -> [CircleKeyTime] {
+        var times: [(group: Int, key: Key, time: Duration)] = []
+        for attempt in attempts {
+            guard let group = attempt.group?.number, case .pass(let facts) = attempt.facts else { continue }
+            let time = attempt.responseTime ?? .zero
+            if let index = times.firstIndex(where: { $0.group == group }) {
+                times[index].time += time
+            } else {
+                times.append((group, facts.scale.key, time))
+            }
+        }
+        return times.map { CircleKeyTime(key: $0.key, time: $0.time) }
+    }
+}
+
+extension Duration {
+    /// A stopwatch's reading, whole seconds: "0:42", "9:12", "1:02:05".
+    public var clockText: String {
+        // Whole seconds counted, not divided, which could fall just short.
+        let seconds = Int(max(.zero, self).components.seconds)
+        let (hours, minutes, rest) = (seconds / 3600, seconds / 60 % 60, seconds % 60)
+        func twoDigits(_ number: Int) -> String { number < 10 ? "0\(number)" : "\(number)" }
+        return hours > 0 ? "\(hours):\(twoDigits(minutes)):\(twoDigits(rest))" : "\(minutes):\(twoDigits(rest))"
+    }
+}
+
 /// Where a circle drill has got to, for its header: the key and its place, the clock, the wrong notes and the best.
 public struct CircleProgress: Hashable, Sendable {
     /// The circle's keys, from the first.
