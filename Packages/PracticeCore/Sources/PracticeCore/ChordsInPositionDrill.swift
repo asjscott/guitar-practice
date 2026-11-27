@@ -219,8 +219,9 @@ public struct ChordsInPositionDrill: Drill {
                                  wrongAnswers: wrongSinceNote, location: locations[note]))
             lastNoteOnset = onset
             wrongSinceNote = []
-            phase = .correct(locations[note])
+            phase = .waiting
             if notes.count == pitches.count {
+                phase = .correct(locations[note])
                 score(skipped: false)
                 nextAt = now + DrillTiming.correctPause
             }

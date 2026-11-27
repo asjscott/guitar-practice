@@ -149,9 +149,10 @@ extension LoggedAttempt {
         positionOctave = facts.position.octave
         playedVoicing = facts.played.map(VoicingRecord.init)
         acceptedVoicings = facts.accepted.map(VoicingRecord.init)
-        backingStyle = facts.style.rawValue
+        // Nil without backing (Chords in position).
+        backingStyle = facts.style?.rawValue
         tempo = facts.tempo
-        (beatsPerBar, beatUnit) = (4, 4)
+        (beatsPerBar, beatUnit) = facts.tempo == nil ? (nil, nil) : (4, 4)
         fadeLevel = facts.fadeLevel.number
         hinted = facts.hinted
         chordOutcomeRaw = facts.outcome.rawValue

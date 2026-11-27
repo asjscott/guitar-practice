@@ -140,6 +140,19 @@ struct ChordsInPositionTests {
         #expect(run.drill.display?.feedback == "Not clean")
     }
 
+    @Test func itListensOnAfterEachNoteAndSaysHowLongTheChordTookOnceDone() {
+        var run = ProgressionRun(.chordsInPosition)
+        run.start()
+        let pitches = run.fretboard.pitches(of: run.voicing(0, [4, 3, 3]))
+        run.drill.handle(.played(pitches[0], onset: s(1), at: s(1.05)))
+        #expect(run.drill.display?.result == .waiting)
+        #expect(run.drill.display?.feedback == "Listening…")
+        run.drill.handle(.played(pitches[1], onset: s(1.5), at: s(1.55)))
+        run.drill.handle(.played(pitches[2], onset: s(2), at: s(2.05)))
+        #expect(run.drill.display?.result == .right)
+        #expect(run.drill.display?.feedback == "Clean · 2.00 s")
+    }
+
     @Test func attemptsRecordTheVoicingsLevelAndNoBacking() {
         let g = ProgressionRun(.chordsInPosition).voicing(0, [4, 3, 3])
         var run = ProgressionRun(.chordsInPosition, fadeLevels: reached(g, level: 2))

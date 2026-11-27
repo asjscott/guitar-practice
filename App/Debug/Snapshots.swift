@@ -245,6 +245,7 @@ enum Snapshots {
         }
 
         try await saveProgressions()
+        try await saveChordsInPositionAndFreeTime()
 
         let climb = DrillViewModel()
         climb.kind = .inversions
@@ -547,6 +548,49 @@ enum Snapshots {
             }
             hidden.stop()
         }
+    }
+
+    /// Chords in position and Free time: I–V–vi–IV in G, E shape.
+    private static func saveChordsInPositionAndFreeTime() async throws {
+        func model(_ kind: DrillKind) -> DrillViewModel {
+            let model = DrillViewModel()
+            model.keepOptionsForSnapshot()
+            model.kind = kind
+            model.progressionKey = .major(.g)
+            model.progression = Progression.named("I–V–vi–IV")!
+            model.options.position = Position.ID(system: .caged, number: CAGEDShape.e.number)
+            return model
+        }
+        try await save("chords-in-position-idle", DrillView(model: model(.chordsInPosition)))
+        // Level 1 fades over 9 s: G played, then D's lowest note, and D half gone 4.5 s after it came up.
+        let faded = model(.chordsInPosition)
+        faded.options.triadFade = FadeLevel(1)
+        try await save("chords-in-position-level-1-mid", DrillView(model: faded)) {
+            faded.start(seed: 1)
+            faded.playInTimeForSnapshot(3)
+            faded.waitForSnapshot(2)
+            faded.playInTimeForSnapshot(1)
+            faded.waitForSnapshot(4.5)
+        }
+        faded.stop()
+        let wrong = model(.chordsInPosition)
+        wrong.options.triadFade = .last
+        try await save("chords-in-position-level-6-wrong", DrillView(model: wrong)) {
+            wrong.start(seed: 1)
+            wrong.playInTimeForSnapshot(1)
+            wrong.playForSnapshot(right: false)
+        }
+        wrong.stop()
+        try await save("free-time-idle", DrillView(model: model(.freeTime)))
+        let free = model(.freeTime)
+        try await save("free-time", DrillView(model: free)) {
+            free.start(seed: 1)
+            // D, in the first time through.
+            if let backing = free.backingForSnapshot { free.playForSnapshot([], until: backing.start + .seconds(60) / backing.bpm * 9) }
+        }
+        free.stop()
+        try await save("free-time-no-output", DrillView(model: model(.freeTime)),
+                       sound: AppSoundOutput(isInert: true, problem: "There’s no sound output device."))
     }
 
     private static func saveMetronome() async throws {
