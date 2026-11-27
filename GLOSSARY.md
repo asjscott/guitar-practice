@@ -16,6 +16,10 @@ _Avoid_: Note class, chroma
 A tonic plus a mode (major or minor) that decides how notes are spelled. The app uses twelve major keys (C G D A E B F♯ F B♭ E♭ A♭ D♭) and their relative minors.
 _Avoid_: Scale (a key is not a scale), tonality
 
+**Circle of fifths**:
+The twelve major keys in order, each a fifth above the last: C G D A E B F♯ D♭ A♭ E♭ B♭ F, and back to C. Their relative minors follow it in the same order. A session goes round it from the theme's key, sharpward.
+_Avoid_: Cycle of fifths, circle of fourths (that is the same circle the other way)
+
 **Spelling**:
 The written name of a pitch class, with its accidental, chosen from context: the key's signature for key notes, the scale's degree formula for scale notes (A blues has E♭, not D♯), and sharps when no key applies.
 _Avoid_: Enharmonic choice, note name (when the accidental matters)
@@ -146,9 +150,17 @@ _Avoid_: Accent, downbeat (beat 1 need not be emphasised)
 The rule that raises a scale drill's tempo after clean passes that kept up with the clicks, and lowers it after passes that weren't clean.
 _Avoid_: Speed trainer, auto-tempo
 
-**Fade stage**:
-How much of a position is shown during a pass: Shown (dots and names), Faded (faint dots, no names) or Hidden (only the root marked). It belongs to one scale kind in one position, whatever the key. A triad's voicing has one too: Shown, Faded or Hidden (nothing marked), belonging to its quality, inversion and string set, whatever the root.
-_Avoid_: Memory level, difficulty
+**Fade time**:
+How long a prompt's notes stay on screen: everything is shown when the prompt starts and fades out by the fade time, except the roots, which stay marked. A pass's prompt is the whole pass; a triad's is its voicing.
+_Avoid_: Fade speed, display time
+
+**Expected time**:
+How long a prompt should take: for a pass or chord played to clicks or backing, its length at the tempo; otherwise a set allowance per note or voicing. The first fade time is most of it.
+_Avoid_: Target time, time limit (a prompt can still time out separately)
+
+**Fade level**:
+How far a scale kind in one position, or a triad's quality, inversion and string set, has got towards being played from the roots alone, whatever the key or root. Level 0 never fades; each level after it shortens the fade time; at the last, only the roots are shown from the start. A clean prompt moves it up a level and any other moves it down.
+_Avoid_: Fade stage (the earlier Shown / Faded / Hidden), memory level, difficulty
 
 **Hint**:
 Showing the position during a pass, or the voicing in a triad drill, on request. The pass or voicing is then not clean.
@@ -157,11 +169,11 @@ _Avoid_: Reveal (that follows a timeout)
 ## Sessions
 
 **Session**:
-One planned run of practice: a time budget split into blocks and tied together by a theme.
+One run of the daily routine: the same blocks in the same order every day, tied together by a theme, lasting as long as its blocks take.
 _Avoid_: Workout, lesson, run (a run is one go at a drill in free practice)
 
 **Block**:
-A timed part of a session, spent on one drill. It ends only when the player moves on; time past its planned end is overtime.
+A part of a session spent on one drill. Most end when their drill is done; one with a planned length ends only when the player moves on.
 _Avoid_: Section, stage, segment
 
 **Theme**:
@@ -169,18 +181,19 @@ What a day's sessions are built around: a key, a position, a string set and a pr
 _Avoid_: Seed (the number it is picked with), topic
 
 **Module**:
-A group of drills that train one skill: Fretboard notes, Scales in position, Triads, Progressions. A session shares its time out by module, in that order.
+A group of drills that train one skill: Fretboard notes, Scales in position, Triads, Progressions.
 _Avoid_: Category, area
 
-**Overtime**:
-Time spent in a block after its planned end. It lengthens the session; later blocks keep their length.
-
 **Extend**:
-To move the end of the current block two minutes later.
+To move the end of a block with a planned length two minutes later.
 
 **Free practice**:
 Doing one drill on its own, outside a session, with no block and no theme.
 _Avoid_: Drill mode, solo practice
+
+**Free time**:
+The last block of a session: the theme's backing loops with the theme's position shown, and the player plays what they like. Nothing is recorded, and it ends when the player ends the session.
+_Avoid_: Jam, free practice (that is a drill outside a session)
 
 **Check run**:
 An "In order (check)" run of Note → play it, which tests what the app hears rather than the player. It is never logged.
