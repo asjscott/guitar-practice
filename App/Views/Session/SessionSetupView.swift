@@ -8,38 +8,38 @@ enum SessionProblem: Equatable {
     case nothingToPrompt(String)
 }
 
-/// Before a session: the theme with its string set, and its position on a neck, minutes, difficulty, the blocks they give, and Start (↩).
+/// Before a session, layout C: the rail with each step's details; today's key large, the theme, its position on a
+/// whole neck, what is left out and why, the note drills' notes and frets, an estimate and Start (↩).
 struct SessionSetupView: View {
-    @Binding var minutes: Int
     @Binding var naturalsOnly: Bool
     @Binding var range: SessionRange
     /// Nil until it is known.
     let theme: SessionTheme?
     /// Nil once it can't be rerolled.
     let reroll: (() -> Void)?
-    let blocks: [SessionBlock]
+    let steps: [RailStep]
+    /// "About 33 minutes, then free time"; nil before there are three past sessions.
+    var estimate: String?
     let problem: SessionProblem?
     /// Nil with sound.
     var noSoundNotice: String?
-    /// Nil with triads.
-    var noTriadsNotice: String?
-    /// Nil with progressions.
-    var noProgressionsNotice: String?
+    /// What is left out, and why.
+    var notices: [String] = []
     /// How a progression block's backing will be heard.
     var backingNotices: [String] = []
     let start: () -> Void
 
-    /// What is stored could be anything.
-    private var shownMinutes: Int { SessionSetup(minutes: minutes).minutes }
-
     var body: some View {
         VStack(spacing: 0) {
-            Spacer(minLength: 8)
-            ViewThatFits(in: .vertical) {
-                choices(neck: theme?.neck)
-                choices(neck: nil)      // in a short window
+            HStack(spacing: 0) {
+                SessionRail(title: "Today", steps: steps)
+                Divider()
+                ViewThatFits(in: .vertical) {
+                    choices(neck: theme?.neck)
+                    choices(neck: nil)      // in a short window
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            Spacer(minLength: 8)
             Divider()
             HStack(spacing: 14) {
                 Spacer()
@@ -52,50 +52,17 @@ struct SessionSetupView: View {
     }
 
     private func choices(neck: FretboardDiagram?) -> some View {
-        VStack(spacing: 12) {
-            VStack(spacing: 4) {
-                Text(theme?.key.description ?? " ").font(.system(size: 52, weight: .bold, design: .rounded))
+        VStack(spacing: 14) {
+            VStack(spacing: 2) {
+                Text(theme?.key.tonic.description ?? " ").font(.system(size: 110, weight: .bold))
                 HStack {
-                    Text(theme?.detailText ?? "").foregroundStyle(.secondary)
+                    Text(themeText).font(.title2)
                     if let reroll { Button("Reroll", action: reroll) }
                 }
-                .font(.title3)
                 .frame(minHeight: 28)
-                if let progression = theme?.progressionText {
-                    Label(progression, systemImage: "music.note.list").font(.title3).foregroundStyle(.secondary)
-                }
             }
-            if let neck {
-                FretboardView(diagram: neck, minHeight: 130).frame(maxHeight: 200).padding(.horizontal, 24)
-            }
-            HStack(spacing: 20) {
-                step("minus.circle", "Less time", by: -SessionSetup.minutesStep)
-                Text("\(shownMinutes) min")
-                    .font(.system(size: 44, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                    .frame(width: 190)
-                step("plus.circle", "More time", by: SessionSetup.minutesStep)
-            }
-            Button(action: start) {
-                Text("Start ↩").font(.title).padding(.horizontal, 48).padding(.vertical, 8)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .disabled(problem != nil)
-            if let problem { SessionProblemNotice(problem: problem) }
-            if let noSoundNotice {
-                Label(noSoundNotice, systemImage: "speaker.slash.fill").foregroundStyle(.orange)
-            }
-            if let noTriadsNotice {
-                Label(noTriadsNotice, systemImage: "info.circle").foregroundStyle(.secondary)
-            }
-            if let noProgressionsNotice {
-                Label(noProgressionsNotice, systemImage: "info.circle").foregroundStyle(.secondary)
-            }
-            ForEach(backingNotices, id: \.self) {
-                Label($0, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
-            }
-            SessionBlocksByModule(blocks: blocks)
+            if let neck { FretboardView(diagram: neck, minHeight: 130).frame(maxHeight: 220) }
+            noticeList
             HStack {
                 Picker("Notes", selection: $naturalsOnly) {
                     Text("Naturals").tag(true)
@@ -107,18 +74,41 @@ struct SessionSetupView: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .frame(width: 560)
+            .frame(maxWidth: 480)
+            .help("For the note drills")
+            HStack {
+                if let estimate { Text(estimate).font(.title3).foregroundStyle(.secondary) }
+                Spacer()
+                Button(action: start) {
+                    Text("Start ↩").font(.title2).padding(.horizontal, 28).padding(.vertical, 4)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .disabled(problem != nil)
+            }
         }
+        .padding(28)
     }
 
-    private func step(_ symbol: String, _ label: String, by change: Int) -> some View {
-        let new = SessionSetup(minutes: shownMinutes + change).minutes
-        return Button { minutes = new } label: {
-            Image(systemName: symbol).font(.largeTitle)
+    /// "major · E shape · D-G-B · I–V–vi–IV".
+    private var themeText: String {
+        guard let theme else { return "" }
+        return [theme.key.mode.rawValue, theme.positionName ?? "", theme.theme.stringSet?.name ?? "",
+                theme.theme.progression?.name ?? ""].filter { !$0.isEmpty }.joined(separator: " · ")
+    }
+
+    @ViewBuilder private var noticeList: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if let problem { SessionProblemNotice(problem: problem) }
+            if let noSoundNotice {
+                Label(noSoundNotice, systemImage: "speaker.slash.fill").foregroundStyle(.orange)
+            }
+            ForEach(notices, id: \.self) { Label($0, systemImage: "info.circle").foregroundStyle(.secondary) }
+            ForEach(backingNotices, id: \.self) {
+                Label($0, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
+            }
         }
-        .buttonStyle(.plain)
-        .disabled(new == shownMinutes)
-        .accessibilityLabel(label)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

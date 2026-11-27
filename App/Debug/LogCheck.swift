@@ -234,8 +234,8 @@ enum LogCheck {
                                  SessionBlockRecord(drill: "b", plannedSeconds: 450)])
     }
 
-    /// Sessions run by the Session screen's model, whatever drills there are: one with attempts in its first block is
-    /// saved with them, and one with none isn't. In memory, since what is prompted varies by day.
+    /// Sessions run by the Session screen's model, the daily routine without sound: one with attempts in its first block
+    /// is saved with them, with no budget, and one with none isn't. In memory, since what is prompted varies by day.
     private static func checkSessions() throws {
         let log = AttemptLog.inMemory()
         let session = SessionViewModel()
@@ -247,9 +247,13 @@ enum LogCheck {
         session.start()
         session.next()
         session.skip()
-        session.extend()
-        session.extend()
         session.skip()
+        // Step 2 has a planned length; the Note circle hasn't.
+        session.extend()
+        session.next()
+        session.next()
+        session.extend()
+        session.extend()
         while session.isActive { session.next() }
         session.done()
         session.start()
@@ -272,7 +276,8 @@ enum LogCheck {
         let attempts = try log.context.fetch(FetchDescriptor<LoggedAttempt>())
         guard saved.map(\.attempts.count) == [2, 1], saved.map(\.state) == [.completed, .endedEarly],
               saved.allSatisfy({ $0.endedAt != nil && $0.totalSeconds != nil && $0.blocks.first?.spentSeconds != nil }),
-              saved.map({ $0.blocks.first?.extends }) == [2, 0],
+              saved.map({ Array($0.blocks.map(\.extends).prefix(2)) }) == [[0, 2], [0, 0]],
+              saved.allSatisfy({ $0.budgetMinutes == nil && $0.blocks.count == 8 }),
               attempts.count == 3, attempts.allSatisfy({ $0.source == .session && $0.blockIndex == 0 }) else {
             throw LogCheckError.sessions(saved.map { "\($0.stateRaw) \($0.attempts.count)" })
         }

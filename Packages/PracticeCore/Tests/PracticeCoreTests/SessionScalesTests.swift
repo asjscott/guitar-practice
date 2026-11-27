@@ -210,8 +210,8 @@ struct SessionPassTests {
     }
 
     @Test func withoutSoundTheyStayInThePlan() {
-        let kinds = SessionPlanner.drills(from: DrillKind.all, for: themed(), hasSound: false)
-        #expect(kinds.contains(.upAndDown) && kinds.contains(.fromADegree))
+        let routine = SessionPlanner.routine(for: themed(), day: 1, hasSound: false, hearFindItUnlocked: false)
+        #expect(routine.blocks.filter { $0.kind.module == .scales }.allSatisfy { !$0.isLeftOut })
         #expect(!playing(hasSound: false).isLeftOut(block: 0))
     }
 }
@@ -359,7 +359,7 @@ struct SessionPassChimeTests {
         player.tick(400.5)
         player.skip(to: 401)
         #expect(player.takeChime() == .softChime)
-        #expect(player.timeLeft(inBlock: 0) < .zero)
+        #expect(player.timeLeft(inBlock: 0)! < .zero)
     }
 }
 

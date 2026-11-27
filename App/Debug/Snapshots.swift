@@ -777,6 +777,36 @@ enum Snapshots {
             highlightedStrings: Set(StringSet.dGB.strings)))
     }
 
+    /// A day whose theme, picked afresh, has a string set and a progression, and whose step 2 is `noteDrill`: sessions
+    /// started on it run all eight steps, the same each time.
+    private static func routineDay(_ noteDrill: DrillKind = .notePlayIt) -> Date {
+        let base = Date(timeIntervalSince1970: 1_790_000_000)
+        let fretboard = Fretboard(tuning: .standard)
+        for offset in 0..<90 {
+            let date = base + Double(offset) * 86_400
+            let day = Calendar.dayNumber(of: date)
+            guard SessionPlanner.noteDrill(day: day, hasSound: true, hearFindItUnlocked: false) == noteDrill else { continue }
+            let theme = AttemptLog.inMemory().theme(on: date, fretboard: fretboard, system: InstrumentSettings.defaultPositionSystem)
+            if theme.progression != nil, theme.stringSet != nil { return date }
+        }
+        return base
+    }
+
+    private static func steps(_ kinds: [DrillKind], details: [String], leftOut: Set<Int> = []) -> [RailStep] {
+        kinds.enumerated().map { index, kind in
+            leftOut.contains(index) ? RailStep(kind: kind, state: .leftOut, detail: "Left out")
+                : RailStep(kind: kind, state: .toCome, detail: details[index])
+        }
+    }
+
+    /// Layout C's rail at setup, for G major's E shape on D-G-B with I–V–vi–IV.
+    private static let routineSteps = steps(
+        [.noteCircle, .notePlayIt, .scaleCircle, .upAndDown, .triadCircle, .chordsInPosition, .stayInPosition, .freeTime],
+        details: ["Every G, then every D, … frets 0–12", "Today’s note drill · 2:00", "G major, E shape, round all 12 keys",
+                  "G major, E shape, to the clicks · 1:00", "Every inversion on D-G-B, round all 12 keys",
+                  "I–V–vi–IV in the E shape, no backing", "I–V–vi–IV over the backing, rock, 70 BPM",
+                  "The backing loops; play what you like"])
+
     private static func saveSession() async throws {
         let problems: [(String, SessionProblem)] = [
             ("access", .input(.noAccess)), ("access-asked", .input(.accessNotGiven)), ("input", .input(.noInput)),
@@ -784,52 +814,45 @@ enum Snapshots {
         ]
         for (name, problem) in problems {
             try await save("session-setup-no-\(name)", SessionSetupView(
-                minutes: .constant(10), naturalsOnly: .constant(false), range: .constant(.wholeNeck),
+                naturalsOnly: .constant(false), range: .constant(.wholeNeck),
                 theme: SessionTheme(Theme(key: .minor(.dSharp), position: Position.ID(system: .threeNotesPerString, number: 2), stringSet: .gBE),
                                     on: Fretboard(tuning: .standard)),
-                reroll: nil, blocks: SessionViewModel().plan(), problem: problem, start: {}))
+                reroll: nil, steps: routineSteps, problem: problem, start: {}))
         }
         // A neck that the theme has no position on.
         try await save("session-setup-no-position", SessionSetupView(
-            minutes: .constant(10), naturalsOnly: .constant(false), range: .constant(.wholeNeck),
+            naturalsOnly: .constant(false), range: .constant(.wholeNeck),
             theme: SessionTheme(Theme(key: .major(.c), position: Position.ID(system: .caged, number: CAGEDShape.d.number), stringSet: .eAD),
                                 on: Fretboard(tuning: .standard, capo: 12)),
-            reroll: {}, blocks: SessionViewModel().plan(), problem: nil, start: {}))
-        try await save("session-setup-no-triads", SessionSetupView(
-            minutes: .constant(15), naturalsOnly: .constant(true), range: .constant(.first12),
-            theme: SessionTheme(Theme(key: .major(.c), position: Position.ID(system: .caged, number: 3), stringSet: .eAD),
-                                on: Fretboard(tuning: .standard)),
-            reroll: nil, blocks: SessionPlanner.plan(DrillKind.all.filter { $0.module != .triads }, budget: .seconds(900), day: 1),
-            problem: nil, noTriadsNotice: "Triads are left out: no voicing of the key’s chords on E-A-D fits these frets.",
-            start: {}))
+            reroll: {}, steps: routineSteps, problem: nil, start: {}))
         // The theme's progression, and what setup says about its backing.
         let progressionTheme = Theme(key: .major(.g), position: Position.ID(system: .caged, number: CAGEDShape.e.number),
                                      stringSet: .dGB, progression: Progression.named("I–V–vi–IV"))
-        try await save("session-progression-setup", SessionSetupView(
-            minutes: .constant(15), naturalsOnly: .constant(true), range: .constant(.first12),
+        try await save("session-setup-routine", SessionSetupView(
+            naturalsOnly: .constant(true), range: .constant(.first12),
             theme: SessionTheme(progressionTheme, on: Fretboard(tuning: .standard)),
-            reroll: {}, blocks: SessionPlanner.plan(DrillKind.all, budget: .seconds(900), day: 1), problem: nil,
-            start: {}))
-        try await save("session-progression-setup-notices", SessionSetupView(
-            minutes: .constant(15), naturalsOnly: .constant(true), range: .constant(.first12),
+            reroll: {}, steps: routineSteps, estimate: "About 33 minutes, then free time", problem: nil, start: {}))
+        try await save("session-setup-notices", SessionSetupView(
+            naturalsOnly: .constant(true), range: .constant(.first12),
             theme: SessionTheme(progressionTheme, on: Fretboard(tuning: .standard)),
-            reroll: nil, blocks: SessionPlanner.plan(DrillKind.all, budget: .seconds(900), day: 1), problem: nil,
+            reroll: nil, steps: routineSteps, estimate: "About 33 minutes, then free time", problem: nil,
             backingNotices: ["No backing sounds: Progressions plays clicks. " + BackingSounds.fetchHint,
                              "The built-in microphone will hear the backing as notes: use the interface, or headphones."],
+            start: {}))
+        // Without a progression: steps 6–8 left out, with today's notice.
+        var noProgression = progressionTheme
+        noProgression.progression = nil
+        try await save("session-setup-left-out", SessionSetupView(
+            naturalsOnly: .constant(true), range: .constant(.first12),
+            theme: SessionTheme(noProgression, on: Fretboard(tuning: .standard)),
+            reroll: nil, steps: steps(routineSteps.map(\.kind), details: routineSteps.map(\.detail), leftOut: [5, 6, 7]),
+            problem: nil,
+            notices: ["Progressions are left out: no progression in G major has every chord in the E shape."],
             start: {}))
 
         let session = SessionViewModel()
         try await save("session-setup", SessionView(model: session))
         try await save("session-setup-short", SessionView(model: session), size: CGSize(width: 1100, height: 480))
-
-        for minutes in [10, 60] {
-            try await save("session-setup-modules-\(minutes)", SessionSetupView(
-                minutes: .constant(minutes), naturalsOnly: .constant(true), range: .constant(.first12),
-                theme: SessionTheme(Theme(key: .major(.bFlat), position: Position.ID(system: .caged, number: 3), stringSet: .dGB),
-                                    on: Fretboard(tuning: .standard)),
-                reroll: {}, blocks: SessionPlanner.plan(DrillKind.all, budget: .seconds(minutes * 60), day: 1),
-                problem: nil, start: {}), size: CGSize(width: 920, height: 620))
-        }
 
         let silent = AppSoundOutput(isInert: true, problem: "There’s no sound output device.")
         try await save("session-setup-no-sound", SessionView(model: SessionViewModel()), sound: silent)
@@ -844,27 +867,26 @@ enum Snapshots {
             type("\r ")
         }
 
-        /// How long the first block is planned to be, in seconds.
-        func firstLength(_ model: SessionViewModel) -> Double { (model.plan().first?.length ?? .zero) / .seconds(1) }
-        /// A new session, on the Ready card of a drill.
-        func ready(_ kind: DrillKind) {
-            session.done()
-            session.end()
-            session.done()
+        let stepTwoLength = SessionPlanner.noteDrillLength / .seconds(1)
+        /// A new session on a routine day, on the Ready card of a step.
+        func ready(_ kind: DrillKind, on model: SessionViewModel = session) {
+            model.done()
+            model.end()
+            model.done()
             // As they were before any pass moved them.
             for kind in DrillKind.all { emptyDefaults.removeObject(forKey: MetronomeSettings.Key.tempo(of: kind)) }
-            session.start(seed: 1)
-            while session.isActive, session.blockKind != kind {
-                session.next()
-                session.next()
+            model.start(on: routineDay(kind == .fretNameIt ? .fretNameIt : .notePlayIt), seed: 1)
+            while model.isActive, model.blockKind != kind {
+                model.next()
+                model.next()
             }
         }
         /// The same, playing its block.
-        func play(_ kind: DrillKind) {
-            ready(kind)
+        func play(_ kind: DrillKind, on model: SessionViewModel = session) {
+            ready(kind, on: model)
             // Any sound of an earlier block is over, so that notes count.
-            session.passTimeForSnapshot(2)
-            session.next()
+            model.passTimeForSnapshot(2)
+            model.next()
         }
         /// Plays the rest of a pass, or some of it.
         func playNotes(_ count: Int = .max) {
@@ -877,9 +899,14 @@ enum Snapshots {
             for _ in 0..<(session.blockKind?.module == .triads ? 3 : 1) { session.answerForSnapshot(right: true) }
             playNotes()
         }
-        // In 60 minutes every drill has a block.
-        emptyDefaults.set(60, forKey: "session.minutes")
-        session.setup = SessionSetup(minutes: 60)
+
+        // Each step playing, with the rail.
+        try await save("session-note-circle-ready", SessionView(model: session)) { ready(.noteCircle) }
+        try await save("session-note-circle", SessionView(model: session)) {
+            play(.noteCircle)
+            for _ in 0..<4 { session.answerForSnapshot(right: true) }
+            session.answerForSnapshot(right: false)
+        }
         try await save("session-waiting", SessionView(model: session)) { play(.notePlayIt) }
         try await save("session-wrong", SessionView(model: session)) {
             play(.notePlayIt)
@@ -887,11 +914,6 @@ enum Snapshots {
         }
         try await save("session-right", SessionView(model: session), settle: .milliseconds(150)) {
             play(.notePlayIt)
-            session.answerForSnapshot(right: true)
-        }
-        try await save("session-sweep", SessionView(model: session)) {
-            play(.allInstances)
-            session.answerForSnapshot(right: true)
             session.answerForSnapshot(right: true)
         }
         try await save("session-typed", SessionView(model: session)) {
@@ -902,38 +924,24 @@ enum Snapshots {
             play(.fretNameIt)
             type("f#\r")
         }
-        try await save("session-hear", SessionView(model: session)) { play(.hearFindIt) }
-        try await save("session-overtime", SessionView(model: session), settle: .milliseconds(1700)) {
+        try await save("session-time-up", SessionView(model: session), settle: .milliseconds(1700)) {
             play(.notePlayIt)
-            session.passTimeForSnapshot(firstLength(session) + 12)
+            session.passTimeForSnapshot(stepTwoLength + 12)
             session.skip()
         }
         // + and = in the drill answered by typing.
         try await save("session-extended", SessionView(model: session), settle: .milliseconds(1700)) {
             play(.fretNameIt)
-            session.passTimeForSnapshot(firstLength(session) + 12)
+            session.passTimeForSnapshot(stepTwoLength + 12)
             type("+=")
         }
-        try await save("session-ready-after-overtime", SessionView(model: session)) {
-            play(.notePlayIt)
-            session.end()
-            session.done()
-            session.start(seed: 1)
-            session.next()
-            session.passTimeForSnapshot(firstLength(session) + 72)
-            session.next()
+        try await save("session-scale-circle", SessionView(model: session)) {
+            play(.scaleCircle)
+            playNotes(5)
         }
-        try await save("session-summary-60", SessionView(model: session), size: CGSize(width: 920, height: 620)) {
-            play(.notePlayIt)
-            session.end()
-            session.done()
-            session.start(seed: 1)
-            while session.isActive {
-                session.passTimeForSnapshot(2)
-                session.next()
-                playPrompt()
-                session.next()
-            }
+        try await save("session-scale-circle-next-key", SessionView(model: session)) {
+            play(.scaleCircle)
+            playNotes()
         }
 
         try await save("session-scale-ready", SessionView(model: session)) { ready(.upAndDown) }
@@ -956,19 +964,13 @@ enum Snapshots {
             play(.upAndDown)
             playNotes()
         }
-        try await save("session-scale-next", SessionView(model: session), size: CGSize(width: 920, height: 520)) {
-            play(.fromADegree)
-            session.skip()
-            playNotes(3)
-        }
         try await save("session-scale-paused", SessionView(model: session)) {
             play(.upAndDown)
             session.pause()
         }
         try await save("session-scale-chiming", SessionView(model: session), settle: .milliseconds(150)) {
             play(.upAndDown)
-            let length = session.plan().first { $0.kind == .upAndDown }?.length ?? .zero
-            session.passTimeForSnapshot(length / .seconds(1) - 29)
+            session.passTimeForSnapshot(SessionPlanner.shortFocusLength / .seconds(1) - 29)
             session.skip()
         }
         // M pauses; the session's keys then do nothing, and [ and ] neither. Closing goes on.
@@ -1009,40 +1011,44 @@ enum Snapshots {
             play(.upAndDown)
         }
 
-        for (name, kind) in [("triad", DrillKind.triadPlayIt), ("climb", .inversions)] {
-            try await save("session-\(name)-waiting", SessionView(model: session)) { play(kind) }
-            try await save("session-\(name)-wrong", SessionView(model: session)) {
-                play(kind)
-                session.answerForSnapshot(right: true)
-                session.answerForSnapshot(right: false)
-            }
-            try await save("session-\(name)-right", SessionView(model: session), size: CGSize(width: 920, height: 520),
-                           settle: .milliseconds(150)) {
-                play(kind)
-                for _ in 0..<3 { session.answerForSnapshot(right: true) }
-            }
+        try await save("session-triad-circle", SessionView(model: session)) {
+            play(.triadCircle)
+            for _ in 0..<7 { session.answerForSnapshot(right: true) }
         }
-        try await save("session-triad-ready", SessionView(model: session)) { ready(.triadPlayIt) }
+        try await save("session-triad-circle-wrong", SessionView(model: session), size: CGSize(width: 920, height: 520)) {
+            play(.triadCircle)
+            session.answerForSnapshot(right: true)
+            session.answerForSnapshot(right: false)
+        }
 
-        try await save("session-progression-ready", SessionView(model: session)) { ready(.nearestVoicing) }
+        try await save("session-chords-in-position", SessionView(model: session)) {
+            play(.chordsInPosition)
+            for _ in 0..<4 { session.answerForSnapshot(right: true) }
+        }
+        try await save("session-progression-ready", SessionView(model: session)) { ready(.stayInPosition) }
         try await save("session-progression-count-in", SessionView(model: session)) {
-            play(.nearestVoicing)
+            play(.stayInPosition)
             session.playProgressionForSnapshot(chords: 0, untilBeat: 1.5)
         }
         try await save("session-progression-playing", SessionView(model: session)) {
-            play(.nearestVoicing)
+            play(.stayInPosition)
             session.playProgressionForSnapshot(chords: 5, wrong: [3], partial: 2, untilBeat: 25.6)
         }
+        try await save("session-free-time", SessionView(model: session)) {
+            play(.freeTime)
+            session.passTimeForSnapshot(9)
+        }
 
+        // Without sound: steps 6–8 left out, in the rail.
         let unheard = SessionViewModel()
+        try await save("session-left-out", SessionView(model: unheard), sound: silent) { play(.triadCircle, on: unheard) }
         try await save("session-flash", SessionView(model: unheard), sound: silent, settle: .milliseconds(500)) {
-            unheard.start(seed: 1)
-            unheard.next()
-            unheard.passTimeForSnapshot(firstLength(unheard) - 29)
+            play(.notePlayIt, on: unheard)
+            unheard.passTimeForSnapshot(stepTwoLength - 29)
             unheard.skip()
         }
         // The output failing: with the block that needs sound to come, and in it.
-        for (name, kind) in [("coming", DrillKind.notePlayIt), ("mid-block", .hearFindIt)] {
+        for (name, kind) in [("coming", DrillKind.chordsInPosition), ("mid-block", .freeTime)] {
             try await save("session-sound-failed-\(name)", SessionView(model: session)) {
                 play(kind)
                 session.soundOutput = silent
@@ -1082,18 +1088,13 @@ enum Snapshots {
             focusSidebar()
             type("\r s\u{1b}\r")
         }
-        emptyDefaults.removeObject(forKey: "session.minutes")
-        session.setup = SessionSetup()
         try await save("session-summary", SessionView(model: session)) {
-            play(.notePlayIt)
-            session.end()
-            session.done()
-            session.start(seed: 1)
+            ready(.noteCircle)
             while session.isActive {
                 session.passTimeForSnapshot(2)
                 session.next()
                 if session.blockKind?.hasBacking == true {
-                    // Two times through clean, then one with a wrong chord: Faded from the third.
+                    // Two times through clean, then one with a wrong chord.
                     session.playProgressionForSnapshot(chords: 12, wrong: [9], untilBeat: 4 + 48 + 0.5)
                 } else {
                     session.skip()

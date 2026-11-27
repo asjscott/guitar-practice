@@ -70,12 +70,4 @@ struct FreeTimeTests {
         #expect(DrillKind.freeTime.module == .progressions)
         #expect(DrillKind.all.suffix(2).map(\.id) == ["chordsInPosition", "freeTime"])
     }
-
-    @Test func aSessionWithoutSoundLeavesItOutWithTheUsualNotice() {
-        let setup = ProgressionRun(.freeTime).drill.setup
-        let kinds: [DrillKind] = [.chordsInPosition, .stayInPosition, .freeTime]
-        #expect(SessionPlanner.drills(from: kinds, for: setup, hasSound: false).map(\.id) == ["chordsInPosition", "stayInPosition"])
-        #expect(SessionPlanner.drills(from: kinds, for: setup, hasSound: true).count == 3)
-        #expect(SessionPlanner.noSoundNotice(from: kinds) == "No sound: Free time is left out, and chimes flash.")
-    }
 }
