@@ -30,6 +30,8 @@ struct FretboardDiagram: Equatable {
         var isFaint = false
         /// Ringed as the last note played.
         var isLastPlayed = false
+        /// PROTOTYPE (Phase 4b): how much of the dot is left, for the fade by time.
+        var opacity: Double = 1
     }
 
     /// One name per string, string 6 first (index 0 = physical string 6, drawn at the bottom).

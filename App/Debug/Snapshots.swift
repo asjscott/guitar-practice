@@ -47,6 +47,14 @@ enum Snapshots {
     }
 
     private static func saveAll() async throws {
+        // PROTOTYPE: only the Phase 4b variants.
+        for v in P4bVariant.allCases {
+            for (i, scene) in P4bScene.allCases.enumerated() {
+                try await save("p4b-\(v.rawValue)-\(i + 1)-\(scene.rawValue.lowercased().replacingOccurrences(of: ":", with: "").replacingOccurrences(of: " ", with: "-"))",
+                               P4bScreen(model: P4bModel(variant: v, scene: scene, progress: 0.45, level: 1), showsSwitcher: false))
+            }
+        }
+        return;
         try await save("explorer", ExplorerView(model: ExplorerViewModel()))
 
         let tuner = TunerViewModel()

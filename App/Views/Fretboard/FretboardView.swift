@@ -178,16 +178,18 @@ struct FretboardView: View {
 
         var shadowed = context
         shadowed.addFilter(.shadow(color: .black.opacity(0.45), radius: 1.5, x: 0, y: 1))
-        for marker in markers {
+        for marker in markers where marker.opacity > 0 {
             let color = FretboardPalette.color(for: marker.role)
             if marker.isFaint {
-                context.fill(Path(ellipseIn: dotRect(marker)), with: .color(color.opacity(0.35)))
+                context.fill(Path(ellipseIn: dotRect(marker)), with: .color(color.opacity(0.35 * marker.opacity)))
             } else {
-                shadowed.fill(Path(ellipseIn: dotRect(marker)), with: .color(color))
+                shadowed.fill(Path(ellipseIn: dotRect(marker)), with: .color(color.opacity(marker.opacity)))
             }
         }
-        for marker in markers {
+        for marker in markers where marker.opacity > 0 {
             let rect = dotRect(marker)
+            var context = context
+            context.opacity = marker.opacity
             context.stroke(Path(ellipseIn: rect), with: .color(.white.opacity(marker.isFaint ? 0.3 : 0.85)), lineWidth: 1.25)
             if marker.isLastPlayed {
                 context.stroke(Path(ellipseIn: rect.insetBy(dx: -3, dy: -3)), with: .color(FretboardPalette.lastPlayedRing),
