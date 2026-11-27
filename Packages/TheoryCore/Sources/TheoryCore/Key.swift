@@ -45,6 +45,12 @@ public struct Key: Hashable, Sendable, Codable {
         mode == self.mode ? self : .app(tonic: tonic.pitchClass, mode: mode)
     }
 
+    /// The circle of fifths from this key: the app's twelve keys in this key's mode, each a fifth above the last, starting
+    /// here and going sharpward (E B F♯ D♭ A♭ E♭ B♭ F C G D A; C♯m G♯m D♯m B♭m …). Spelled as the app's keys.
+    public var circleOfFifths: [Key] {
+        (0..<12).map { step in .app(tonic: tonic.pitchClass + Interval(7 * step), mode: mode) }
+    }
+
     /// All 15 major key signatures, from 7 flats (C♭) to 7 sharps (C♯).
     public static let allMajorKeySignatures: [Key] = [
         .cFlat, .gFlat, .dFlat, .aFlat, .eFlat, .bFlat, .f, .c, .g, .d, .a, .e, .b, .fSharp, .cSharp,
