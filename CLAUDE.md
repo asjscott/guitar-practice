@@ -12,7 +12,7 @@ Carried over from the Phase 3 gate (#48), to check on a guitar in Phase 4: a ful
 
 Phases 0 (spec #1), 1 (spec #11), 2 (spec #21) and 3 (spec #33) are complete.
 
-Phase order: 0 Foundations → 1 Hear the guitar → 2 Session MVP → 3 Scales and triads → 4 Backing and progressions → 5 Lick → solo → 6 Adaptive and polish. Don't start work from a later phase unless asked.
+Phase order: 0 Foundations → 1 Hear the guitar → 2 Session MVP → 3 Scales and triads → 4 Backing and progressions → 4b Daily routine (spec #64, tickets #65–#73) → 5 Lick → solo → 6 Adaptive and polish. Don't start work from a later phase unless asked.
 
 ## Stack
 
