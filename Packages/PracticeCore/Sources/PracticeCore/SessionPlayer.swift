@@ -109,7 +109,7 @@ public struct SessionPlayer: Sendable {
     private var pendingBacking: [BackingRequest] = []
     private var settingsByKind: [DrillKind: PassSettings] = [:]
     /// What has been reached, this session's passes included.
-    private var fadeLevels: FadeLevels
+    public private(set) var fadeLevels: FadeLevels
 
     /// A block as played.
     private struct Progress: Sendable {
