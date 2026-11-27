@@ -41,8 +41,10 @@ public struct SessionBlock: Hashable, Sendable {
 public struct SessionRoutine: Hashable, Sendable {
     /// The eight steps in order, those left out included.
     public let blocks: [SessionBlock]
-    /// For setup: what is left out, and what goes differently.
+    /// For setup: what is left out, and why.
     public let notices: [String]
+    /// For setup, without sound: what goes differently. Nil with sound.
+    public let noSoundNotice: String?
 
     /// Why the session can't start: every step is left out. Nil when one can run.
     public var nothingToPromptReason: String? {
@@ -72,10 +74,11 @@ public enum SessionPlanner {
                                circleBests: [DrillKind: CircleResult] = [:]) -> SessionRoutine {
         var notices: [String] = []
         let progressionProblem = setup.progressionProblem
+        var noSoundNotice: String?
         if !hasSound {
-            notices.append(progressionProblem == nil
+            noSoundNotice = progressionProblem == nil
                 ? "No sound: \(listed(progressionSteps.map(\.title))) are left out, and chimes flash."
-                : "No sound: chimes flash.")
+                : "No sound: chimes flash."
         }
         if let progressionProblem {
             notices.append("Progressions are left out: " + progressionNotice(for: setup, problem: progressionProblem))
@@ -103,7 +106,7 @@ public enum SessionPlanner {
             }
             return SessionBlock(kind: kind, end: end, setup: stepSetup, isLeftOut: isLeftOut)
         }
-        return SessionRoutine(blocks: blocks, notices: notices)
+        return SessionRoutine(blocks: blocks, notices: notices, noSoundNotice: noSoundNotice)
     }
 
     /// Steps 6–8.

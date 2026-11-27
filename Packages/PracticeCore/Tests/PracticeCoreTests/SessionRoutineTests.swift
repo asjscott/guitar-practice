@@ -46,6 +46,7 @@ struct SessionRoutineTests {
         #expect(routine.blocks.map(\.kind) == steps)
         #expect(routine.blocks.allSatisfy { !$0.isLeftOut })
         #expect(routine.notices.isEmpty)
+        #expect(routine.noSoundNotice == nil)
         #expect(routine.nothingToPromptReason == nil)
     }
 
@@ -95,7 +96,9 @@ struct SessionRoutineTests {
         let routine = routine(hasSound: false)
         #expect(routine.blocks.map(\.kind) == steps)
         #expect(routine.blocks.map(\.isLeftOut) == [false, false, false, false, false, true, true, true])
-        #expect(routine.notices == ["No sound: Chords in position, Stay in position and Free time are left out, and chimes flash."])
+        #expect(routine.noSoundNotice
+                == "No sound: Chords in position, Stay in position and Free time are left out, and chimes flash.")
+        #expect(routine.notices.isEmpty)
         var player = playing(step: 5, routine, hasSound: false)
         #expect(player.drill?.kind == .triadCircle)
         #expect((5...7).allSatisfy { player.isLeftOut(block: $0) })
@@ -107,10 +110,9 @@ struct SessionRoutineTests {
     @Test func withoutSoundOrAProgressionOnlyTheProgressionNoticeNamesThem() {
         var theme = gTheme
         theme.progression = nil
-        #expect(routine(themed(theme), hasSound: false).notices == [
-            "No sound: chimes flash.",
-            "Progressions are left out: no progression in G major has every chord in the E shape.",
-        ])
+        let routine = routine(themed(theme), hasSound: false)
+        #expect(routine.noSoundNotice == "No sound: chimes flash.")
+        #expect(routine.notices == ["Progressions are left out: no progression in G major has every chord in the E shape."])
     }
 
     @Test func withoutAProgressionStepsSixToEightAreLeftOut() {
