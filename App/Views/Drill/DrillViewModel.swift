@@ -126,6 +126,8 @@ final class DrillViewModel: MetronomePanelOwner {
         options.key = theme.key
         options.position = theme.position
         if let themed = theme.progression { progression = themed }
+        // For the Triad circle, which climbs on the theme's string set, whichever themed drill was chosen first.
+        if let set = theme.stringSet { options.stringSets = [set] }
     }
 
     #if DEBUG
