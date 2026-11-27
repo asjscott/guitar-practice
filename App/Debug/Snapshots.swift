@@ -353,10 +353,16 @@ enum Snapshots {
             run(11) { scales.timeOutForSnapshot() }
         }
         try await save("pass-clean", DrillView(model: scales), settle: .milliseconds(150)) { run(33) }
-        for stage in FadeStage.allCases {
+        for level in [0, 6] {
             scales.stop()
-            scales.options.pass.fadeStage = stage
-            try await save("pass-fade-\(stage.rawValue)", DrillView(model: scales)) { run(11) }
+            scales.options.pass.fadeLevel = FadeLevel(level)
+            try await save("pass-fade-level-\(level)", DrillView(model: scales)) { run(11) }
+        }
+        // Level 1, a note a second: by the 13th, about halfway through its fade.
+        scales.stop()
+        scales.options.pass.fadeLevel = FadeLevel(1)
+        try await save("pass-fade-level-1-mid", DrillView(model: scales)) {
+            run { scales.playInTimeForSnapshot(13) }
         }
         try await save("pass-hint", DrillView(model: scales)) {
             run(11) { scales.hint(isShown: true) }
@@ -369,7 +375,7 @@ enum Snapshots {
             }
         }
         scales.stop()
-        scales.options.pass.fadeStage = nil
+        scales.options.pass.fadeLevel = nil
         try await save("pass-paused", DrillView(model: scales)) {
             run(3) { scales.togglePause() }
         }

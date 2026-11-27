@@ -4,7 +4,7 @@ import TheoryCore
 /// fades. Shown has its dots and names, Faded faint dots, Hidden nothing.
 struct VoicingFade: Sendable {
     /// This run's voicings included.
-    var reached: FadeStages
+    var reached: FadeLevels
 
     private let override: FadeStage?
     private let tuning: Tuning
@@ -14,10 +14,10 @@ struct VoicingFade: Sendable {
     /// H is held.
     private var isHintShown = false
     /// The voicing's, since it last started.
-    private var notes: [FadeStages.VoicingNote] = []
+    private var notes: [FadeLevels.VoicingNote] = []
 
     init(setup: DrillSetup) {
-        reached = setup.fadeStages
+        reached = setup.fadeLevels
         override = setup.options.triadFade
         tuning = setup.fretboard.tuning
     }
@@ -30,7 +30,7 @@ struct VoicingFade: Sendable {
 
     /// A voicing is up, from its lowest note.
     mutating func start(_ facts: TriadFacts) {
-        stage = override ?? reached.stage(of: FadeStages.VoicingShape(facts, in: tuning))
+        stage = override ?? reached.stage(of: FadeLevels.VoicingShape(facts, in: tuning))
         isHinted = isHintShown
         notes = []
     }
@@ -50,7 +50,7 @@ struct VoicingFade: Sendable {
 
     /// Counts a note that was dealt with; the voicing's last counts the voicing.
     mutating func dealtWith(_ attempt: Attempt) {
-        guard let note = FadeStages.VoicingNote(attempt, in: tuning) else { return }
+        guard let note = FadeLevels.VoicingNote(attempt, in: tuning) else { return }
         notes.append(note)
         // Nothing is counted until the voicing is over.
         reached.add(voicing: notes)

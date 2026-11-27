@@ -12,8 +12,8 @@ public struct PassSettings: Hashable, Sendable {
     public var holdsTempo = false
     public var ladder = TempoLadder()
     public var meter = Meter(.fourFour)
-    /// Nil follows the stage reached (`DrillSetup.fadeStages`).
-    public var fadeStage: FadeStage?
+    /// Nil follows the level reached (`DrillSetup.fadeLevels`).
+    public var fadeLevel: FadeLevel?
 
     public init() {}
 
@@ -60,11 +60,17 @@ public protocol PassRules: Sendable {
 
     /// Next to the headline. Default: the position's name.
     func subline(of pass: Pass) -> String
+
+    /// How long the pass should take, which its fade time is a share of. Default: a click per note.
+    func expectedTime(of pass: Pass, at settings: PassSettings) -> Duration
 }
 
 extension PassRules {
     public mutating func begin() {}
     public func subline(of pass: Pass) -> String { pass.position.name }
+    public func expectedTime(of pass: Pass, at settings: PassSettings) -> Duration {
+        Duration.seconds(60) / settings.tempo * pass.locations.count
+    }
 }
 
 extension DrillSetup {

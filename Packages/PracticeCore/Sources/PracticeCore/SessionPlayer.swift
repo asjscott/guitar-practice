@@ -45,9 +45,9 @@ public enum SessionEvent: Hashable, Sendable {
     case backingStarted(Backing)
     /// What the block's passes are played at, from the next one on: on its Ready card and while paused too.
     case passSettings(PassSettings, at: Duration)
-    /// The fade stages reached by now, read again from the log, which has this session's passes too: from the next pass
+    /// The fade levels reached by now, read again from the log, which has this session's passes too: from the next pass
     /// on.
-    case fadeStages(FadeStages)
+    case fadeLevels(FadeLevels)
     case hint(isShown: Bool, at: Duration)
     case skip(at: Duration)
     case `repeat`(at: Duration)
@@ -105,7 +105,7 @@ public struct SessionPlayer: Sendable {
     private var pendingBacking: [BackingRequest] = []
     private var settingsByKind: [DrillKind: PassSettings] = [:]
     /// What has been reached, this session's passes included.
-    private var fadeStages: FadeStages
+    private var fadeLevels: FadeLevels
 
     /// A block as played.
     private struct Progress: Sendable {
@@ -120,7 +120,7 @@ public struct SessionPlayer: Sendable {
         self.blocks = blocks
         self.hasSound = hasSound
         self.setup = setup
-        fadeStages = setup.fadeStages
+        fadeLevels = setup.fadeLevels
         progress = blocks.map { _ in Progress() }
     }
 
@@ -285,9 +285,9 @@ public struct SessionPlayer: Sendable {
             settingsByKind[blocks[blockIndex].kind] = new
             drill?.handle(.passSettings(new, at: now))
             followDrill()
-        case .fadeStages(let new):
-            fadeStages = new
-            drill?.handle(.fadeStages(new))
+        case .fadeLevels(let new):
+            fadeLevels = new
+            drill?.handle(.fadeLevels(new))
         case .hint(let isShown, let now):
             passTime(to: now)
             send(.hint(isShown: isShown, at: now))
@@ -392,7 +392,7 @@ public struct SessionPlayer: Sendable {
         var blockSetup = setup
         if let passSettings { blockSetup.options.pass = passSettings }
         blockSetup.seed &+= UInt64(blockIndex)
-        blockSetup.fadeStages = fadeStages
+        blockSetup.fadeLevels = fadeLevels
         drill = blocks[blockIndex].kind.makeDrill(blockSetup)
         send(.start(at: now))
     }
@@ -424,6 +424,6 @@ public struct SessionPlayer: Sendable {
         pendingClicks += drill?.takeClicks() ?? []
         pendingBacking += drill?.takeBacking() ?? []
         if let settings = drill?.passSettings { settingsByKind[blocks[blockIndex].kind] = settings }
-        if let reached = drill?.fadeStages { fadeStages = reached }
+        if let reached = drill?.fadeLevels { fadeLevels = reached }
     }
 }

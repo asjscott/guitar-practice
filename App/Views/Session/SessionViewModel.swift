@@ -264,7 +264,7 @@ final class SessionViewModel: MetronomePanelOwner {
         var drillSetup = drillSetup(seed: seed)
         passPositions = drillSetup.passPositions.map(\.id)
         stringSets = drillSetup.options.stringSets
-        drillSetup.fadeStages = log?.fadeStages(in: passPositions, on: stringSets) ?? FadeStages()
+        drillSetup.fadeLevels = log?.fadeLevels(in: passPositions, on: stringSets) ?? FadeLevels()
         fretboard = drillSetup.fretboard
         frets = drillSetup.options.frets
         player = SessionPlayer(blocks: blocks, setup: drillSetup, hasSound: hasSound)
@@ -314,7 +314,7 @@ final class SessionViewModel: MetronomePanelOwner {
         asksToEnd = false
         loadPassSettings()
         // Free practice may have moved them.
-        if let log { send(.fadeStages(log.fadeStages(in: passPositions, on: stringSets))) }
+        if let log { send(.fadeLevels(log.fadeLevels(in: passPositions, on: stringSets))) }
         send(.resume(at: clockNow()))
     }
 

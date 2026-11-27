@@ -69,7 +69,7 @@ public struct PromptDrill<Rules: DrillRules>: Drill {
         }
     }
 
-    public var fadeStages: FadeStages? { rules.fadeStages }
+    public var fadeLevels: FadeLevels? { rules.fadeLevels }
 
     public var isPartWay: Bool { isAnswerable && rules.isPartWay }
 
@@ -132,8 +132,8 @@ public struct PromptDrill<Rules: DrillRules>: Drill {
         case .hint(let isShown, let now):
             advance(to: now)
             if isRunning, phase != .paused { rules.hint(isShown: isShown) }
-        case .fadeStages(let stages):
-            rules.fadeStages = stages
+        case .fadeLevels(let stages):
+            rules.fadeLevels = stages
         case .clicksStarted, .backingStarted, .passSettings:
             break
         case .tick(let now):

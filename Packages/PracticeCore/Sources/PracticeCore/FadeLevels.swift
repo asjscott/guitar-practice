@@ -1,10 +1,36 @@
 import TheoryCore
 
-/// The fade stage each scale kind has reached in each position, worked out from the logged passes and never stored:
-/// from Shown, one on for a clean pass and one back for any other. Passes that aren't complete, or were played at a
-/// stage other than the one reached, don't count. The same for each shape of triad voicing, voicing by voicing.
-public struct FadeStages: Hashable, Sendable {
-    /// What a stage belongs to, whatever the key, capo and octave.
+/// The fade level each subject has reached, worked out from the log and never stored (ADR 0007): from 0, one up for a
+/// clean prompt and one down for any other. A prompt played at another level than the one reached doesn't count.
+/// Each drill that fades keeps one per kind of subject, and decides what makes a prompt complete and clean.
+public struct FadeLadder<Subject: Hashable & Sendable>: Hashable, Sendable {
+    private var levels: [Subject: FadeLevel] = [:]
+
+    public init() {}
+
+    public func level(of subject: Subject) -> FadeLevel { levels[subject] ?? .first }
+
+    /// Counts a complete prompt. `steps` are the levels it moves between: all of them, unless it was logged at a fade
+    /// stage (`FadeLevel.stageSteps`).
+    public mutating func count(_ subject: Subject, playedAt played: FadeLevel, isClean: Bool,
+                               steps: [FadeLevel] = FadeLevel.all) {
+        let reached = level(of: subject)
+        guard played == reached else { return }
+        levels[subject] = isClean ? steps.first { $0 > reached } ?? reached : steps.last { $0 < reached } ?? .first
+    }
+}
+
+extension FadeLevel {
+    /// The levels the old fade stages moved between: Shown, Faded and Hidden.
+    public static let stageSteps = FadeStage.allCases.map(FadeLevel.init)
+}
+
+/// The fade levels reached in the scale and triad drills, from the logged passes and voicings: each scale kind in
+/// each position, and each shape of triad voicing, voicing by voicing. Passes that aren't complete don't count.
+///
+/// Triads still play at fade stages, so their levels move only between Shown, Faded and Hidden (0, 2 and 6).
+public struct FadeLevels: Hashable, Sendable {
+    /// What a pass's level belongs to, whatever the key, capo and octave.
     public struct Subject: Hashable, Sendable {
         public var tuning: Tuning
         public var scaleKind: Scale.Kind
@@ -22,7 +48,7 @@ public struct FadeStages: Hashable, Sendable {
         }
     }
 
-    /// What a triad's stage belongs to, whatever its root, frets and capo.
+    /// What a triad's level belongs to, whatever its root, frets and capo.
     public struct VoicingShape: Hashable, Sendable {
         public var tuning: Tuning
         public var quality: Triad.Quality
@@ -41,8 +67,8 @@ public struct FadeStages: Hashable, Sendable {
         }
     }
 
-    private var stages: [Subject: FadeStage] = [:]
-    private var voicingStages: [VoicingShape: FadeStage] = [:]
+    private var passes = FadeLadder<Subject>()
+    private var voicings = FadeLadder<VoicingShape>()
 
     public init() {}
 
@@ -70,19 +96,21 @@ public struct FadeStages: Hashable, Sendable {
         add(voicing: voicing)
     }
 
-    public func stage(of subject: Subject) -> FadeStage { stages[subject.lowest] ?? .shown }
+    public func level(of subject: Subject) -> FadeLevel { passes.level(of: subject.lowest) }
 
     /// Counts the next pass, given all that was logged of it.
     public mutating func add(_ notes: [Note]) {
         let results = notes.map(\.result)
         guard let first = notes.first, results.isComplete(size: first.size),
               Set(notes.map(\.place)) == Set(0..<max(0, first.size)) else { return }
-        let reached = stage(of: first.subject)
-        guard first.stage == reached else { return }
-        stages[first.subject.lowest] = results.isClean(size: first.size) ? reached.next : reached.previous
+        passes.count(first.subject.lowest, playedAt: first.level, isClean: results.isClean(size: first.size),
+                     steps: first.steps)
     }
 
-    public func stage(of shape: VoicingShape) -> FadeStage { voicingStages[shape] ?? .shown }
+    public func level(of shape: VoicingShape) -> FadeLevel { voicings.level(of: shape) }
+
+    /// The stage a triad's voicing is played at.
+    public func stage(of shape: VoicingShape) -> FadeStage { FadeStage(level(of: shape)) }
 
     /// Counts the next voicing, given all that was logged of it: played whole, or to where the time ran out. One skipped
     /// or cut short counts neither way.
@@ -90,10 +118,8 @@ public struct FadeStages: Hashable, Sendable {
         guard let first = notes.first, let last = notes.last, notes.map(\.place) == Array(notes.indices),
               last.result.outcome == .timedOut || last.result.outcome == .answered && notes.count == first.shape.noteCount
         else { return }
-        let reached = stage(of: first.shape)
-        guard first.stage == reached else { return }
         let isClean = notes.allSatisfy { $0.result.firstRight && !$0.result.hinted }
-        voicingStages[first.shape] = isClean ? reached.next : reached.previous
+        voicings.count(first.shape, playedAt: FadeLevel(first.stage), isClean: isClean, steps: FadeLevel.stageSteps)
     }
 
     /// Counts a run's passes.
@@ -102,22 +128,39 @@ public struct FadeStages: Hashable, Sendable {
     }
 }
 
-extension FadeStages {
+extension FadeLevels {
     /// One note of a logged pass, as far as fading goes.
     public struct Note: Hashable, Sendable {
         public let subject: Subject
         /// What the pass was played at.
-        public let stage: FadeStage
+        public let level: FadeLevel
         /// How many notes the whole pass has, and which this is (0 = first).
         public let size: Int
         public let place: Int
         let result: NoteResult
+        /// The levels the pass moves between.
+        let steps: [FadeLevel]
 
         /// `hinted`: whether a hint had been used in the pass by then.
+        public init(subject: Subject, level: FadeLevel, hinted: Bool, size: Int, place: Int, outcome: Attempt.Outcome,
+                    firstRight: Bool) {
+            self.init(subject: subject, level: level, steps: FadeLevel.all, hinted: hinted, size: size, place: place,
+                      outcome: outcome, firstRight: firstRight)
+        }
+
+        /// Logged before fade levels, at a stage: it moves between Shown, Faded and Hidden, as the stages did, so that
+        /// no progress is lost.
         public init(subject: Subject, stage: FadeStage, hinted: Bool, size: Int, place: Int, outcome: Attempt.Outcome,
                     firstRight: Bool) {
+            self.init(subject: subject, level: FadeLevel(stage), steps: FadeLevel.stageSteps, hinted: hinted, size: size,
+                      place: place, outcome: outcome, firstRight: firstRight)
+        }
+
+        private init(subject: Subject, level: FadeLevel, steps: [FadeLevel], hinted: Bool, size: Int, place: Int,
+                     outcome: Attempt.Outcome, firstRight: Bool) {
             self.subject = subject
-            self.stage = stage
+            self.level = level
+            self.steps = steps
             self.size = size
             self.place = place
             result = NoteResult(outcome: outcome, firstRight: firstRight, hinted: hinted)
@@ -127,17 +170,17 @@ extension FadeStages {
         public init?(_ attempt: Attempt, in tuning: Tuning) {
             guard case .pass(let facts) = attempt.facts, let size = attempt.group?.size, let place = attempt.group?.place else { return nil }
             self.init(subject: Subject(tuning: tuning, scaleKind: facts.scale.kind, position: facts.position),
-                      stage: facts.fadeStage, hinted: facts.hinted, size: size, place: place, outcome: attempt.outcome,
+                      level: facts.fadeLevel, hinted: facts.hinted, size: size, place: place, outcome: attempt.outcome,
                       firstRight: attempt.firstRight)
         }
     }
 }
 
-extension FadeStages.VoicingShape {
+extension FadeLevels.VoicingShape {
     fileprivate var noteCount: Int { stringSet.strings.count }
 }
 
-extension FadeStages {
+extension FadeLevels {
     /// One note of a logged voicing, as far as fading goes.
     public struct VoicingNote: Hashable, Sendable {
         public let shape: VoicingShape
@@ -172,8 +215,8 @@ extension FadeStages {
 }
 
 extension FadeStage {
-    /// One on; Hidden stays.
-    fileprivate var next: FadeStage { self == .shown ? .faded : .hidden }
-    /// One back; Shown stays.
-    fileprivate var previous: FadeStage { self == .hidden ? .faded : .shown }
+    /// What a triad is played at, at a level reached: Faded between Shown and Hidden.
+    init(_ level: FadeLevel) {
+        self = level == .first ? .shown : level == .last ? .hidden : .faded
+    }
 }

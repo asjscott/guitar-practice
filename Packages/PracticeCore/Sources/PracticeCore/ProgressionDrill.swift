@@ -214,7 +214,7 @@ public struct ProgressionDrill<Rules: ProgressionRules>: Drill {
             advance(to: now)
         case .hold(let end):
             hold(until: end)
-        case .typed, .soundStarted, .clicksStarted, .passSettings, .fadeStages:
+        case .typed, .soundStarted, .clicksStarted, .passSettings, .fadeLevels:
             break
         }
     }

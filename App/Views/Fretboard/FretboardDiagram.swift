@@ -28,6 +28,8 @@ struct FretboardDiagram: Equatable {
         var role: Role
         /// Drawn faintly, without its label.
         var isFaint = false
+        /// Dot, ring and label, from 1 (solid) to 0, as a note fades by time.
+        var opacity: Double = 1
         /// Ringed as the last note played.
         var isLastPlayed = false
     }
