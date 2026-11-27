@@ -39,6 +39,7 @@ enum LogCheck {
                     try checkSessions()
                     try checkThemes()
                     try checkFreePractice()
+                    try checkNoteCircle()
                     try checkResume()
                     try await write(log)
                 }
@@ -319,6 +320,37 @@ enum LogCheck {
         drill.pause(notice: "The Mac went to sleep.")
         try require(drill.isPaused, "sleep didn't pause")
         drill.stop()
+    }
+
+    /// A Note circle logs one attempt per location, a group per key and one circle id per run; the log reads circles
+    /// back, complete or not, and the best clean one per tuning and capo. In memory.
+    private static func checkNoteCircle() throws {
+        func require(_ condition: Bool, _ what: String) throws {
+            if !condition { throw LogCheckError.freePractice("Note circle: " + what) }
+        }
+        let log = AttemptLog.inMemory()
+        let drill = DrillViewModel()
+        drill.kind = .noteCircle
+        drill.keepOptionsForSnapshot()
+        drill.log = log
+        for interval in [2.0, 1.0] {
+            drill.start(seed: 1)
+            drill.playCircleForSnapshot(every: .seconds(interval))
+            drill.stop()
+        }
+        drill.start(seed: 1)
+        drill.playCircleForSnapshot(5)
+        drill.stop()
+        let attempts = try log.context.fetch(FetchDescriptor<LoggedAttempt>())
+        let locations = (attempts.count - 5) / 2
+        try require(attempts.allSatisfy { $0.drill == "noteCircle" && $0.groupSize != nil }, "attempts")
+        try require(Set(attempts.compactMap(\.circleID)).count == 3, "one circle id per run")
+        try require(Set(attempts.compactMap(\.groupID)).count == 25, "a group per key")
+        let circles = log.circles(of: .noteCircle)
+        try require(circles.map(\.isComplete) == [true, true, false], "complete circles")
+        try require(circles.map(\.time) == [.seconds(2 * locations), .seconds(locations), .seconds(5)], "times")
+        try require(log.circleBest(of: .noteCircle, on: drill.fretboard) == circles[1], "the best")
+        try require(log.circleBest(of: .noteCircle, on: Fretboard(tuning: .standard, capo: 2)) == nil, "best per capo")
     }
 
     /// Resuming a scale drill takes up the tempo and the fade level that a session has moved meanwhile. In memory.

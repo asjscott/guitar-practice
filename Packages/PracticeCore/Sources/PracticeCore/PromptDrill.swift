@@ -100,7 +100,7 @@ public struct PromptDrill<Rules: DrillRules>: Drill {
         return rules.display(of: DrillMoment(prompt: prompt, phase: phase, isHeld: heldUntil != nil,
                                              wrongAnswers: wrongSoFar, attempts: attempts,
                                              correctLocations: correctLocations, now: now,
-                                             promptStart: timerStart ?? now))
+                                             promptStart: timerStart))
     }
 
     public mutating func takeSounds() -> [DrillSoundRequest] {

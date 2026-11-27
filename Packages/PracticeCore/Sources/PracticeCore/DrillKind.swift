@@ -7,12 +7,14 @@ public struct DrillKind: Identifiable, Sendable {
     public static let all: [DrillKind] = [
         .notePlayIt,
         .allInstances,
+        .noteCircle,
         .hearFindIt,
         .fretNameIt,
         .upAndDown,
         .fromADegree,
         .triadPlayIt,
         .inversions,
+        .triadCircle,
         .nearestVoicing,
         .stayInPosition,
         .targetTopNote,
@@ -47,7 +49,8 @@ public struct DrillKind: Identifiable, Sendable {
         public static let hasPasses = Traits(rawValue: 1 << 5)
         public static let hasClimbs = Traits(rawValue: 1 << 6)
         public static let hasBacking = Traits(rawValue: 1 << 7)
-        public static let hasNoPrompts = Traits(rawValue: 1 << 8)
+        public static let goesRoundTheCircle = Traits(rawValue: 1 << 8)
+        public static let hasNoPrompts = Traits(rawValue: 1 << 9)
     }
 
     private let traits: Traits
@@ -78,6 +81,9 @@ public struct DrillKind: Identifiable, Sendable {
 
     /// Asks nothing and logs nothing: Free time.
     public var hasNoPrompts: Bool { traits.contains(.hasNoPrompts) }
+
+    /// A circle drill: once round the circle of fifths from the key, against the best (`CircleProgress`).
+    public var goesRoundTheCircle: Bool { traits.contains(.goesRoundTheCircle) }
 
     /// Its prompts are climbs.
     public var hasClimbs: Bool { traits.contains(.hasClimbs) }
