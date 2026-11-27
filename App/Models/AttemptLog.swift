@@ -54,7 +54,7 @@ final class AttemptLog {
     }
 
     private static func makeContainer(at url: URL?) throws -> ModelContainer {
-        let schema = Schema(versionedSchema: PracticeSchemaV3.self)
+        let schema = Schema(versionedSchema: PracticeSchemaV4.self)
         let configuration = url.map { ModelConfiguration(schema: schema, url: $0, cloudKitDatabase: .none) }
             ?? ModelConfiguration(schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, migrationPlan: PracticeMigrationPlan.self, configurations: configuration)

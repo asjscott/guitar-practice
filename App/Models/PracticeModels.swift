@@ -4,17 +4,18 @@ import SwiftData
 import TheoryCore
 
 // The current version's models. `LoggedAttempt` is the saved record; PracticeCore's `Attempt` is the drill's.
-typealias PracticeSession = PracticeSchemaV3.Session
-typealias LoggedAttempt = PracticeSchemaV3.Attempt
-typealias DayTheme = PracticeSchemaV3.DayTheme
+typealias PracticeSession = PracticeSchemaV4.Session
+typealias LoggedAttempt = PracticeSchemaV4.Attempt
+typealias DayTheme = PracticeSchemaV4.DayTheme
 
 enum PracticeMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] {
-        [PracticeSchemaV1.self, PracticeSchemaV2.self, PracticeSchemaV3.self]
+        [PracticeSchemaV1.self, PracticeSchemaV2.self, PracticeSchemaV3.self, PracticeSchemaV4.self]
     }
     static var stages: [MigrationStage] {
         [.lightweight(fromVersion: PracticeSchemaV1.self, toVersion: PracticeSchemaV2.self),
-         .lightweight(fromVersion: PracticeSchemaV2.self, toVersion: PracticeSchemaV3.self)]
+         .lightweight(fromVersion: PracticeSchemaV2.self, toVersion: PracticeSchemaV3.self),
+         .lightweight(fromVersion: PracticeSchemaV3.self, toVersion: PracticeSchemaV4.self)]
     }
 }
 
@@ -119,7 +120,7 @@ extension LoggedAttempt {
         tempo = facts.tempo
         beatsPerBar = facts.signature.beats
         beatUnit = facts.signature.unit
-        fadeStageRaw = facts.fadeStage.rawValue
+        fadeLevel = facts.fadeLevel.number
         hinted = facts.hinted
         clickOffsetSeconds = facts.clickOffset.map { $0 / .seconds(1) }
         inputDelaySeconds = facts.inputDelay / .seconds(1)
@@ -159,6 +160,11 @@ extension LoggedAttempt {
     }
 
     var source: AttemptSource? { AttemptSource(rawValue: sourceRaw) }
+
+    /// What the pass, voicing or chord was played at: its level, or in older versions' attempts its stage as a level.
+    var playedFadeLevel: FadeLevel? {
+        fadeLevel.map(FadeLevel.init) ?? fadeStageRaw.flatMap(FadeStage.init).map(FadeLevel.init)
+    }
     var outcome: Attempt.Outcome? { Attempt.Outcome(rawValue: outcomeRaw) }
 }
 

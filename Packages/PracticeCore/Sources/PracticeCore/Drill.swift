@@ -44,8 +44,8 @@ public enum DrillEvent: Hashable, Sendable {
     case hint(isShown: Bool, at: Duration)
     /// What passes are played at, from the next one on.
     case passSettings(PassSettings, at: Duration)
-    /// The fade stages reached by now, read again from the log, which has this run's too: from the next pass or voicing on.
-    case fadeStages(FadeStages)
+    /// The fade levels reached by now, read again from the log, which has this run's too: from the next pass or voicing on.
+    case fadeLevels(FadeLevels)
     /// The clock moved on; timeouts and the next prompt happen on ticks.
     case tick(at: Duration)
 }
@@ -152,8 +152,8 @@ public protocol Drill: Sendable {
     /// What the next pass will be played at, as the tempo ladder moves it; nil in drills without passes.
     var passSettings: PassSettings? { get }
 
-    /// The fade stages reached, this run's included; nil in drills that don't fade.
-    var fadeStages: FadeStages? { get }
+    /// The fade levels reached, this run's included; nil in drills that don't fade.
+    var fadeLevels: FadeLevels? { get }
 }
 
 extension Drill {
@@ -167,7 +167,7 @@ extension Drill {
 
     public var passSettings: PassSettings? { nil }
 
-    public var fadeStages: FadeStages? { nil }
+    public var fadeLevels: FadeLevels? { nil }
 
     /// True from Start until Stop (or the end of an "In order (check)" run), paused included.
     public var isRunning: Bool { phase != .idle }

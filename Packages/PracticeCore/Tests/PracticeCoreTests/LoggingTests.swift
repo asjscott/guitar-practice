@@ -85,7 +85,7 @@ struct LoggingTests {
         #expect(attempt != Attempt(prompt: prompt, outcome: .skipped))
     }
 
-    @Test func savedFadeStagesKeepTheirNames() {
+    @Test func savedFadeLevelsKeepTheirNames() {
         #expect(FadeStage.allCases.map(\.rawValue) == ["shown", "faded", "hidden"])
     }
 }

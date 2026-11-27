@@ -1,7 +1,7 @@
 #!/bin/bash
 # Checks that logged practice survives a relaunch, in a throwaway store: one process logs and quits without warning,
 # another reads it back and the result is compared with what it should be. Then the same for stores written with
-# schemas V1 and V2, each read twice: as it is migrated, and again after. ~15 s plus the build.
+# schemas V1, V2 and V3, each read twice: as it is migrated, and again after. ~15 s plus the build.
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 xcodegen generate --quiet
@@ -14,7 +14,7 @@ trap 'rm -rf "$folder"' EXIT
 export GP_LOG_CHECK="$folder/Check.store"
 GP_LOG_CHECK_STEP=write "$app"
 found="$(GP_LOG_CHECK_STEP=read "$app")"
-expected='fade hidden, in Drop D shown
+expected='fade Level 2, in Drop D Level 0
 triads faded on D-G-B 1, hidden 0
 attempt notePlayIt freePractice answered tuning [38, 45, 50, 55, 59, 64] capo 2 target E string 3 fret 9 pitch 64 group none first false wrong [65] timed session none facts []
 attempt notePlayIt freePractice skipped tuning [38, 45, 50, 55, 59, 64] capo 2 target C string 2 fret -1 pitch -1 group none first false wrong [] no time session none facts []
@@ -24,13 +24,13 @@ attempt notePlayIt freePractice answered tuning [40, 45, 50, 55, 59, 64] capo 0 
 attempt allInstances freePractice skipped tuning [40, 45, 50, 55, 59, 64] capo 0 target G string 0 fret 3 pitch 43 group 1 first false wrong [] no time session none facts []
 attempt allInstances freePractice skipped tuning [40, 45, 50, 55, 59, 64] capo 0 target G string 1 fret 10 pitch 55 group 1 first false wrong [] no time session none facts []
 attempt allInstances freePractice skipped tuning [40, 45, 50, 55, 59, 64] capo 0 target G string 0 fret 3 pitch 43 group 2 first false wrong [] no time session none facts []
-attempt notePlayIt freePractice skipped tuning [40, 45, 50, 55, 59, 64] capo 0 target F string 2 fret 3 pitch 53 group 3 first false wrong [] no time session none facts [size 3, place 0, scale blues, tonic 9, system caged, number 4, octave 1, degree 5, alteration -1, tempo 72, beats 7, unit 8, fade faded, hinted true, offset -0.125, delay 0.0125]
+attempt notePlayIt freePractice skipped tuning [40, 45, 50, 55, 59, 64] capo 0 target F string 2 fret 3 pitch 53 group 3 first false wrong [] no time session none facts [size 3, place 0, scale blues, tonic 9, system caged, number 4, octave 1, degree 5, alteration -1, tempo 72, beats 7, unit 8, level 2, as 2, hinted true, offset -0.125, delay 0.0125]
 attempt notePlayIt freePractice skipped tuning [40, 45, 50, 55, 59, 64] capo 0 target F string 2 fret 3 pitch 53 group 4 first false wrong [] no time session none facts [size 3, place 1, root B♭, rootClass 10, quality minor, inversion second, set dGB]
-attempt nearestVoicing freePractice answered tuning [40, 45, 50, 55, 59, 64] capo 0 target E string 2 fret -1 pitch -1 group 5 first false wrong [] no time session none facts [size 4, place 2, system caged, number 4, octave 0, tempo 70, beats 4, unit 4, fade hidden, hinted false, root E, rootClass 4, quality minor, delay 0.0, progression I–V–vi–IV, key 7, mode major, numeral vi, played 2:2/3:0/4:0, accepted 3:2/4:0/5:0 1:2/2:2/3:0, style rock, chord wrong, onset -0.25]
-attempt nearestVoicing freePractice answered tuning [40, 45, 50, 55, 59, 64] capo 0 target E string 2 fret -1 pitch -1 group 5 first false wrong [] no time session none facts [size 4, place 3, system caged, number 4, octave 0, tempo 70, beats 4, unit 4, fade hidden, hinted true, root E, rootClass 4, quality minor, delay 0.0, progression I–V–vi–IV, key 7, mode major, numeral vi, accepted 3:2/4:0/5:0 1:2/2:2/3:0, style rock, chord missed]
-attempt nearestVoicing freePractice answered tuning [40, 45, 50, 55, 59, 64] capo 0 target G string 2 fret 5 pitch 55 group 6 first true wrong [] no time session none facts [size 4, place 0, system caged, number 1, octave 0, tempo 60, beats 4, unit 4, fade shown, hinted false, root G, rootClass 7, quality major, delay 0.0, progression I–V–vi–IV, key 7, mode major, numeral I, played 2:5/3:4/4:3, accepted 3:4/4:3/5:3 2:5/3:4/4:3 1:5/2:5/3:4, style rock, chord clean, onset -0.25]
-attempt nearestVoicing freePractice answered tuning [40, 45, 50, 55, 59, 64] capo 0 target D string 4 fret 3 pitch 62 group 6 first false wrong [58] no time session none facts [size 4, place 1, system caged, number 1, octave 0, tempo 60, beats 4, unit 4, fade shown, hinted false, root D, rootClass 2, quality major, delay 0.0, progression I–V–vi–IV, key 7, mode major, numeral V, accepted 2:4/3:2/4:3, style rock, chord wrong, onset 0.0]
-attempt nearestVoicing freePractice timedOut tuning [40, 45, 50, 55, 59, 64] capo 0 target E string 4 fret 5 pitch 64 group 6 first false wrong [] no time session none facts [size 4, place 2, system caged, number 1, octave 0, tempo 60, beats 4, unit 4, fade shown, hinted false, root E, rootClass 4, quality minor, delay 0.0, progression I–V–vi–IV, key 7, mode major, numeral vi, accepted 0:3/1:2/2:2 3:4/4:5/5:3 2:5/3:4/4:5, style rock, chord missed]
+attempt nearestVoicing freePractice answered tuning [40, 45, 50, 55, 59, 64] capo 0 target E string 2 fret -1 pitch -1 group 5 first false wrong [] no time session none facts [size 4, place 2, system caged, number 4, octave 0, tempo 70, beats 4, unit 4, fade hidden, as 6, hinted false, root E, rootClass 4, quality minor, delay 0.0, progression I–V–vi–IV, key 7, mode major, numeral vi, played 2:2/3:0/4:0, accepted 3:2/4:0/5:0 1:2/2:2/3:0, style rock, chord wrong, onset -0.25]
+attempt nearestVoicing freePractice answered tuning [40, 45, 50, 55, 59, 64] capo 0 target E string 2 fret -1 pitch -1 group 5 first false wrong [] no time session none facts [size 4, place 3, system caged, number 4, octave 0, tempo 70, beats 4, unit 4, fade hidden, as 6, hinted true, root E, rootClass 4, quality minor, delay 0.0, progression I–V–vi–IV, key 7, mode major, numeral vi, accepted 3:2/4:0/5:0 1:2/2:2/3:0, style rock, chord missed]
+attempt nearestVoicing freePractice answered tuning [40, 45, 50, 55, 59, 64] capo 0 target G string 2 fret 5 pitch 55 group 6 first true wrong [] no time session none facts [size 4, place 0, system caged, number 1, octave 0, tempo 60, beats 4, unit 4, fade shown, as 0, hinted false, root G, rootClass 7, quality major, delay 0.0, progression I–V–vi–IV, key 7, mode major, numeral I, played 2:5/3:4/4:3, accepted 3:4/4:3/5:3 2:5/3:4/4:3 1:5/2:5/3:4, style rock, chord clean, onset -0.25]
+attempt nearestVoicing freePractice answered tuning [40, 45, 50, 55, 59, 64] capo 0 target D string 4 fret 3 pitch 62 group 6 first false wrong [58] no time session none facts [size 4, place 1, system caged, number 1, octave 0, tempo 60, beats 4, unit 4, fade shown, as 0, hinted false, root D, rootClass 2, quality major, delay 0.0, progression I–V–vi–IV, key 7, mode major, numeral V, accepted 2:4/3:2/4:3, style rock, chord wrong, onset 0.0]
+attempt nearestVoicing freePractice timedOut tuning [40, 45, 50, 55, 59, 64] capo 0 target E string 4 fret 5 pitch 64 group 6 first false wrong [] no time session none facts [size 4, place 2, system caged, number 1, octave 0, tempo 60, beats 4, unit 4, fade shown, as 0, hinted false, root E, rootClass 4, quality minor, delay 0.0, progression I–V–vi–IV, key 7, mode major, numeral vi, accepted 0:3/1:2/2:2 3:4/4:5/5:3 2:5/3:4/4:5, style rock, chord missed]
 session 2026-07-25 endedEarly theme B♭ major set E-A-D progression I–V–vi–IV blocks [450.0, 450.0] attempts 1
 theme 2026-07-25 B♭ major position caged 3 rerolls 2 set G-B-E progression vi–IV–I–V'
 diff <(printf '%s\n' "$expected") <(printf '%s\n' "$found") || { echo "✗ log check" >&2; exit 1; }
@@ -67,13 +67,34 @@ block upAndDown 300.0 1 400.0
 block triadPlayIt 300.0 0 310.5
 attempt 021 21.0 session upAndDown [40, 45, 50, 55, 59, 64] 0
   target C 0 4 1 60 answered false 0.75 ["61"]
-  group 201 session 003 0 facts [size 6, place 0, scale minorPentatonic, tonic 9, system caged, number 2, octave 0, degree 3, alteration -1, tempo 80, beats 4, unit 4, fade shown, hinted false, offset 0.03125]
+  group 201 session 003 0 facts [size 6, place 0, scale minorPentatonic, tonic 9, system caged, number 2, octave 0, degree 3, alteration -1, tempo 80, beats 4, unit 4, fade shown, as 0, hinted false, offset 0.03125]
 attempt 022 22.0 session triadPlayIt [40, 45, 50, 55, 59, 64] 0
   target C 0 4 1 60 skipped true 0.75 []
-  group 202 session 003 1 facts [size 6, place 1, fade faded, hinted true, root A, rootClass 9, quality minor, inversion root, set gBE]
+  group 202 session 003 1 facts [size 6, place 1, fade faded, as 2, hinted true, root A, rootClass 9, quality minor, inversion root, set gBE]
 theme 2026-11-20 1 9 minor caged 2 0 gBE -'
 for opening in first second; do
   found="$(GP_LOG_CHECK_STEP=readAll "$app")"
   diff <(printf '%s\n' "$expected") <(printf '%s\n' "$found") || { echo "✗ log check: V2 store, $opening opening" >&2; exit 1; }
+done
+export GP_LOG_CHECK="$folder/V3.store"
+GP_LOG_CHECK_STEP=writeV3 "$app"
+expected='session 004 2026-11-24 4000.0 4700.0 completed 700.5 25 true false theme 7 major caged 4 0 dGB I–V–vi–IV attempts ["031", "032", "033", "034"]
+block upAndDown 600.0 0 610.0
+attempt 031 31.0 session upAndDown [40, 45, 50, 55, 59, 64] 0
+  target G 7 0 3 43 answered true 0.5 []
+  group 301 session 004 0 facts [size 1, place 0, scale major, tonic 7, system caged, number 4, octave 0, degree 1, alteration 0, tempo 64, beats 4, unit 4, fade shown, as 0, hinted false, offset -0.0625, delay 0.0125]
+attempt 032 32.0 session upAndDown [40, 45, 50, 55, 59, 64] 0
+  target G 7 0 3 43 answered true 0.5 []
+  group 302 session 004 0 facts [size 1, place 0, scale major, tonic 7, system caged, number 4, octave 0, degree 1, alteration 0, tempo 64, beats 4, unit 4, fade faded, as 2, hinted false, offset -0.0625, delay 0.0125]
+attempt 033 33.0 session upAndDown [40, 45, 50, 55, 59, 64] 0
+  target G 7 0 3 43 answered true 0.5 []
+  group 303 session 004 0 facts [size 1, place 0, scale major, tonic 7, system caged, number 4, octave 0, degree 1, alteration 0, tempo 64, beats 4, unit 4, fade hidden, as 6, hinted false, offset -0.0625, delay 0.0125]
+attempt 034 34.0 session stayInPosition [40, 45, 50, 55, 59, 64] 0
+  target G 7 0 3 43 answered true 0.5 []
+  group 304 session 004 0 facts [size 4, place 1, system caged, number 4, octave 0, tempo 90, beats 4, unit 4, fade faded, as 2, hinted false, root D, rootClass 2, quality major, delay 0.0125, progression I–V–vi–IV, key 7, mode major, numeral V, played 2:0/3:2/4:3, style pop, chord clean, onset 0.125]
+theme 2026-11-24 0 7 major caged 4 0 dGB I–V–vi–IV'
+for opening in first second; do
+  found="$(GP_LOG_CHECK_STEP=readAll "$app")"
+  diff <(printf '%s\n' "$expected") <(printf '%s\n' "$found") || { echo "✗ log check: V3 store, $opening opening" >&2; exit 1; }
 done
 echo "✓ log check"

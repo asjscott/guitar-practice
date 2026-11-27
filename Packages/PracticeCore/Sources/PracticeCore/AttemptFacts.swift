@@ -36,7 +36,7 @@ public struct PassFacts: Hashable, Sendable {
     public var signature: TimeSignature
 
     /// What the pass was played at.
-    public var fadeStage: FadeStage
+    public var fadeLevel: FadeLevel
 
     /// Whether a hint had been used in the pass by the time this note was dealt with.
     public var hinted: Bool
@@ -49,13 +49,13 @@ public struct PassFacts: Hashable, Sendable {
     public var inputDelay: Duration
 
     public init(scale: Scale, position: Position.ID, startDegree: Scale.Degree, tempo: Int, signature: TimeSignature,
-                fadeStage: FadeStage, hinted: Bool, clickOffset: Duration?, inputDelay: Duration = .zero) {
+                fadeLevel: FadeLevel, hinted: Bool, clickOffset: Duration?, inputDelay: Duration = .zero) {
         self.scale = scale
         self.position = position
         self.startDegree = startDegree
         self.tempo = tempo
         self.signature = signature
-        self.fadeStage = fadeStage
+        self.fadeLevel = fadeLevel
         self.hinted = hinted
         self.clickOffset = clickOffset
         self.inputDelay = inputDelay
@@ -148,7 +148,9 @@ extension Attempt {
     }
 }
 
-/// How much of a position is shown during a pass, or of a triad's voicing. The raw values are saved in the attempt log: never change them.
+/// How much of a triad's voicing is shown while it is played, and in the progression drills a time through's. Passes
+/// were played at one before fade levels, and the log keeps it, read as a level (`FadeLevel.init(_:)`). The raw values
+/// are saved in the attempt log: never change them.
 public enum FadeStage: String, Hashable, Sendable, CaseIterable {
     case shown, faded, hidden
 }

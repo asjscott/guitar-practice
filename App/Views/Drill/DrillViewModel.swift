@@ -174,10 +174,10 @@ final class DrillViewModel: MetronomePanelOwner {
     var chordSummary: ChordSummary { ChordSummary(attempts: snapshot.attempts) }
 
     /// Those reached by now in what the drill goes through, a session's included.
-    private func loggedFadeStages() -> FadeStages? {
+    private func loggedFadeLevels() -> FadeLevels? {
         guard kind.fades else { return nil }
-        return kind.hasPasses ? log?.fadeStages(in: setup.passPositions.map(\.id), on: [])
-            : log?.fadeStages(in: [], on: options.stringSets)
+        return kind.hasPasses ? log?.fadeLevels(in: setup.passPositions.map(\.id), on: [])
+            : log?.fadeLevels(in: [], on: options.stringSets)
     }
 
     /// The metronome panel. The view keeps the run's buttons and keys from acting while it is open.
@@ -244,10 +244,10 @@ final class DrillViewModel: MetronomePanelOwner {
         return setup
     }
 
-    private func newDrill(seed: UInt64, fadeStages: FadeStages = FadeStages()) -> any Drill {
+    private func newDrill(seed: UInt64, fadeLevels: FadeLevels = FadeLevels()) -> any Drill {
         var setup = setup
         setup.seed = seed
-        setup.fadeStages = fadeStages
+        setup.fadeLevels = fadeLevels
         return kind.makeDrill(setup)
     }
 
@@ -255,7 +255,7 @@ final class DrillViewModel: MetronomePanelOwner {
         loadTempo()
         loadBacking()
         guard !isRunning, inputProblem == nil, nothingToPromptReason == nil, prepareSound() else { return }
-        drill = newDrill(seed: seed, fadeStages: loggedFadeStages() ?? FadeStages())
+        drill = newDrill(seed: seed, fadeLevels: loggedFadeLevels() ?? FadeLevels())
         runLog = log?.run()
         send(.start(at: clockNow()))
         startTicking()
@@ -278,7 +278,7 @@ final class DrillViewModel: MetronomePanelOwner {
         guard isPaused, inputProblem == nil, prepareSound() else { return }
         pauseNotice = nil
         loadTempo()
-        if let stages = loggedFadeStages() { send(.fadeStages(stages)) }
+        if let stages = loggedFadeLevels() { send(.fadeLevels(stages)) }
         send(.resume(at: clockNow()))
         startTicking()
     }
@@ -442,6 +442,17 @@ final class DrillViewModel: MetronomePanelOwner {
         let pitch = fretboard.pitch(at: location)
         let now = max(clockNow(), drill.promptStart ?? .zero)
         send(.played(right ? pitch : pitch + Interval(1), onset: now, at: now))
+    }
+
+    /// Plays the next notes right, each a second after the last (the first as its prompt starts), on the drill's clock,
+    /// which is left at the last.
+    func playInTimeForSnapshot(_ count: Int) {
+        ticker.stop()
+        for index in 0..<count {
+            guard let location = drill.rightLocationForSnapshot, let start = drill.promptStart else { return }
+            let onset = index == 0 ? start : start + .seconds(1)
+            send(.played(fretboard.pitch(at: location), onset: onset, at: onset))
+        }
     }
 
     /// Lets the current prompt's time run out now.

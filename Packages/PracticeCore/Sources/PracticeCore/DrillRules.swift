@@ -60,8 +60,8 @@ public protocol DrillRules: Sendable {
     /// H held or let go; pausing and stopping let go. Default: nothing.
     mutating func hint(isShown: Bool)
 
-    /// The fade stages reached, read again from the log, are set; nil in drills that don't fade. Default: nil.
-    var fadeStages: FadeStages? { get set }
+    /// The fade levels reached, read again from the log, are set; nil in drills that don't fade. Default: nil.
+    var fadeLevels: FadeLevels? { get set }
 
     /// What to show. Default: the note name over its string, wrong notes as "You played G".
     func display(of moment: DrillMoment) -> DrillDisplay
@@ -145,6 +145,6 @@ extension DrillRules {
     public var isPartWay: Bool { false }
     public var isTimed: Bool { true }
     public mutating func hint(isShown: Bool) {}
-    public var fadeStages: FadeStages? { get { nil } set {} }
+    public var fadeLevels: FadeLevels? { get { nil } set {} }
     public func display(of moment: DrillMoment) -> DrillDisplay { DrillDisplay(standard: moment, in: setup) }
 }

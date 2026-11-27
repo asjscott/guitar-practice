@@ -95,7 +95,7 @@ public struct TriadPlayItRules: DrillRules {
 
     public mutating func hint(isShown: Bool) { fade.hint(isShown: isShown) }
 
-    public var fadeStages: FadeStages? {
+    public var fadeLevels: FadeLevels? {
         get { fade.reached }
         set { if let newValue { fade.reached = newValue } }
     }

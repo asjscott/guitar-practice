@@ -3,27 +3,27 @@ import TheoryCore
 import PracticeCore
 
 private let aMinorSecond = TriadFacts(triad: Triad(.minor, root: .a), inversion: .second, stringSet: .dGB)
-private let shape = FadeStages.VoicingShape(tuning: .standard, quality: .minor, inversion: .second, stringSet: .dGB)
+private let shape = FadeLevels.VoicingShape(tuning: .standard, quality: .minor, inversion: .second, stringSet: .dGB)
 
-private func reached(_ stage: FadeStage, _ shape: FadeStages.VoicingShape = shape) -> FadeStages {
-    var stages = FadeStages()
+private func reached(_ stage: FadeStage, _ shape: FadeLevels.VoicingShape = shape) -> FadeLevels {
+    var stages = FadeLevels()
     let steps: [FadeStage] = stage == .shown ? [] : stage == .faded ? [.shown] : [.shown, .faded]
     for step in steps { stages.add(voicing: voicing(at: step, shape)) }
     return stages
 }
 
 /// The notes of a voicing: clean, unless something is said to go wrong.
-private func voicing(at stage: FadeStage, _ shape: FadeStages.VoicingShape = shape, wrongAt: Int? = nil,
-                     hintedAt: Int? = nil, endingWith last: Attempt.Outcome = .answered, count: Int = 3) -> [FadeStages.VoicingNote] {
+private func voicing(at stage: FadeStage, _ shape: FadeLevels.VoicingShape = shape, wrongAt: Int? = nil,
+                     hintedAt: Int? = nil, endingWith last: Attempt.Outcome = .answered, count: Int = 3) -> [FadeLevels.VoicingNote] {
     (0..<count).map { place in
         let outcome = place == count - 1 ? last : .answered
-        return FadeStages.VoicingNote(shape: shape, stage: stage, hinted: hintedAt.map { place >= $0 } ?? false, place: place,
+        return FadeLevels.VoicingNote(shape: shape, stage: stage, hinted: hintedAt.map { place >= $0 } ?? false, place: place,
                                       outcome: outcome, firstRight: outcome == .answered && place != wrongAt)
     }
 }
 
-private func stage(after voicings: [FadeStages.VoicingNote]...) -> FadeStage {
-    var stages = FadeStages()
+private func stage(after voicings: [FadeLevels.VoicingNote]...) -> FadeStage {
+    var stages = FadeLevels()
     for voicing in voicings { stages.add(voicing: voicing) }
     return stages.stage(of: shape)
 }
@@ -56,7 +56,7 @@ struct TriadFadeFoldTests {
 
     @Test func shapesAreSeparate() {
         var stages = reached(.faded)
-        var others = [FadeStages.VoicingShape](repeating: shape, count: 4)
+        var others = [FadeLevels.VoicingShape](repeating: shape, count: 4)
         others[0].tuning = TuningPreset.dropD.tuning
         others[1].quality = .major
         others[2].inversion = .first
@@ -69,14 +69,14 @@ struct TriadFadeFoldTests {
     @Test func theLogIsSplitIntoVoicings() {
         // A climb's are in one group. One a pause cut short starts again.
         let again = voicing(at: .shown, count: 2) + voicing(at: .shown) + voicing(at: .faded)
-        #expect(FadeStages(log: [(group: Int, note: FadeStages.Note)](), voicings: again.map { (group: 1, note: $0) }).stage(of: shape) == .hidden)
+        #expect(FadeLevels(log: [(group: Int, note: FadeLevels.Note)](), voicings: again.map { (group: 1, note: $0) }).stage(of: shape) == .hidden)
         // One a stop cut short isn't finished by another group's notes.
         let cut = voicing(at: .shown, count: 2).map { (group: 1, note: $0) } + voicing(at: .shown).suffix(1).map { (group: 2, note: $0) }
-        #expect(FadeStages(log: [(group: Int, note: FadeStages.Note)](), voicings: cut).stage(of: shape) == .shown)
+        #expect(FadeLevels(log: [(group: Int, note: FadeLevels.Note)](), voicings: cut).stage(of: shape) == .shown)
     }
 }
 
-private func setup(_ stages: FadeStages = FadeStages(), key: Key = .major(.c), override: FadeStage? = nil, capo: Int = 0,
+private func setup(_ stages: FadeLevels = FadeLevels(), key: Key = .major(.c), override: FadeStage? = nil, capo: Int = 0,
                    seed: UInt64) -> DrillSetup {
     var options = DrillOptions()
     options.key = key
@@ -85,12 +85,12 @@ private func setup(_ stages: FadeStages = FadeStages(), key: Key = .major(.c), o
     options.inversions = [.second]
     options.triadFade = override
     var setup = DrillSetup(fretboard: Fretboard(tuning: .standard, capo: capo), options: options, seed: seed)
-    setup.fadeStages = stages
+    setup.fadeLevels = stages
     return setup
 }
 
 /// A run whose first prompt is for A minor's 2nd inversion on D-G-B: 2 2 1 (52 57 60), or an octave up.
-private func asking(_ stages: FadeStages = FadeStages(), override: FadeStage? = nil) -> any Drill {
+private func asking(_ stages: FadeLevels = FadeLevels(), override: FadeStage? = nil) -> any Drill {
     for seed in UInt64(0)..<500 {
         var drill = DrillKind.triadPlayIt.makeDrill(setup(stages, override: override, seed: seed))
         drill.handle(.start(at: s(0)))
@@ -178,7 +178,7 @@ struct TriadPlayItFadeTests {
         let facts = drill.attempts.map { if case .triad(let facts) = $0.facts { facts.hinted } else { false } }
         #expect(facts == [false, true])
         play(60, at: 5, &drill)
-        #expect(drill.fadeStages?.stage(of: shape) == .faded)
+        #expect(drill.fadeLevels?.stage(of: shape) == .faded)
     }
 
     @Test func pausingEndsAHint() {
@@ -192,40 +192,40 @@ struct TriadPlayItFadeTests {
     @Test func aCleanOneMovesOnAndIsLoggedAtItsStage() {
         var drill = asking()
         for (index, midi) in low.enumerated() { play(midi, at: 1 + Double(index), &drill) }
-        #expect(drill.fadeStages?.stage(of: shape) == .faded)
+        #expect(drill.fadeLevels?.stage(of: shape) == .faded)
         let stages = drill.attempts.map { attempt -> FadeStage? in
             guard case .triad(let facts) = attempt.facts else { return nil }
             return facts.fadeStage
         }
         #expect(stages == [.shown, .shown, .shown])
         let notes = drill.attemptsToLog.compactMap { attempt in
-            FadeStages.VoicingNote(attempt, in: .standard).map { (group: attempt.group?.number ?? -1, note: $0) }
+            FadeLevels.VoicingNote(attempt, in: .standard).map { (group: attempt.group?.number ?? -1, note: $0) }
         }
-        #expect(FadeStages(log: [(group: Int, note: FadeStages.Note)](), voicings: notes).stage(of: shape) == .faded)
+        #expect(FadeLevels(log: [(group: Int, note: FadeLevels.Note)](), voicings: notes).stage(of: shape) == .faded)
     }
 
     @Test func aSkippedOneLeavesIt() {
         var drill = asking(reached(.faded))
         play(52, at: 1, &drill)
         drill.handle(.skip(at: s(2)))
-        #expect(drill.fadeStages?.stage(of: shape) == .faded)
+        #expect(drill.fadeLevels?.stage(of: shape) == .faded)
     }
 
     @Test func anOverrideDoesntMoveIt() {
         var drill = asking(override: .hidden)
         for (index, midi) in low.enumerated() { play(midi, at: 1 + Double(index), &drill) }
-        #expect(drill.fadeStages?.stage(of: shape) == .shown)
+        #expect(drill.fadeLevels?.stage(of: shape) == .shown)
     }
 
     @Test func resumingTakesUpWhatWasReachedMeanwhile() {
         var drill = asking()
         drill.handle(.pause(at: s(1)))
-        var all = FadeStages()
+        var all = FadeLevels()
         for quality in Triad.Quality.allCases {
-            let shape = FadeStages.VoicingShape(tuning: .standard, quality: quality, inversion: .second, stringSet: .dGB)
+            let shape = FadeLevels.VoicingShape(tuning: .standard, quality: quality, inversion: .second, stringSet: .dGB)
             all.add(voicing: voicing(at: .shown, shape))
         }
-        drill.handle(.fadeStages(all))
+        drill.handle(.fadeLevels(all))
         drill.handle(.resume(at: s(2)))
         #expect(drill.display?.markers.allSatisfy { $0.isFaint } == true)
     }
@@ -246,12 +246,12 @@ struct TriadPlayItFadeTests {
 @Suite("Inversions fading")
 struct InversionsFadeTests {
     /// A minor on D-G-B up to fret 12: 2nd inversion, root position, 1st inversion, and back.
-    private func climbing(_ stages: FadeStages = FadeStages()) -> any Drill {
+    private func climbing(_ stages: FadeLevels = FadeLevels()) -> any Drill {
         for seed in UInt64(0)..<500 {
             var options = DrillOptions()
             options.stringSets = [.dGB]
             var setup = DrillSetup(fretboard: Fretboard(tuning: .standard), options: options, seed: seed)
-            setup.fadeStages = stages
+            setup.fadeLevels = stages
             var drill = DrillKind.inversions.makeDrill(setup)
             drill.handle(.start(at: s(0)))
             if drill.display?.headline.hasPrefix("A minor · ") == true { return drill }
@@ -278,7 +278,7 @@ struct InversionsFadeTests {
         play(first, from: 11, &drill)
         // Root position again, now faded.
         #expect(drill.display?.markers.map(\.isFaint) == [true, true, true])
-        #expect(drill.fadeStages?.stage(of: shape) == .faded)
+        #expect(drill.fadeLevels?.stage(of: shape) == .faded)
     }
 
     @Test func aVoicingResumedStartsAfresh() {
@@ -288,11 +288,11 @@ struct InversionsFadeTests {
         drill.handle(.pause(at: s(3)))
         drill.handle(.resume(at: s(4)))
         play(low, from: 5, &drill)
-        #expect(drill.fadeStages?.stage(of: shape) == .faded)
+        #expect(drill.fadeLevels?.stage(of: shape) == .faded)
         let notes = drill.attemptsToLog.compactMap { attempt in
-            FadeStages.VoicingNote(attempt, in: .standard).map { (group: attempt.group?.number ?? -1, note: $0) }
+            FadeLevels.VoicingNote(attempt, in: .standard).map { (group: attempt.group?.number ?? -1, note: $0) }
         }
-        #expect(FadeStages(log: [(group: Int, note: FadeStages.Note)](), voicings: notes).stage(of: shape) == .faded)
+        #expect(FadeLevels(log: [(group: Int, note: FadeLevels.Note)](), voicings: notes).stage(of: shape) == .faded)
     }
 }
 
@@ -300,7 +300,7 @@ struct InversionsFadeTests {
 struct SessionTriadFadeTests {
     @Test func theBlocksCarryItOnAndTakeHints() {
         let block = SessionBlock(kind: .triadPlayIt, length: s(180))
-        var stages = FadeStages()
+        var stages = FadeLevels()
         for quality in Triad.Quality.allCases {
             stages.add(voicing: voicing(at: .shown, .init(tuning: .standard, quality: quality, inversion: .second, stringSet: .dGB)))
         }
