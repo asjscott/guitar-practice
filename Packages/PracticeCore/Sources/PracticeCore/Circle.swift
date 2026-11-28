@@ -162,6 +162,33 @@ public struct CircleProgress: Hashable, Sendable {
         self.best = best
     }
 
+    /// A circle drill's, at a moment: `place` is kept within the keys. Its wrong notes include the prompt's own while
+    /// it can be answered; its clock runs while a prompt can be answered and, between prompts, from the last right
+    /// note, and stops once the circle is complete.
+    public init(at moment: DrillMoment, keys: [Key], place: Int, best: CircleResult?) {
+        let attempts = moment.attempts
+        let isAnswerable = switch moment.phase {
+        case .waiting, .wrong: true
+        default: false
+        }
+        let result = CircleResult(attempts: attempts, count: keys.count).flatMap { $0.isComplete ? $0 : nil }
+        let runningSince: Duration? = if result != nil {
+            nil
+        } else if isAnswerable {
+            moment.promptStart
+        } else if let start = moment.promptStart, let time = attempts.last?.responseTime {
+            // Between prompts: from the last right note.
+            start + time
+        } else {
+            nil
+        }
+        self.init(keys: keys, place: min(max(place, 0), keys.count - 1),
+                  wrongNotes: attempts.map(\.wrongAnswers.count).reduce(0, +) + (isAnswerable ? moment.wrongAnswers.count : 0),
+                  skips: attempts.filter(\.skipped).count,
+                  elapsed: attempts.reduce(.zero) { $0 + ($1.responseTime ?? .zero) },
+                  runningSince: runningSince, result: result, best: best)
+    }
+
     public var key: Key { keys[place] }
     public var count: Int { keys.count }
     /// Nil at the last key.

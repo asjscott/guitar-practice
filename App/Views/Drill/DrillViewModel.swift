@@ -294,7 +294,7 @@ final class DrillViewModel: MetronomePanelOwner {
         guard isPaused, inputProblem == nil, prepareSound() else { return }
         pauseNotice = nil
         loadTempo()
-        if let stages = loggedFadeLevels() { send(.fadeLevels(stages)) }
+        if let levels = loggedFadeLevels() { send(.fadeLevels(levels)) }
         send(.resume(at: clockNow()))
         startTicking()
     }

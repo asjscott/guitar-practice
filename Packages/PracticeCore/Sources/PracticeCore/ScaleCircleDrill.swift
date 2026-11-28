@@ -71,7 +71,7 @@ public struct ScaleCircleRules: DrillRules {
         }
         let location = queue.removeFirst()
         return NotePrompt(name: setup.fretboard.name(at: location, in: positions[pass].scale), string: location.string,
-                          target: location, sweep: pass)
+                          target: location, pass: pass)
     }
 
     private func direction(of pass: Int) -> PassDirection {
@@ -95,13 +95,13 @@ public struct ScaleCircleRules: DrillRules {
     }
 
     public func group(for prompt: NotePrompt) -> AttemptGroup? {
-        guard let pass = prompt.sweep else { return nil }
+        guard let pass = prompt.pass else { return nil }
         let order = order(of: pass)
         return AttemptGroup(number: pass, size: order.count, place: order.firstIndex { $0 == prompt.target }, circle: 0)
     }
 
     public func facts(for prompt: NotePrompt) -> AttemptFacts? {
-        guard let pass = prompt.sweep else { return nil }
+        guard let pass = prompt.pass else { return nil }
         let position = positions[pass], order = order(of: pass)
         let first = order.first.map { setup.fretboard.pitch(at: $0).pitchClass }
         return .pass(PassFacts(scale: position.scale, position: position.id,
@@ -141,14 +141,14 @@ public struct ScaleCircleRules: DrillRules {
     public var resumeRule: DrillResumeRule { .samePrompt(keepingWrongAnswers: true) }
 
     public func display(of moment: DrillMoment) -> DrillDisplay {
-        let pass = moment.prompt.sweep ?? 0
+        let pass = moment.prompt.pass ?? 0
         let position = positions[pass], scale = position.scale
         var display = DrillDisplay(standard: moment, in: setup)
         display.headline = scale.name
         display.subline = "\(scale.kind.name) · \(position.name) · \(direction(of: pass).text)"
         display.highlightedStrings = []
         if case .wrong(let played) = moment.phase { display.feedback = "You played \(scale.spell(played))" }
-        let done = moment.attempts.filter { $0.prompt.sweep == pass }
+        let done = moment.attempts.filter { $0.prompt.pass == pass }
         display.markers = markers(of: pass, done: done, at: moment.now)
         let order = order(of: pass)
         display.pass = PassProgress(
@@ -188,20 +188,8 @@ public struct ScaleCircleRules: DrillRules {
     }
 
     private func progress(at moment: DrillMoment) -> CircleProgress {
-        let attempts = moment.attempts
-        let isAnswerable = switch moment.phase {
-        case .waiting, .wrong: true
-        default: false
-        }
-        let keys = positions.map(\.scale.key)
-        let result = CircleResult(attempts: attempts, count: keys.count).flatMap { $0.isComplete ? $0 : nil }
-        let pass = moment.prompt.sweep ?? 0
-        var progress = CircleProgress(
-            keys: keys, place: pass,
-            wrongNotes: attempts.map(\.wrongAnswers.count).reduce(0, +) + (isAnswerable ? moment.wrongAnswers.count : 0),
-            skips: attempts.filter(\.skipped).count,
-            elapsed: attempts.reduce(.zero) { $0 + ($1.responseTime ?? .zero) },
-            runningSince: result == nil && isAnswerable ? moment.promptStart : nil, result: result, best: setup.circleBest)
+        let pass = moment.prompt.pass ?? 0
+        var progress = CircleProgress(at: moment, keys: positions.map(\.scale.key), place: pass, best: setup.circleBest)
         if pass + 1 < positions.count {
             progress.nextDetail = "\(positions[pass + 1].name) · \(direction(of: pass + 1).rawValue)"
         }

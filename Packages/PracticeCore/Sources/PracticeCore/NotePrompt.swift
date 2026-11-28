@@ -15,11 +15,15 @@ public struct NotePrompt: Hashable, Sendable {
     /// Which of the run's sweeps this is in, in All instances; nil in other drills. The log groups attempts by it.
     public let sweep: Int?
 
-    public init(name: NoteName, string: Int, target: FretboardLocation? = nil, sweep: Int? = nil) {
+    /// Which of the run's passes this is in, in the Scale circle; nil in other drills.
+    public let pass: Int?
+
+    public init(name: NoteName, string: Int, target: FretboardLocation? = nil, sweep: Int? = nil, pass: Int? = nil) {
         self.name = name
         self.string = string
         self.target = target
         self.sweep = sweep
+        self.pass = pass
     }
 
     /// Spelled with sharps, since no key applies.

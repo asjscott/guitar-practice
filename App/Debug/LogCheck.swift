@@ -734,17 +734,17 @@ enum LogCheck {
 
     private static func read(_ log: AttemptLog) throws {
         let eShape = FadeLevels.Subject(tuning: .standard, scaleKind: .major, position: Position.ID(system: .caged, number: 1))
-        let stages = log.fadeLevels(in: [eShape.position], on: [.dGB])
+        let levels = log.fadeLevels(in: [eShape.position], on: [.dGB])
         var dropD = eShape
         dropD.tuning = TuningPreset.dropD.tuning
-        print("fade \(stages.level(of: eShape)), in Drop D \(stages.level(of: dropD))")
+        print("fade \(levels.level(of: eShape)), in Drop D \(levels.level(of: dropD))")
         let shapes = Triad.Quality.allCases.flatMap { quality in
             Triad.Inversion.allCases.map {
                 FadeLevels.VoicingShape(tuning: .standard, quality: quality, inversion: $0, stringSet: .dGB)
             }
         }
-        let levels = shapes.map { stages.level(of: $0).number }
-        print("triads on D-G-B at level 1 \(levels.filter { $0 == 1 }.count), above \(levels.filter { $0 > 1 }.count)")
+        let shapeLevels = shapes.map { levels.level(of: $0).number }
+        print("triads on D-G-B at level 1 \(shapeLevels.filter { $0 == 1 }.count), above \(shapeLevels.filter { $0 > 1 }.count)")
         var groups: [UUID] = []
         func group(of attempt: LoggedAttempt) -> String {
             guard let id = attempt.groupID else { return "none" }

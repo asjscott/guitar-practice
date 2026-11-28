@@ -110,27 +110,6 @@ public struct NoteCircleRules: DrillRules {
     }
 
     private func progress(at moment: DrillMoment) -> CircleProgress {
-        let attempts = moment.attempts
-        let isAnswerable = switch moment.phase {
-        case .waiting, .wrong: true
-        default: false
-        }
-        let result = CircleResult(attempts: attempts, count: keys.count).flatMap { $0.isComplete ? $0 : nil }
-        let runningSince: Duration? = if result != nil {
-            nil
-        } else if isAnswerable {
-            moment.promptStart
-        } else if let start = moment.promptStart, let time = attempts.last?.responseTime {
-            // Between sweeps: from the last right note.
-            start + time
-        } else {
-            nil
-        }
-        return CircleProgress(
-            keys: keys, place: moment.prompt.sweep ?? 0,
-            wrongNotes: attempts.map(\.wrongAnswers.count).reduce(0, +) + (isAnswerable ? moment.wrongAnswers.count : 0),
-            skips: attempts.filter(\.skipped).count,
-            elapsed: attempts.reduce(.zero) { $0 + ($1.responseTime ?? .zero) },
-            runningSince: runningSince, result: result, best: setup.circleBest)
+        CircleProgress(at: moment, keys: keys, place: moment.prompt.sweep ?? 0, best: setup.circleBest)
     }
 }

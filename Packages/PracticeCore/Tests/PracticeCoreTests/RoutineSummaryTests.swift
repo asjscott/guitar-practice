@@ -114,7 +114,7 @@ private func scaleCircle(_ seconds: [Double]) -> [Attempt] {
     var drill = DrillKind.scaleCircle.makeDrill(setup)
     drill.handle(.start(at: s(0)))
     for (pass, interval) in seconds.enumerated() {
-        while drill.isRunning, drill.prompt?.sweep == pass, let target = drill.prompt?.target, let start = drill.promptStart {
+        while drill.isRunning, drill.prompt?.pass == pass, let target = drill.prompt?.target, let start = drill.promptStart {
             drill.handle(.played(drill.fretboard.pitch(at: target), onset: start + s(interval), at: start + s(interval)))
             drill.handle(.tick(at: start + s(interval + 0.1)))
         }
@@ -212,8 +212,8 @@ struct RoutineSummaryFromSessionTests {
         var player = routine()
         player.play(step: 3)
         for _ in 0..<3 {
-            let pass = player.drill?.prompt?.sweep
-            while player.stage == .playing, player.drill?.prompt?.sweep == pass { player.playRight(1) }
+            let pass = player.drill?.prompt?.pass
+            while player.stage == .playing, player.drill?.prompt?.pass == pass { player.playRight(1) }
         }
         let keys = player.summary.scaleCircleKeys
         #expect(keys.map(\.key.shortName) == ["G", "D", "A"])

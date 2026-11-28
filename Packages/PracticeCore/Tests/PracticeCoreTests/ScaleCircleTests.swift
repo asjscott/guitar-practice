@@ -20,8 +20,8 @@ private func circle(on fretboard: Fretboard = standard, _ change: (inout DrillSe
 @discardableResult
 private func finishPass(_ drill: inout any Drill, every interval: Double = 1) -> [FretboardLocation] {
     var played: [FretboardLocation] = []
-    let pass = drill.prompt?.sweep
-    while drill.isRunning, drill.prompt?.sweep == pass, let target = drill.prompt?.target, let start = drill.promptStart,
+    let pass = drill.prompt?.pass
+    while drill.isRunning, drill.prompt?.pass == pass, let target = drill.prompt?.target, let start = drill.promptStart,
           played.count < 100 {
         played.append(target)
         drill.handle(.played(drill.fretboard.pitch(at: target), onset: start + s(interval), at: start + s(interval)))
@@ -122,6 +122,21 @@ struct ScaleCircleAnswerTests {
         let notes = drill.attempts.count
         #expect(drill.display?.circle?.time(at: drill.promptStart ?? .zero) == s(2) * notes)
         #expect(drill.promptStart == s(2) * notes)
+    }
+
+    @Test func theClockRunsOnBetweenOnePasssLastNoteAndTheNextKey() throws {
+        var drill = circle()
+        while drill.isRunning, drill.attempts.count + 1 < standard.passOrder(of: try theme(), going: .up).count {
+            guard let target = drill.prompt?.target, let start = drill.promptStart else { break }
+            drill.handle(.played(drill.fretboard.pitch(at: target), onset: start + s(1), at: start + s(1)))
+            drill.handle(.tick(at: start + s(1.1)))
+        }
+        let last = try #require(drill.prompt?.target)
+        let start = try #require(drill.promptStart)
+        drill.handle(.played(drill.fretboard.pitch(at: last), onset: start + s(1), at: start + s(1)))
+        // The pass's last note is in, and the next key isn't up yet.
+        let circle = try #require(drill.display?.circle)
+        #expect(circle.time(at: start + s(3)) == circle.elapsed + s(2))
     }
 
     @Test func wrongNotesAreCountedAndASkipLeavesTheCircleNotClean() {

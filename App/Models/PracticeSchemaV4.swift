@@ -26,7 +26,7 @@ enum PracticeSchemaV4: VersionedSchema {
         /// A `SessionState` raw value.
         var stateRaw: String
 
-        /// From Start to the end, Ready cards and overtime included; nil until it ends.
+        /// From Start to the end, Ready cards and extended blocks included; nil until it ends.
         var totalSeconds: Double?
 
         // What was chosen at setup.
