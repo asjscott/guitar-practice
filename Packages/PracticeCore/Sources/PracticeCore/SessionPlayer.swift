@@ -56,7 +56,8 @@ public enum SessionEvent: Hashable, Sendable {
 /// Runs a session's blocks: a pure state machine driven by events and a clock, like the drills it drives.
 ///
 /// A block with a planned length ends only when the player moves on; the others end by themselves (`SessionBlock.End`),
-/// with a soft chime, or when the player moves on. The open prompt is then dropped, unrecorded. Blocks left out, and
+/// with a soft chime, or when the player moves on. One that ends after the pass that crosses its length does so with
+/// the chime that waits for the pass to end. The open prompt is then dropped, unrecorded. Blocks left out, and
 /// those that need sound when there is none, are passed over.
 ///
 /// Chimes mark 30 s left and the planned end. Each waits for a gap between prompts (in triad drills, voicings), and the next prompt then waits for
@@ -274,7 +275,7 @@ public struct SessionPlayer: Sendable {
             }
         case .extend(let now):
             passTime(to: now)
-            guard stage == .playing, blocks[blockIndex].length != nil, let left = extended() else { return }
+            guard stage == .playing, blocks[blockIndex].isExtendable, let left = extended() else { return }
             if (dueChime == .chime && left > Self.warningTime) || (dueChime == .softChime && left > .zero) { dueChime = nil }
         case .end(let now):
             guard stage == .ready || stage == .playing || stage == .paused else { return }
@@ -344,8 +345,13 @@ public struct SessionPlayer: Sendable {
             let before = timeLeft(inBlock: blockIndex)
             progress[blockIndex].spent? += passed
             if let before, let after = timeLeft(inBlock: blockIndex) {
-                if before > Self.warningTime, after <= Self.warningTime { dueChime = .chime }
-                if before > .zero, after <= .zero { dueChime = .softChime }
+                let crossesItsLength = !blocks[blockIndex].isExtendable
+                if !crossesItsLength, before > Self.warningTime, after <= Self.warningTime { dueChime = .chime }
+                if before > .zero, after <= .zero {
+                    dueChime = .softChime
+                    // It ends with the chime, which waits for the pass to end.
+                    if crossesItsLength { endsOnChime = true }
+                }
             }
         }
         elapsed += passed

@@ -173,7 +173,7 @@ One run of the daily routine: the same blocks in the same order every day, tied 
 _Avoid_: Workout, lesson, run (a run is one go at a drill in free practice)
 
 **Block**:
-A part of a session spent on one drill. Most end when their drill is done; one with a planned length ends only when the player moves on.
+A part of a session spent on one drill. Most end when their drill is done; one with a planned length (step 2) ends only when the player moves on, and step 4 by itself after the pass that crosses its minute.
 _Avoid_: Section, stage, segment
 
 **Theme**:

@@ -126,6 +126,8 @@ struct SessionRoutineTests {
     @Test func plannedLengthsAndExtend() {
         let routine = routine()
         #expect(routine.blocks.map(\.length) == [nil, s(120), nil, s(60), nil, nil, nil, nil])
+        #expect(routine.blocks[1].end == .planned(s(120)))
+        #expect(routine.blocks[3].end == .afterPassCrossing(s(60)))
         var player = playing(step: 2)
         player.handle(.extend(at: s(110)))
         #expect(player.length(ofBlock: 1) == s(240))
@@ -133,8 +135,9 @@ struct SessionRoutineTests {
         player.handle(.next(at: s(112)))
         player.handle(.next(at: s(113)))
         player.handle(.next(at: s(114)))       // step 4 playing
+        // Step 4 ends by itself after the pass that crosses its minute: no Extend.
         player.handle(.extend(at: s(115)))
-        #expect(player.length(ofBlock: 3) == s(180))
+        #expect(player.length(ofBlock: 3) == s(60))
         var circle = playing(step: 1)
         circle.handle(.extend(at: s(110)))
         #expect(circle.length(ofBlock: 0) == nil)
