@@ -168,13 +168,13 @@ extension SessionPlayer {
 
     /// Plays each prompt's pitch a second after its timer starts, then ticks past any pause, `count` times or until
     /// the block is over.
-    fileprivate mutating func playRight(_ count: Int = 1000) {
+    fileprivate mutating func playRight(_ count: Int = 1000, after seconds: Double = 1) {
         let block = blockIndex
         for _ in 0..<count {
             guard stage == .playing, blockIndex == block, let drill, let target = drill.prompt?.target,
                   let start = drill.promptStart else { return }
-            handle(.played(drill.fretboard.pitch(at: target), onset: start + s(1), at: start + s(1)))
-            handle(.tick(at: start + s(1.6)))
+            handle(.played(drill.fretboard.pitch(at: target), onset: start + s(seconds), at: start + s(seconds)))
+            handle(.tick(at: start + s(seconds + 0.6)))
         }
     }
 }
@@ -198,6 +198,18 @@ struct RoutineSummaryFromSessionTests {
         #expect(block.circle == circle(78))
         #expect(block.resultText == "1:18 · 0 wrong")
         #expect(summary.circles.map(\.kind) == [.noteCircle])
+    }
+
+    @Test func theSlowestPromptsLeaveOutTheScaleCircle() {
+        var player = routine()
+        player.play(step: 1)
+        player.playRight(3, after: 2)
+        player.play(step: 3)
+        player.playRight(3, after: 5)
+        player.handle(.end(at: s(1000)))
+        let slowest = player.summary.slowest(3)
+        #expect(slowest.count == 3)
+        #expect(slowest.allSatisfy { $0.responseTime == s(2) })
     }
 
     @Test func aCircleNotFinishedSaysSo() {
