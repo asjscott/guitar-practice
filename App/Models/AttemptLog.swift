@@ -112,8 +112,9 @@ final class RunLog {
         guard !new.isEmpty else { return }
         for attempt in new {
             let record = LoggedAttempt(attempt, in: drill, date: .now, source: session == nil ? .freePractice : .session,
-                                       groupID: (attempt.group?.number).map(groupID),
-                                       circleID: (attempt.group?.circle).map(circleID), blockIndex: blockIndex)
+                                       groupID: (attempt.group?.number).map { Self.id(for: $0, in: &groupIDs) },
+                                       circleID: (attempt.group?.circle).map { Self.id(for: $0, in: &circleIDs) },
+                                       blockIndex: blockIndex)
             log.context.insert(record)
             record.session = session
         }
@@ -121,18 +122,11 @@ final class RunLog {
         log.save()
     }
 
-    private func groupID(_ group: Int) -> UUID {
-        if let id = groupIDs[group] { return id }
+    /// One id per group (`AttemptGroup.number`), or per circle of fifths (`AttemptGroup.circle`), in the run.
+    private static func id(for number: Int, in ids: inout [Int: UUID]) -> UUID {
+        if let id = ids[number] { return id }
         let id = UUID()
-        groupIDs[group] = id
-        return id
-    }
-
-    /// One per circle of fifths in the run (`AttemptGroup.circle`).
-    private func circleID(_ circle: Int) -> UUID {
-        if let id = circleIDs[circle] { return id }
-        let id = UUID()
-        circleIDs[circle] = id
+        ids[number] = id
         return id
     }
 }
