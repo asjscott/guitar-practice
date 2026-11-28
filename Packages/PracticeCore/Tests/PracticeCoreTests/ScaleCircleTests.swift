@@ -247,9 +247,11 @@ struct ScaleCircleFadeTests {
         var drill = circle { $0.options.pass.fadeLevel = .last }
         let first = standard.passOrder(of: try theme(), going: .up)[0]
         let markers = try #require(drill.display?.markers)
-        // The roots, and the ringed first note to start from.
-        #expect(markers.allSatisfy { $0.isAnswer || $0.location == first })
-        #expect(markers.count > 1)
+        // At the last level only the roots, without the first note ringed.
+        #expect(!markers.isEmpty)
+        #expect(markers.allSatisfy { $0.isAnswer })
+        #expect(!markers.contains { $0.location == first })
+        #expect(!markers.contains { $0.isLastPlayed })
         play(&drill, at: 1)
         #expect(drill.attempts.compactMap(passFacts).first?.fadeLevel == .last)
     }

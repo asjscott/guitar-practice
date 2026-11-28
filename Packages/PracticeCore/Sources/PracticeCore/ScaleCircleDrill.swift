@@ -22,7 +22,7 @@ extension DrillSetup {
 /// each key in turn down or up through its nearest position (TheoryCore's Scale circle positions). No clicks and no
 /// timeout: the circle's time and wrong notes are set against the best, as in the Note circle. Each pass fades at its
 /// scale kind and position's level from when it starts, expecting a second a note; when one ends, the next key's
-/// position is shown whole at once, its first note ringed. One attempt per note, grouped by pass, all in circle 0.
+/// position is shown whole at once, its first note ringed; at the last level only its roots are. One attempt per note, grouped by pass, all in circle 0.
 public struct ScaleCircleRules: DrillRules {
     public static var kind: DrillKind { .scaleCircle }
 
@@ -170,13 +170,14 @@ public struct ScaleCircleRules: DrillRules {
     }
 
     /// The position, fading from the pass's start, or all of it during a hint. The roots and the notes played stay; the
-    /// last of those is ringed, or before any, the first to play.
+    /// last of those is ringed, or before any, the first to play, except at the last level, which shows only the roots.
     private func markers(of pass: Int, done: [Attempt], at now: Duration) -> [DrillDisplay.Marker] {
         let position = positions[pass]
         let expected = Self.expectedTimePerNote * order(of: pass).count
         let fade = isHintShown ? NoteFade.none : NoteFade(level: level, expected: expected, start: passStart)
         let played = Set(done.filter { !$0.skipped }.compactMap(\.prompt.target))
-        let ringed = done.last?.prompt.target ?? order(of: pass).first
+        let showsFirst = level < .last || isHintShown
+        let ringed = done.last?.prompt.target ?? (showsFirst ? order(of: pass).first : nil)
         return position.locations.compactMap { location in
             let name = setup.fretboard.name(at: location, in: position.scale)
             let isRoot = name == position.scale.tonic
