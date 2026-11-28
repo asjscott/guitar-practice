@@ -101,6 +101,8 @@ struct CircleTextTests {
         #expect(circle(600).comparison(with: circle(598)) == "Best 9:58")
         #expect(circle(300, complete: false).comparison(with: circle(598)) == "Not finished")
         #expect(circle(300, skips: 2).comparison(with: circle(598)) == "Not clean: 2 skipped")
+        #expect(circle(300, wrong: 1).comparison(with: circle(598)) == "Not clean: 1 wrong")
+        #expect(circle(300, wrong: 2, skips: 1).comparison(with: circle(598)) == "Not clean: 2 wrong · 1 skipped")
     }
 }
 

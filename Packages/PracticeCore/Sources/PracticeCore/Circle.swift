@@ -9,8 +9,8 @@ public struct CircleResult: Hashable, Sendable {
     /// Every prompt of every key dealt with: answered, timed out or skipped.
     public let isComplete: Bool
 
-    /// Complete with nothing skipped: only a clean circle can be the best.
-    public var isClean: Bool { isComplete && skips == 0 }
+    /// Complete with no wrong note and nothing skipped (glossary: Clean): only a clean circle can be the best.
+    public var isClean: Bool { isComplete && wrongNotes == 0 && skips == 0 }
 
     public init(time: Duration, wrongNotes: Int, skips: Int, isComplete: Bool) {
         self.time = time
@@ -80,7 +80,10 @@ extension CircleResult {
     /// "New best: −46 s", "First clean circle", "Best 9:58", or why it can't be the best.
     public func comparison(with best: CircleResult?) -> String {
         if !isComplete { return "Not finished" }
-        if !isClean { return "Not clean: \(skips) skipped" }
+        if !isClean {
+            let mistakes = [wrongNotes > 0 ? "\(wrongNotes) wrong" : nil, skips > 0 ? "\(skips) skipped" : nil]
+            return "Not clean: " + mistakes.compactMap(\.self).joined(separator: " · ")
+        }
         guard let best else { return "First clean circle" }
         if isBetter(than: best) {
             let gain = best.time - time
