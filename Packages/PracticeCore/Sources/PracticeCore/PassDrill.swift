@@ -27,8 +27,10 @@ public struct PassDrill<Rules: PassRules>: Drill {
     /// H is held.
     private var isHintShown = false
     /// What has been reached, this run's passes included, and what this pass is played at.
-    private var reached: FadeStages
-    private var fadeStage = FadeStage.shown
+    private var reached: FadeLevels
+    private var fadeLevel = FadeLevel.first
+    /// Once the pass is over, when its beat one was.
+    private var overPassStart: Duration = .zero
     /// Every note has been dealt with.
     private var isOver = false
 
@@ -47,7 +49,7 @@ public struct PassDrill<Rules: PassRules>: Drill {
         rules = Rules(setup: setup)
         settings = setup.options.pass
         nextSettings = settings
-        reached = setup.fadeStages
+        reached = setup.fadeLevels
         track = ClickTrack(meter: settings.meter, bpm: settings.tempo, start: .zero)
     }
 
@@ -60,7 +62,7 @@ public struct PassDrill<Rules: PassRules>: Drill {
     /// Between passes: the next count-in is put off.
     public var canHold: Bool { true }
     public var passSettings: PassSettings? { nextSettings }
-    public var fadeStages: FadeStages? { reached }
+    public var fadeLevels: FadeLevels? { reached }
     public var passEnd: Duration? {
         let isAboutToCountIn = hasNewClicks && isAnswerable && noteIndex == 0 && now <= countInStart
         return isRunning && phase != .paused && (isOver || isAboutToCountIn) ? barEnd : nil
@@ -151,7 +153,7 @@ public struct PassDrill<Rules: PassRules>: Drill {
             advance(to: now)
             change(from: old, to: new)
             if isOver, phase != .paused { askForNextClicks() }
-        case .fadeStages(let new):
+        case .fadeLevels(let new):
             reached = new
         case .hold(let end):
             if passEnd != nil, end > countInStart { askForClicks(from: end) }
@@ -193,8 +195,8 @@ public struct PassDrill<Rules: PassRules>: Drill {
         lastDealtWith = nil
         wrongSoFar = []
         isHinted = isHintShown
-        fadeStage = settings.fadeStage ?? reached.stage(
-            of: FadeStages.Subject(tuning: fretboard.tuning, scaleKind: pass.scale.kind, position: pass.position.id))
+        fadeLevel = settings.fadeLevel ?? reached.level(
+            of: FadeLevels.Subject(tuning: fretboard.tuning, scaleKind: pass.scale.kind, position: pass.position.id))
         isOver = false
         phase = .waiting
     }
@@ -225,6 +227,7 @@ public struct PassDrill<Rules: PassRules>: Drill {
     /// The last note was dealt with: the click runs to the end of the bar that note's nearest click is in.
     private mutating func end(at time: Duration) {
         isOver = true
+        overPassStart = beatOne
         reached.add([PassResult(attempts: passAttempts)], in: fretboard.tuning)
         let beats = track.meter.signature.beats
         countInClick = (track.nearestClick(to: time) / beats + 1) * beats
@@ -288,7 +291,7 @@ public struct PassDrill<Rules: PassRules>: Drill {
         guard let pass, let prompt else { return }
         let facts = PassFacts(scale: pass.scale, position: pass.position.id, startDegree: pass.startDegree,
                               tempo: settings.tempo, signature: settings.meter.signature,
-                              fadeStage: fadeStage, hinted: isHinted,
+                              fadeLevel: fadeLevel, hinted: isHinted,
                               clickOffset: onset.map { $0 - track.time(ofClick: track.nearestClick(to: $0)) },
                               inputDelay: setup.inputDelay)
         attempts.append(Attempt(prompt: prompt, outcome: outcome, responseTime: onset.map { max(.zero, $0 - timerStart) },
@@ -317,7 +320,7 @@ public struct PassDrill<Rules: PassRules>: Drill {
         let done = passAttempts
         let (result, feedback) = resultAndFeedback(after: done, in: pass)
         var display = DrillDisplay(headline: rules.headline(of: pass), subline: rules.subline(of: pass), feedback: feedback,
-                                   result: result, markers: markers(of: pass, last: done.last?.prompt.target))
+                                   result: result, markers: markers(of: pass, done: done))
         display.pass = PassProgress(notes: line(of: pass, done: done), countIn: countInBeat,
                                     evenness: evenness, settings: settings,
                                     fretWindow: pass.position.fretWindow)
@@ -350,17 +353,19 @@ public struct PassDrill<Rules: PassRules>: Drill {
         }
     }
 
-    /// As much of the position as the fade stage shows, or all of it during a hint; the last note played or revealed is
-    /// ringed.
-    private func markers(of pass: Pass, last: FretboardLocation?) -> [DrillDisplay.Marker] {
-        let stage = isHintShown ? .shown : fadeStage
+    /// The position, fading from beat one by the pass's fade time, or all of it during a hint. The roots and the notes
+    /// played or revealed stay; the last of those is ringed.
+    private func markers(of pass: Pass, done: [Attempt]) -> [DrillDisplay.Marker] {
+        let fade = isHintShown ? NoteFade.none
+            : NoteFade(level: fadeLevel, expected: rules.expectedTime(of: pass, at: settings), start: isOver ? overPassStart : beatOne)
+        let played = Set(done.compactMap(\.prompt.target)), last = done.last?.prompt.target
         return pass.position.locations.compactMap { location in
             let name = fretboard.name(at: location, in: pass.scale)
-            let isRoot = name == pass.scale.tonic, isLast = location == last
-            guard stage != .hidden || isRoot || isLast else { return nil }
-            let isFaint = stage != .shown && !isLast
-            return DrillDisplay.Marker(location: location, label: isFaint ? "" : name.description, isAnswer: isRoot,
-                                       isFaint: isFaint, isLastPlayed: isLast)
+            let isRoot = name == pass.scale.tonic
+            let opacity = isRoot || played.contains(location) ? 1 : fade.opacity(at: now)
+            guard opacity > 0 else { return nil }
+            return DrillDisplay.Marker(location: location, label: name.description, isAnswer: isRoot, opacity: opacity,
+                                       isLastPlayed: location == last)
         }
     }
 

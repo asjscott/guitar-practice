@@ -4,7 +4,7 @@ import PracticeCore
 
 private func themed(_ set: StringSet = .dGB, seed: UInt64 = 1) -> DrillSetup {
     var setup = DrillSetup(fretboard: Fretboard(tuning: .standard), seed: seed)
-    setup.options.triadFade = .hidden
+    setup.options.triadFade = .last
     setup.follow(Theme(key: .minor(.a), position: .init(system: .caged, number: 5), stringSet: set))
     return setup
 }
@@ -93,7 +93,7 @@ struct SessionTriadChimeTests {
         var player = partWay(kind)
         player.playNote(at: 252)
         #expect(player.takeChime() == nil)
-        #expect(player.notes?.filter { $0 == "?" }.count == 1)
+        #expect(player.notes?.prefix(2).contains("?") == false)
         player.playNote(at: 253)
         #expect(player.drill?.attempts.suffix(3).map(\.outcome) == [.answered, .answered, .answered])
         #expect(player.playChime(at: 253) == .chime)        // until 253 + 0.1 + 0.9 + 0.3
@@ -101,7 +101,7 @@ struct SessionTriadChimeTests {
         #expect(player.display?.result == .right)
         player.handle(.tick(at: s(254.4)))
         #expect(player.drill?.phase == .waiting)
-        #expect(player.notes == ["?", "?", "?"])
+        #expect(player.notes?.filter { $0 == "?" }.count == 2)
         #expect(player.drill?.promptStart == s(254.4))
     }
 
@@ -112,7 +112,7 @@ struct SessionTriadChimeTests {
         #expect(player.playChime(at: 252) == .chime)
         player.handle(.tick(at: s(253.4)))
         #expect(player.drill?.phase == .waiting)
-        #expect(player.notes == ["?", "?", "?"])
+        #expect(player.notes?.filter { $0 == "?" }.count == 2)
         #expect((player.drill?.promptStart).map { $0 >= s(253.3) } == true)
     }
 
@@ -139,7 +139,7 @@ struct SessionTriadChimeTests {
         player.handle(.pause(at: s(252)))
         player.handle(.resume(at: s(260)))
         #expect(player.playChime(at: 260) == .chime)
-        #expect(player.notes == ["?", "?", "?"])
+        #expect(player.notes?.filter { $0 == "?" }.count == 2)
         #expect(player.drill?.timeRemaining(at: s(261)) == nil)
         player.handle(.tick(at: s(261.4)))
         #expect(player.drill?.promptStart == s(261.3))

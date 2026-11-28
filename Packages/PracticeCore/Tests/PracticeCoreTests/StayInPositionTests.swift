@@ -11,13 +11,16 @@ struct ProgressionRun {
     let progression = Progression.named("I–V–vi–IV")!
     let key = Key.major(.g)
 
-    init(_ kind: DrillKind) {
+    init(_ kind: DrillKind, fadeLevels: FadeLevels = FadeLevels(), override: FadeLevel? = nil) {
         var options = DrillOptions()
         options.key = key
         options.progression = progression
         options.position = Position.ID(system: .caged, number: CAGEDShape.e.number)
         options.backing = BackingSettings(tempo: 60)
-        drill = kind.makeDrill(DrillSetup(fretboard: fretboard, options: options, seed: 1))
+        options.triadFade = override
+        var setup = DrillSetup(fretboard: fretboard, options: options, seed: 1)
+        setup.fadeLevels = fadeLevels
+        drill = kind.makeDrill(setup)
     }
 
     var position: Position { drill.setup.progressionPosition! }

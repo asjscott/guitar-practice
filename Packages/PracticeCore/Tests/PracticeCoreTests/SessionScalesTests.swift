@@ -210,8 +210,8 @@ struct SessionPassTests {
     }
 
     @Test func withoutSoundTheyStayInThePlan() {
-        let kinds = SessionPlanner.drills(from: DrillKind.all, for: themed(), hasSound: false)
-        #expect(kinds.contains(.upAndDown) && kinds.contains(.fromADegree))
+        let routine = SessionPlanner.routine(for: themed(), day: 1, hasSound: false, hearFindItUnlocked: false)
+        #expect(routine.blocks.filter { $0.kind.module == .scales }.allSatisfy { !$0.isLeftOut })
         #expect(!playing(hasSound: false).isLeftOut(block: 0))
     }
 }
@@ -359,7 +359,57 @@ struct SessionPassChimeTests {
         player.tick(400.5)
         player.skip(to: 401)
         #expect(player.takeChime() == .softChime)
-        #expect(player.timeLeft(inBlock: 0) < .zero)
+        #expect(player.timeLeft(inBlock: 0)! < .zero)
+    }
+}
+
+@Suite("Scales in a session: a block that ends after the pass that crosses its length")
+struct SessionPassCrossingTests {
+    /// Up and down for 3 minutes from 100 s, ending after the pass that crosses 280 s; then Note → play it.
+    private func playing() -> SessionPlayer {
+        let blocks = [SessionBlock(kind: .upAndDown, end: .afterPassCrossing(s(180))), SessionBlock(kind: .notePlayIt, length: s(180))]
+        var player = SessionPlayer(blocks: blocks, setup: themed(), hasSound: true)
+        player.handle(.start(at: s(99)))
+        player.handle(.next(at: s(100)))
+        return player
+    }
+
+    @Test func itEndsByItselfWithItsChimeOnceThePassIsOver() {
+        var player = playing()
+        player.skip(to: 270)
+        player.tick(274.5)
+        let last = player.playPass(from: 275)
+        #expect(last > 280)
+        #expect(player.blockIndex == 0)
+        var time = last
+        var chime: AppSound?
+        while player.blockIndex == 0, time < 320 {
+            time += 0.1
+            player.tick(time)
+            chime = chime ?? player.takeChime()
+        }
+        #expect(chime == .softChime)
+        #expect(player.blockIndex == 1)
+        #expect(player.stage == .ready)
+        #expect(player.spent(inBlock: 0)! > s(180))
+    }
+
+    @Test func noChimeThirtySecondsBeforeAndNoExtend() {
+        var player = playing()
+        player.skip(to: 246)
+        player.tick(251)
+        #expect(player.takeChime() == nil)
+        player.handle(.extend(at: s(252)))
+        #expect(player.length(ofBlock: 0) == s(180))
+        #expect(player.extends(ofBlock: 0) == 0)
+    }
+
+    @Test func passesInProgressAtItsLengthFinishFirst() {
+        var player = playing()
+        player.skip(to: 274)
+        player.tick(281)
+        #expect(player.blockIndex == 0)
+        #expect(player.stage == .playing)
     }
 }
 

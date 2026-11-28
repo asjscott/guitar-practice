@@ -8,7 +8,7 @@ private func result(_ times: [Double], tempo: Int = 60, wrongAt: Int? = nil, tim
     let location = FretboardLocation(string: 0, fret: 5)
     let prompt = NotePrompt(name: Key.minor(.a).tonic, string: 0, target: location)
     let facts = PassFacts(scale: Scale(.minorPentatonic, tonic: .a), position: .init(system: .caged, number: 5),
-                          startDegree: .init(1), tempo: tempo, signature: .fourFour, fadeStage: .shown,
+                          startDegree: .init(1), tempo: tempo, signature: .fourFour, fadeLevel: .first,
                           hinted: hinted, clickOffset: nil)
     return PassResult.passes(in: times.enumerated().map { index, time in
         let outcome: Attempt.Outcome = index == timeoutAt ? .timedOut : index == skipAt ? .skipped : .answered
@@ -238,10 +238,10 @@ struct DrillTempoTests {
         var drill = started()
         playPass(&drill, wrong: true)
         playPass(&drill, wrong: true) { drill in
-            change(&drill, at: s(32.5)) { $0.fadeStage = .faded }
+            change(&drill, at: s(32.5)) { $0.fadeLevel = FadeLevel(2) }
         }
         #expect(drill.passSettings?.tempo == 56)
-        #expect(drill.passSettings?.fadeStage == .faded)
+        #expect(drill.passSettings?.fadeLevel == FadeLevel(2))
     }
 
     /// The change's own time can end the pass, before the change is made.
@@ -253,7 +253,7 @@ struct DrillTempoTests {
             drill.handle(.played(Pitch(midi), onset: start + s(Double(index)), at: start + s(Double(index) + 0.1)))
         }
         // The last note's 5 s are over.
-        change(&drill, at: start + s(21 + 5.2)) { $0.fadeStage = .faded }
+        change(&drill, at: start + s(21 + 5.2)) { $0.fadeLevel = FadeLevel(2) }
         #expect(drill.passSettings?.tempo == 56)
     }
 

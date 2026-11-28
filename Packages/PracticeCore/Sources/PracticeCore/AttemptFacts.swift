@@ -5,15 +5,20 @@ public struct AttemptGroup: Hashable, Sendable {
     /// Tells the run's groups apart.
     public let number: Int
 
-    /// How many attempts the whole group has, and which this is (0 = first); nil in sweeps. With them the log shows
-    /// whether a group is complete.
+    /// How many attempts the whole group has, and which this is (0 = first); nil in All instances' sweeps. With them
+    /// the log shows whether a group is complete.
     public let size: Int?
     public let place: Int?
 
-    public init(number: Int, size: Int? = nil, place: Int? = nil) {
+    /// Which of the run's circles of fifths the group is in (`CircleResult`); nil outside one. The log gives each
+    /// circle an id.
+    public let circle: Int?
+
+    public init(number: Int, size: Int? = nil, place: Int? = nil, circle: Int? = nil) {
         self.number = number
         self.size = size
         self.place = place
+        self.circle = circle
     }
 }
 
@@ -30,13 +35,16 @@ public struct PassFacts: Hashable, Sendable {
     public var position: Position.ID
     public var startDegree: Scale.Degree
 
-    /// BPM, counting clicks.
-    public var tempo: Int
+    /// BPM, counting clicks; nil in a pass without clicks (Scale circle).
+    public var tempo: Int?
 
-    public var signature: TimeSignature
+    public var signature: TimeSignature?
+
+    /// Which way a one-way pass went; nil where a pass goes up and down.
+    public var direction: PassDirection?
 
     /// What the pass was played at.
-    public var fadeStage: FadeStage
+    public var fadeLevel: FadeLevel
 
     /// Whether a hint had been used in the pass by the time this note was dealt with.
     public var hinted: Bool
@@ -48,14 +56,16 @@ public struct PassFacts: Hashable, Sendable {
     /// What was taken off the onsets.
     public var inputDelay: Duration
 
-    public init(scale: Scale, position: Position.ID, startDegree: Scale.Degree, tempo: Int, signature: TimeSignature,
-                fadeStage: FadeStage, hinted: Bool, clickOffset: Duration?, inputDelay: Duration = .zero) {
+    public init(scale: Scale, position: Position.ID, startDegree: Scale.Degree, tempo: Int?, signature: TimeSignature?,
+                direction: PassDirection? = nil, fadeLevel: FadeLevel, hinted: Bool, clickOffset: Duration?,
+                inputDelay: Duration = .zero) {
         self.scale = scale
         self.position = position
         self.startDegree = startDegree
         self.tempo = tempo
         self.signature = signature
-        self.fadeStage = fadeStage
+        self.direction = direction
+        self.fadeLevel = fadeLevel
         self.hinted = hinted
         self.clickOffset = clickOffset
         self.inputDelay = inputDelay
@@ -69,7 +79,7 @@ public struct TriadFacts: Hashable, Sendable {
     public var stringSet: StringSet
 
     /// What the voicing was played at; nil where it isn't being played.
-    public var fadeStage: FadeStage?
+    public var fadeLevel: FadeLevel?
 
     /// Whether a hint had been used in the voicing by the time this note was dealt with.
     public var hinted = false
@@ -103,16 +113,17 @@ public struct ChordFacts: Hashable, Sendable {
     public var played: TriadVoicing?
     /// Every voicing that would have been clean.
     public var accepted: [TriadVoicing]
-    public var style: BackingStyle
-    /// BPM.
-    public var tempo: Int
-    /// What the time through was played at.
-    public var fadeStage: FadeStage
+    /// Nil when played without backing (Chords in position).
+    public var style: BackingStyle?
+    /// BPM; nil when played without backing.
+    public var tempo: Int?
+    /// What the chord's voicing was played at.
+    public var fadeLevel: FadeLevel
     /// Whether H was held during the chord.
     public var hinted: Bool
     public var outcome: ChordOutcome
-    /// The first note's onset, input delay taken off, less the chord's first beat: negative = early. Nil if nothing
-    /// was played in its window.
+    /// The first note's onset, input delay taken off, less the chord's first beat (without backing, less when the
+    /// chord came up): negative = early. Nil if nothing was played in its window.
     public var firstOnset: Duration?
     /// What was taken off the onsets.
     public var inputDelay: Duration
@@ -121,8 +132,8 @@ public struct ChordFacts: Hashable, Sendable {
     public var numeral: Progression.Numeral { progression.steps[place].numeral }
 
     public init(progression: Progression, key: Key, place: Int, triad: Triad, position: Position.ID,
-                played: TriadVoicing?, accepted: [TriadVoicing], style: BackingStyle, tempo: Int,
-                fadeStage: FadeStage, hinted: Bool, outcome: ChordOutcome, firstOnset: Duration?,
+                played: TriadVoicing?, accepted: [TriadVoicing], style: BackingStyle?, tempo: Int?,
+                fadeLevel: FadeLevel, hinted: Bool, outcome: ChordOutcome, firstOnset: Duration?,
                 inputDelay: Duration) {
         self.progression = progression
         self.key = key
@@ -133,7 +144,7 @@ public struct ChordFacts: Hashable, Sendable {
         self.accepted = accepted
         self.style = style
         self.tempo = tempo
-        self.fadeStage = fadeStage
+        self.fadeLevel = fadeLevel
         self.hinted = hinted
         self.outcome = outcome
         self.firstOnset = firstOnset
@@ -148,7 +159,8 @@ extension Attempt {
     }
 }
 
-/// How much of a position is shown during a pass, or of a triad's voicing. The raw values are saved in the attempt log: never change them.
+/// How much of a position or a triad's voicing was shown while it was played, before fade levels. The log keeps it,
+/// read as a level (`FadeLevel.init(_:)`). The raw values are saved in the attempt log: never change them.
 public enum FadeStage: String, Hashable, Sendable, CaseIterable {
     case shown, faded, hidden
 }

@@ -19,25 +19,15 @@ public enum SessionRange: String, CaseIterable, Hashable, Sendable {
     }
 }
 
-/// What the player chooses before a session.
+/// What the player chooses before a session: the note drills' notes and frets. There is no time budget.
 public struct SessionSetup: Hashable, Sendable {
-    public static let minutesRange = 10...60
-    public static let minutesStep = 5
-
-    /// 10–60, in steps of 5.
-    public let minutes: Int
     public let notes: DrillOptions.Notes
     public let range: SessionRange
 
-    /// Minutes are brought to the nearest that is offered.
-    public init(minutes: Int = 15, notes: DrillOptions.Notes = .naturals, range: SessionRange = .first12) {
-        let bounded = min(max(minutes, Self.minutesRange.lowerBound), Self.minutesRange.upperBound)
-        self.minutes = (bounded + Self.minutesStep / 2) / Self.minutesStep * Self.minutesStep
+    public init(notes: DrillOptions.Notes = .naturals, range: SessionRange = .first12) {
         self.notes = notes
         self.range = range
     }
-
-    public var budget: Duration { .seconds(minutes * 60) }
 
     public func drillOptions(on fretboard: Fretboard) -> DrillOptions {
         var options = DrillOptions()

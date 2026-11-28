@@ -39,6 +39,8 @@ public struct PromptDrill<Rules: DrillRules>: Drill {
     /// The prompt's own sounds were asked for and haven't started; a replay's don't count.
     private var awaitsSound = false
     private var heldUntil: Duration?
+    /// The latest time an event brought.
+    private var now: Duration = .zero
 
     public init(setup: DrillSetup) {
         rules = Rules(setup: setup)
@@ -69,7 +71,7 @@ public struct PromptDrill<Rules: DrillRules>: Drill {
         }
     }
 
-    public var fadeStages: FadeStages? { rules.fadeStages }
+    public var fadeLevels: FadeLevels? { rules.fadeLevels }
 
     public var isPartWay: Bool { isAnswerable && rules.isPartWay }
 
@@ -97,7 +99,8 @@ public struct PromptDrill<Rules: DrillRules>: Drill {
         guard isRunning, let prompt else { return nil }
         return rules.display(of: DrillMoment(prompt: prompt, phase: phase, isHeld: heldUntil != nil,
                                              wrongAnswers: wrongSoFar, attempts: attempts,
-                                             correctLocations: correctLocations))
+                                             correctLocations: correctLocations, now: now,
+                                             promptStart: timerStart))
     }
 
     public mutating func takeSounds() -> [DrillSoundRequest] {
@@ -132,8 +135,8 @@ public struct PromptDrill<Rules: DrillRules>: Drill {
         case .hint(let isShown, let now):
             advance(to: now)
             if isRunning, phase != .paused { rules.hint(isShown: isShown) }
-        case .fadeStages(let stages):
-            rules.fadeStages = stages
+        case .fadeLevels(let levels):
+            rules.fadeLevels = levels
         case .clicksStarted, .backingStarted, .passSettings:
             break
         case .tick(let now):
@@ -150,6 +153,7 @@ public struct PromptDrill<Rules: DrillRules>: Drill {
 
     private mutating func start(at now: Duration) {
         guard !isRunning else { return }
+        self.now = max(self.now, now)
         attempts = []
         rules.begin()
         showNextPrompt(at: now)
@@ -167,6 +171,7 @@ public struct PromptDrill<Rules: DrillRules>: Drill {
 
     private mutating func resume(at now: Duration) {
         guard phase == .paused else { return }
+        self.now = max(self.now, now)
         guard wasAnswerableBeforePause, let current, case .samePrompt(let keepsWrong) = rules.resumeRule else {
             return showNextPrompt(at: now)
         }
@@ -253,14 +258,19 @@ public struct PromptDrill<Rules: DrillRules>: Drill {
         guard awaitsSound, isAnswerable, let current, let timerStart else { return }
         awaitsSound = false
         self.timerStart = max(timerStart, start + latency + rules.timerDelay(for: current))
+        rules.timerStarted(at: self.timerStart ?? start)
     }
 
     /// Moves the clock to `now`: the end of a hold, a due timeout (once `grace` past the timeout), then a due next
     /// prompt.
     private mutating func advance(to now: Duration, grace: Duration = DrillTiming.detectionGrace) {
+        self.now = max(self.now, now)
         if let end = heldUntil, now >= end {
             heldUntil = nil
-            if let start = timerStart, isAnswerable { timerStart = max(start, end) }
+            if let start = timerStart, isAnswerable {
+                timerStart = max(start, end)
+                rules.timerStarted(at: max(start, end))
+            }
         }
         if isAnswerable, rules.isTimed, heldUntil == nil, let current, let timerStart, now - timerStart >= timeLimit + grace {
             let attempt = record(.timedOut, of: current)
@@ -282,7 +292,9 @@ public struct PromptDrill<Rules: DrillRules>: Drill {
 
     private mutating func show(_ prompt: NotePrompt, at now: Duration, timerStart: Duration? = nil) {
         current = prompt
-        self.timerStart = timerStart ?? now + rules.timerDelay(for: prompt)
+        let start = timerStart ?? now + rules.timerDelay(for: prompt)
+        self.timerStart = start
+        rules.timerStarted(at: start)
         next = nil
         wrongSoFar = []
         rawWrongSoFar = []

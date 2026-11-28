@@ -1,85 +1,188 @@
-/// A planned block: one drill and how long it is meant to last.
-public struct SessionBlock: Hashable, Sendable {
-    public let kind: DrillKind
-    public let length: Duration
+import TheoryCore
 
-    public init(kind: DrillKind, length: Duration) {
+/// A planned block: one drill, what it is made from and when it ends.
+public struct SessionBlock: Hashable, Sendable {
+    /// When a block is over.
+    public enum End: Hashable, Sendable {
+        /// Chimes 30 s before its planned length and at it (Extend moves both); it goes on until the player moves on.
+        case planned(Duration)
+        /// When its drill is done: it stops by itself, with a chime. Free time never is.
+        case whenDone
+        /// When the time through numbered this (from 1) ends, with the chime that waits for it.
+        case afterTimesThrough(Int)
+        /// By itself, after the pass that crosses this length, with the chime that waits for the pass to end. No
+        /// chime before it, and no Extend.
+        case afterPassCrossing(Duration)
+    }
+
+    public let kind: DrillKind
+    public let end: End
+    /// The block's own setup, in place of the session's; nil = the session's.
+    public let setup: DrillSetup?
+    /// Planned but not played: the session passes over it.
+    public let isLeftOut: Bool
+
+    public init(kind: DrillKind, end: End, setup: DrillSetup? = nil, isLeftOut: Bool = false) {
         self.kind = kind
-        self.length = length
+        self.end = end
+        self.setup = setup
+        self.isLeftOut = isLeftOut
+    }
+
+    /// A block with a planned length.
+    public init(kind: DrillKind, length: Duration) {
+        self.init(kind: kind, end: .planned(length))
+    }
+
+    /// Nil unless it has a planned length, or ends after the pass that crosses one.
+    public var length: Duration? {
+        switch end {
+        case .planned(let length), .afterPassCrossing(let length): length
+        case .whenDone, .afterTimesThrough: nil
+        }
+    }
+
+    /// Whether Extend moves its end: only a planned length's.
+    public var isExtendable: Bool {
+        if case .planned = end { true } else { false }
     }
 }
 
-/// Splits a session's time into blocks.
+/// A day's session: the routine's eight blocks, some perhaps left out, and why.
+public struct SessionRoutine: Hashable, Sendable {
+    /// The eight steps in order, those left out included.
+    public let blocks: [SessionBlock]
+    /// For setup: what is left out, and why.
+    public let notices: [String]
+    /// For setup, without sound: what goes differently. Nil with sound.
+    public let noSoundNotice: String?
+
+    /// Why the session can't start: every step is left out. Nil when one can run.
+    public var nothingToPromptReason: String? {
+        blocks.contains { !$0.isLeftOut } ? nil : notices.last ?? "Nothing in the session can be played."
+    }
+}
+
+/// Plans the daily routine (spec #64): the same eight steps every day, from the theme.
 public enum SessionPlanner {
-    /// The drills a session can use: those with something to prompt and, without sound, that don't need it.
-    public static func drills(from kinds: [DrillKind], for setup: DrillSetup, hasSound: Bool) -> [DrillKind] {
-        kinds.filter { canUse($0, hasSound: hasSound) && $0.makeDrill(setup).nothingToPromptReason == nil }
-    }
+    /// Step 2's planned length.
+    public static let noteDrillLength: Duration = .seconds(120)
+    /// Step 4's.
+    public static let shortFocusLength: Duration = .seconds(60)
+    /// Stay in position goes through the progression at least this often.
+    public static let minimumTimesThrough = 4
 
-    /// What a session without sound does differently.
-    public static func noSoundNotice(from kinds: [DrillKind]) -> String {
-        let leftOut = kinds.filter(\.needsSound).map(\.title)
-        guard !leftOut.isEmpty else { return "No sound: chimes flash." }
-        return "No sound: \(leftOut.joined(separator: ", ")) \(leftOut.count == 1 ? "is" : "are") left out, and chimes flash."
-    }
-
-    /// Why a session has no triads, when no voicing is in range; nil when it has some.
-    public static func noTriadsNotice(from kinds: [DrillKind], for setup: DrillSetup) -> String? {
-        let triads = kinds.filter { $0.module == .triads }
-        guard !triads.isEmpty, drills(from: triads, for: setup, hasSound: true).isEmpty else { return nil }
-        let sets = setup.fretboard.stringSets.filter(setup.options.stringSets.contains).map(\.name)
-        return "Triads are left out: no voicing of the key’s chords on \(sets.joined(separator: ", ")) fits these frets."
-    }
-
-    /// Why a session has no progressions, when the theme has none; nil when it has one.
-    public static func noProgressionsNotice(from kinds: [DrillKind], for setup: DrillSetup) -> String? {
-        let progressions = kinds.filter { $0.module == .progressions }
-        guard !progressions.isEmpty, drills(from: progressions, for: setup, hasSound: true).isEmpty else { return nil }
-        guard setup.options.progression == nil, let position = setup.progressionPosition else {
-            return progressions[0].makeDrill(setup).nothingToPromptReason.map { "Progressions are left out: \($0)" }
+    /// The eight blocks, from a setup that follows the day's theme (`DrillSetup.follow`):
+    ///
+    /// 1. Note circle; 2. a note drill by day (`noteDrill(day:hasSound:hearFindItUnlocked:)`), 2 minutes; 3. Scale circle;
+    /// 4. Up and down in the theme's scale and position alone, ending after the pass that crosses 1 minute; 5. Triad circle on the theme's string set, or
+    /// where that can't go round, on another; 6. Chords in position; 7. Stay in position, until every voicing of every
+    /// chord in the position has come up and at least 4 times through; 8. Free time.
+    ///
+    /// Without sound, or without a progression, steps 6–8 are left out; so is any step with nothing to prompt. `day`
+    /// is a count of calendar days. Circle steps are set against `circleBests`.
+    public static func routine(for setup: DrillSetup, day: Int, hasSound: Bool, hearFindItUnlocked: Bool,
+                               circleBests: [DrillKind: CircleResult] = [:]) -> SessionRoutine {
+        var notices: [String] = []
+        let progressionProblem = setup.progressionProblem
+        var noSoundNotice: String?
+        if !hasSound {
+            noSoundNotice = progressionProblem == nil
+                ? "No sound: \(listed(progressionSteps.map(\.title))) are left out, and chimes flash."
+                : "No sound: chimes flash."
         }
-        return "Progressions are left out: no progression in \(setup.chosenKey) has every chord in the \(position.name)."
-    }
-
-    /// Why a session can't prompt anything; nil when one of its drills can.
-    public static func nothingToPromptReason(from kinds: [DrillKind], for setup: DrillSetup, hasSound: Bool) -> String? {
-        let reasons = kinds.filter { canUse($0, hasSound: hasSound) }.map { $0.makeDrill(setup).nothingToPromptReason }
-        return reasons.contains(nil) ? nil : reasons.compactMap { $0 }.first
-    }
-
-    private static func canUse(_ kind: DrillKind, hasSound: Bool) -> Bool {
-        hasSound || !kind.needsSound
-    }
-
-    /// Modules in order, with time by weight; each takes as many of its drills as fit its minimum, at least one, in
-    /// equal parts. `day` is a count of calendar days: it says which drills are left out, and seeds the order.
-    public static func plan(_ drills: [DrillKind], budget: Duration, day: Int) -> [SessionBlock] {
-        var random = SplitMix64(seed: UInt64(bitPattern: Int64(day)))
-        let groups = DrillModule.groups(of: drills, by: \.module)
-        let totalWeight = groups.map(\.module.weight).reduce(0, +)
-        return groups.flatMap { group in
-            let share = budget * group.module.weight / totalWeight
-            let count = min(max(1, Int(share / group.module.minimumLength)), group.members.count)
-            let length = share / count
-            return shuffled(rotated(group.members, keeping: count, day: day), random: &random)
-                .map { SessionBlock(kind: $0, length: length) }
+        if let progressionProblem {
+            notices.append("Progressions are left out: " + progressionNotice(for: setup, problem: progressionProblem))
         }
+        let steps: [(DrillKind, SessionBlock.End, DrillSetup)] = [
+            (.noteCircle, .whenDone, setup),
+            (noteDrill(day: day, hasSound: hasSound, hearFindItUnlocked: hearFindItUnlocked), .planned(noteDrillLength),
+             setup),
+            (.scaleCircle, .whenDone, setup),
+            (.upAndDown, .afterPassCrossing(shortFocusLength), themesScaleOnly(setup)),
+            (.triadCircle, .whenDone, triadCircleSetup(setup)),
+            (.chordsInPosition, .whenDone, setup),
+            (.stayInPosition, .afterTimesThrough(timesThrough(of: setup)), setup),
+            (.freeTime, .whenDone, setup),
+        ]
+        let blocks = steps.map { kind, end, stepSetup in
+            var stepSetup = stepSetup
+            stepSetup.circleBest = circleBests[kind]
+            var isLeftOut = false
+            if progressionSteps.contains(kind), !hasSound || progressionProblem != nil {
+                isLeftOut = true
+            } else if let reason = kind.makeDrill(stepSetup).nothingToPromptReason {
+                isLeftOut = true
+                notices.append("\(kind.title) is left out: \(reason)")
+            }
+            return SessionBlock(kind: kind, end: end, setup: stepSetup, isLeftOut: isLeftOut)
+        }
+        return SessionRoutine(blocks: blocks, notices: notices, noSoundNotice: noSoundNotice)
     }
 
-    /// Some of the drills, starting one later each day; in the given order, so that the shuffle doesn't follow the
-    /// rotation.
-    private static func rotated(_ drills: [DrillKind], keeping count: Int, day: Int) -> [DrillKind] {
-        let first = (day % drills.count + drills.count) % drills.count
-        let kept = (drills[first...] + drills[..<first]).suffix(count)
-        return drills.filter { kept.contains($0) }
+    /// Steps 6–8.
+    private static let progressionSteps: [DrillKind] = [.chordsInPosition, .stayInPosition, .freeTime]
+
+    /// Step 2: Note → play it on even days, Fret → name it on odd ones; once Hear → find it is unlocked, it takes every
+    /// third day, if there is sound.
+    public static func noteDrill(day: Int, hasSound: Bool, hearFindItUnlocked: Bool) -> DrillKind {
+        if hearFindItUnlocked, hasSound, day.isMultiple(of: 3) { return .hearFindIt }
+        return day.isMultiple(of: 2) ? .notePlayIt : .fretNameIt
     }
 
-    /// Any drill that uses the keyboard is first or last, so that the player changes between keyboard and guitar at
-    /// most once.
-    private static func shuffled(_ drills: [DrillKind], random: inout SplitMix64) -> [DrillKind] {
-        let drills = random.shuffled(drills)
-        let keyboard = drills.filter(\.usesKeyboard)
-        let guitar = drills.filter { !$0.usesKeyboard }
-        return random.next().isMultiple(of: 2) ? keyboard + guitar : guitar + keyboard
+    /// Whether Hear → find it joins step 2: the last 3 complete Note circles (oldest first) had no wrong notes.
+    public static func unlocksHearFindIt(noteCircles: [CircleResult]) -> Bool {
+        let last = noteCircles.filter(\.isComplete).suffix(3)
+        return last.count == 3 && last.allSatisfy { $0.wrongNotes == 0 }
+    }
+
+    /// How long a session takes: the median of past ones (Free time left out), once there are three.
+    public static func estimate(from past: [Duration]) -> Duration? {
+        guard past.count >= 3 else { return nil }
+        let sorted = past.sorted()
+        let middle = sorted.count / 2
+        return sorted.count.isMultiple(of: 2) ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle]
+    }
+
+    /// Up and down through the theme's own scale, not each of its mode's in turn.
+    private static func themesScaleOnly(_ setup: DrillSetup) -> DrillSetup {
+        guard let theme = setup.theme else { return setup }
+        var only = setup
+        only.theme = nil
+        only.key = theme.key
+        only.options.key = theme.key
+        only.options.scaleKind = theme.key.scale.kind
+        only.options.positionSystem = theme.position.system
+        only.options.position = theme.position
+        return only
+    }
+
+    /// The theme's string set, or where not every key's triad has two voicings on it, every set: the drill climbs the
+    /// first that holds them.
+    private static func triadCircleSetup(_ setup: DrillSetup) -> DrillSetup {
+        guard DrillKind.triadCircle.makeDrill(setup).nothingToPromptReason != nil else { return setup }
+        var other = setup
+        other.options.stringSets = Set(setup.fretboard.stringSets)
+        return other
+    }
+
+    /// Enough times through for every chord's every voicing in the position to come up, and at least 4.
+    private static func timesThrough(of setup: DrillSetup) -> Int {
+        guard let progression = setup.options.progression, let position = setup.progressionPosition else {
+            return minimumTimesThrough
+        }
+        let most = progression.chords(in: setup.chosenKey).map { setup.fretboard.voicings(of: $0, in: position).count }
+            .max() ?? 0
+        return max(minimumTimesThrough, most)
+    }
+
+    private static func progressionNotice(for setup: DrillSetup, problem: String) -> String {
+        guard setup.options.progression == nil, let position = setup.progressionPosition else { return problem }
+        return "no progression in \(setup.chosenKey) has every chord in the \(position.name)."
+    }
+
+    /// "A, B and C".
+    private static func listed(_ names: [String]) -> String {
+        names.count < 2 ? names.joined() : names.dropLast().joined(separator: ", ") + " and " + names.last!
     }
 }

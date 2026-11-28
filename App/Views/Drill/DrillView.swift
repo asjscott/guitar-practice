@@ -80,10 +80,12 @@ struct DrillView: View {
             }
             Divider()
             HStack(spacing: 18) {
-                if model.kind.hasPasses {
+                if model.kind.module == .scales {
                     Text("\(model.completePasses) \(model.completePasses == 1 ? "pass" : "passes")")
                     Text("\(model.cleanPasses) clean")
-                } else if model.kind.hasBacking {
+                } else if model.kind.hasNoPrompts {
+                    Text("Nothing is logged")
+                } else if model.kind.module == .progressions {
                     let summary = model.chordSummary
                     Text("\(summary.chords) \(summary.chords == 1 ? "chord" : "chords")")
                     Text("\(summary.clean) clean")
@@ -104,6 +106,16 @@ struct DrillView: View {
     }
 
     @ViewBuilder private var notes: some View {
+        if model.kind.goesRoundTheCircle {
+            NoteCirclePrompt(display: model.snapshot.display, fretboard: model.fretboard, now: .seconds(model.now)) {
+                DrillRestingText(model: model)
+            }
+        } else {
+            noteDrill
+        }
+    }
+
+    @ViewBuilder private var noteDrill: some View {
         DrillNeck(display: model.snapshot.display, fretboard: model.fretboard)
             .padding(.horizontal, 24)
             .padding(.top, 20)
@@ -117,7 +129,19 @@ struct DrillView: View {
         Spacer(minLength: 12)
     }
 
-    private var scales: some View {
+    @ViewBuilder private var scales: some View {
+        if model.kind.goesRoundTheCircle {
+            ScaleCirclePrompt(display: model.snapshot.display, position: model.position,
+                              restingMarkers: model.restingMarkers, fretboard: model.fretboard,
+                              now: .seconds(model.now)) {
+                DrillRestingText(model: model)
+            }
+        } else {
+            passPrompt
+        }
+    }
+
+    private var passPrompt: some View {
         PassPrompt(display: model.snapshot.display, position: model.position, restingMarkers: model.restingMarkers,
                    settings: model.passSettings, fretboard: model.fretboard) {
             DrillRestingText(model: model)
@@ -131,7 +155,18 @@ struct DrillView: View {
         }
     }
 
-    private var triads: some View {
+    @ViewBuilder private var triads: some View {
+        if model.kind.goesRoundTheCircle {
+            TriadCirclePrompt(display: model.snapshot.display, frets: model.options.frets, fretboard: model.fretboard,
+                              now: .seconds(model.now)) {
+                DrillRestingText(model: model)
+            }
+        } else {
+            triadDrill
+        }
+    }
+
+    private var triadDrill: some View {
         TriadPrompt(display: model.snapshot.display, hasClimbs: model.kind.hasClimbs, frets: model.options.frets, fretboard: model.fretboard) {
             LiveCountdownRing { model.countdown }
         } resting: {
@@ -165,7 +200,8 @@ private struct DrillOptionsBar: View {
     var body: some View {
         DrillPicker(kind: $model.kind)
         switch model.kind.module {
-        case .notes: NoteOptions(model: model)
+        // A circle drill's frets and strings are its own, and it starts from the day's key.
+        case .notes: if !model.kind.goesRoundTheCircle { NoteOptions(model: model) }
         // Gone during a run, when the header names them: its buttons need the room.
         case .scales: if !model.isRunning { ScaleOptions(setup: model.setup, options: $model.options) }
         case .triads: if !model.isRunning { TriadOptions(kind: model.kind, options: $model.options) }
@@ -328,12 +364,14 @@ private struct DrillRestingText: View {
 
     private var hintText: String {
         let (shown, unclean) = model.kind.hasPasses ? ("position", "pass")
-            : model.kind.hasBacking ? ("voicing", "chord") : ("notes", "voicing")
+            : model.kind.module == .progressions ? ("voicing", "chord") : ("notes", "voicing")
         return " Hold H to see the \(shown): the \(unclean) then isn’t clean."
     }
 
     private var resumeText: String {
         if model.kind.hasPasses { return model.resumesSamePrompt ? "Resume (P) to restart the pass" : "Resume (P) for the next pass" }
+        if model.kind.hasNoPrompts { return "Resume (P) to count the backing in again" }
+        if model.kind == .chordsInPosition { return "Resume (P) to play the chord again" }
         if model.kind.hasBacking { return "Resume (P) to start the time through again, after a count-in" }
         return model.resumesSamePrompt ? "Resume (P) to carry on" : "Resume (P) for a new prompt"
     }
@@ -386,7 +424,7 @@ private struct DrillRunSummary: View {
                 if model.kind.hasPasses {
                     stat("Passes", "\(model.completePasses)")
                     stat("Clean", "\(model.cleanPasses)")
-                } else if model.kind.hasBacking {
+                } else if model.kind.module == .progressions {
                     let summary = model.chordSummary
                     stat("Chords", "\(summary.chords)")
                     stat("Clean", "\(summary.clean)")
@@ -396,7 +434,7 @@ private struct DrillRunSummary: View {
                     stat("First-try right", stats.firstTryText)
                     stat("Median time", stats.medianText)
                 }
-                if !model.kind.hasBacking {
+                if model.kind.module != .progressions {
                     stat("Timed out", "\(stats.timeouts)")
                     stat("Skipped", "\(stats.skips)")
                 }
@@ -404,7 +442,7 @@ private struct DrillRunSummary: View {
             if model.isCheckRun {
                 list("Misses", stats.misses, emptyText: "None: every location was right first time.")
                 list("Slowest onsets", stats.slowest(5).filter { $0.outcome == .answered })
-            } else if model.kind.hasBacking {
+            } else if model.kind.module == .progressions {
                 let summary = model.chordSummary
                 Text(summary.text).font(.callout).foregroundStyle(.secondary)
                 if !summary.hardest.isEmpty {
@@ -414,6 +452,9 @@ private struct DrillRunSummary: View {
             } else if !model.kind.hasPasses {
                 list("Slowest", stats.slowest(3))
                 if !model.sweeps.isEmpty { lines("Sweeps", model.sweeps.suffix(6).map(\.summaryLine)) }
+                if let circle = model.circle {
+                    lines("Circle of fifths", [circle.summaryText + " · " + circle.comparison(with: model.circleBest)])
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

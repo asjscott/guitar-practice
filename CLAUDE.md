@@ -6,13 +6,13 @@ Full spec and roadmap: Claude Docs `c1631de5-f295-4bd8-a9fe-f1c1948a980d`. Befor
 
 ## Current phase
 
-**Phase 4 · Backing and progressions.** Scope: MIDI backing via SoundFont (bass, keys, drums; tempo and style); progression library and Roman-numeral → key rendering; nearest voicing, stay in position and target top note drills; latency check. Spec #51 (audio file import moved to Phase 5); tickets #52–#61.
+**Phase 4b · Daily routine.** Scope: the session becomes a fixed eight-step routine round the circle of fifths (Note circle, a note drill, Scale circle, Up and down, Triad circle, Chords in position, Stay in position, Free time), with no time budget; the fade becomes continuous, by fade levels (ADR 0007). Spec #64; tickets #65–#72 on branch `phase-4b` (PR #75); gate #73.
 
-Carried over from the Phase 3 gate (#48), to check on a guitar in Phase 4: a full Inversions climb on the theme's string set, with the triad fade.
+Still to check on a guitar, from this build: the Phase 4 gate #61, including the Phase 3 carry-over (a full Inversions climb on the theme's string set, with the triad fade).
 
-Phases 0 (spec #1), 1 (spec #11), 2 (spec #21) and 3 (spec #33) are complete.
+Phases 0 (spec #1), 1 (spec #11), 2 (spec #21) and 3 (spec #33) are complete; Phase 4 (spec #51) is built and waits on its gate #61.
 
-Phase order: 0 Foundations → 1 Hear the guitar → 2 Session MVP → 3 Scales and triads → 4 Backing and progressions → 5 Lick → solo → 6 Adaptive and polish. Don't start work from a later phase unless asked.
+Phase order: 0 Foundations → 1 Hear the guitar → 2 Session MVP → 3 Scales and triads → 4 Backing and progressions → 4b Daily routine (spec #64, tickets #65–#73) → 5 Lick → solo → 6 Adaptive and polish. Don't start work from a later phase unless asked.
 
 ## Stack
 
@@ -44,7 +44,7 @@ To see a UI change, run `scripts/snapshot --only <prefix> --sheet` and read the 
 - **Layers:** Views → Session engine / Exercise modules / Progress engine → TheoryCore + Audio engine → SwiftData. Lower layers never import higher ones.
 - Before changing the fretboard, explorer or Settings, read `docs/ui.md`.
 - Use `@Observable` for view state; keep views thin.
-- SwiftData models live in `App/Models` only. Run `scripts/log-check` after changing them. The schema is V3: never edit a released version; copy it and add a migration stage (V2 → V3 is the latest example). The player's store is opened only by `AttemptLog.live()`; snapshots and previews use `.inMemory()`.
+- SwiftData models live in `App/Models` only. Run `scripts/log-check` after changing them. The schema is V5: never edit a released version; copy it and add a migration stage (V4 → V5 is the latest example). The player's store is opened only by `AttemptLog.live()`; snapshots and previews use `.inMemory()`.
 - No new dependencies without asking first.
 
 ## Music conventions (TheoryCore)

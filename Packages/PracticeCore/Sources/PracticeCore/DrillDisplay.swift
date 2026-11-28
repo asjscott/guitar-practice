@@ -18,6 +18,12 @@ public struct DrillMoment: Hashable, Sendable {
 
     /// The locations that answer the prompt.
     public let correctLocations: [FretboardLocation]
+
+    /// On the drill's clock.
+    public var now: Duration = .zero
+
+    /// When the prompt's timer started; nil until it has.
+    public var promptStart: Duration? = nil
 }
 
 /// What the target card and the neck show for a prompt, worked out here so it can be tested.
@@ -34,15 +40,18 @@ public struct DrillDisplay: Hashable, Sendable {
         public var isAnswer: Bool
         /// Drawn faintly.
         public var isFaint: Bool
+        /// From 1 (solid) down to 0 as it fades by time (`NoteFade`), label and all; never 0.
+        public var opacity: Double
         /// Ringed as the last note played.
         public var isLastPlayed: Bool
 
-        public init(location: FretboardLocation, label: String, isAnswer: Bool, isFaint: Bool = false,
+        public init(location: FretboardLocation, label: String, isAnswer: Bool, isFaint: Bool = false, opacity: Double = 1,
                     isLastPlayed: Bool = false) {
             self.location = location
             self.label = label
             self.isAnswer = isAnswer
             self.isFaint = isFaint
+            self.opacity = opacity
             self.isLastPlayed = isLastPlayed
         }
     }
@@ -96,6 +105,9 @@ public struct DrillDisplay: Hashable, Sendable {
 
     /// The time through, in progression drills.
     public var progression: ProgressionProgress?
+
+    /// Where the circle of fifths has got to, in circle drills.
+    public var circle: CircleProgress?
 
     /// Waiting for a typed name: what is typed so far replaces the headline.
     public var acceptsTypedName = false

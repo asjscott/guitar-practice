@@ -2,8 +2,8 @@ import PracticeCore
 import SwiftUI
 import TheoryCore
 
-/// The Session screen, S4: setup, then for each block a Ready card and the drill under a bar of the session's drills,
-/// then a summary. Return starts and leaves the summary; Space goes on; S skips; + extends; R is up to the drill; in a scale or triad block H shows what has faded, and in a scale block M opens the metronome panel; P pauses and
+/// The Session screen, layout C: the daily routine's rail down the left; setup, then for each step a Ready card and the
+/// drill, then a summary. Return starts and leaves the summary; Space goes on; S skips; + extends; R is up to the drill; in a scale or triad block H shows what has faded, and in a scale block M opens the metronome panel; P pauses and
 /// resumes; Esc pauses and asks before ending. A listening screen; leaving it pauses the session, as do sleep and losing
 /// the input. Follows the tuning, capo and position system in Settings.
 struct SessionView: View {
@@ -13,7 +13,6 @@ struct SessionView: View {
     @Environment(Metronome.self) private var metronome
     @Environment(BackingPlayer.self) private var backingPlayer
     @Environment(AttemptLog.self) private var log
-    @AppStorage("session.minutes") private var minutes = SessionSetup().minutes
     @AppStorage("session.naturalsOnly") private var naturalsOnly = true
     @AppStorage("session.range") private var range = SessionRange.first12
     @AppStorage(InstrumentSettings.Key.positionSystem) private var positionSystem = InstrumentSettings.defaultPositionSystem
@@ -52,17 +51,16 @@ struct SessionView: View {
     @ViewBuilder private var content: some View {
         switch model.stage {
         case .idle:
-            SessionSetupView(minutes: $minutes, naturalsOnly: $naturalsOnly, range: $range, theme: model.theme,
-                             reroll: model.canReroll ? { model.reroll() } : nil, blocks: model.plan(), problem: model.problem,
-                             noSoundNotice: model.noSoundNotice, noTriadsNotice: model.noTriadsNotice,
-                             noProgressionsNotice: model.noProgressionsNotice, backingNotices: model.backingNotices,
-                             start: { model.start() })
+            SessionSetupView(naturalsOnly: $naturalsOnly, range: $range, theme: model.theme,
+                             reroll: model.canReroll ? { model.reroll() } : nil, steps: model.plannedSteps(),
+                             estimate: model.estimateText(), problem: model.problem, noSoundNotice: model.noSoundNotice,
+                             notices: model.notices, backingNotices: model.backingNotices, start: { model.start() })
         case .ready, .playing, .paused:
             SessionPlayingView(model: model)
         case .finished:
             if let summary = model.summary {
-                SessionSummaryView(summary: summary, tuning: model.fretboard.tuning, key: model.theme?.key,
-                                   done: model.done)
+                SessionSummaryView(summary: summary, steps: model.snapshot.steps, tuning: model.fretboard.tuning,
+                                   key: model.theme?.key, done: model.done)
             }
         }
     }
@@ -70,7 +68,7 @@ struct SessionView: View {
     private let meters = StoredMeters()
 
     private var setup: SessionSetup {
-        SessionSetup(minutes: minutes, notes: naturalsOnly ? .naturals : .all, range: range)
+        SessionSetup(notes: naturalsOnly ? .naturals : .all, range: range)
     }
 
     private func press(_ key: PlainKey) -> Bool {

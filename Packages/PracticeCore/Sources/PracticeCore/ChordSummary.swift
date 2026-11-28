@@ -18,8 +18,6 @@ public struct ChordSummary: Hashable, Sendable {
     public let clean: Int
     /// Times through played to the end.
     public let timesThrough: Int
-    /// The first of those played at Hidden, from 1; nil if none was.
-    public let firstHidden: Int?
     /// At most two that weren't always clean, fewest clean first (in order of the progression when tied).
     public let hardest: [Chord]
 
@@ -35,7 +33,6 @@ public struct ChordSummary: Hashable, Sendable {
         }
         let complete = groups.filter { $0.facts.count == $0.size }
         timesThrough = complete.count
-        firstHidden = complete.firstIndex { $0.facts.first?.fadeStage == .hidden }.map { $0 + 1 }
         var byChord: [(name: String, clean: Int, played: Int, place: Int)] = []
         for (_, facts) in chords {
             let name = facts.triad.shortName
@@ -51,11 +48,8 @@ public struct ChordSummary: Hashable, Sendable {
             .prefix(2).map { Chord(name: $0.name, clean: $0.clean, played: $0.played) }
     }
 
-    /// "31 of 40 chords clean · 10 times through · Hidden from the 5th".
+    /// "31 of 40 chords clean · 10 times through".
     public var text: String {
-        var parts = ["\(clean) of \(chords) chords clean",
-                     "\(timesThrough) \(timesThrough == 1 ? "time" : "times") through"]
-        if let firstHidden { parts.append("Hidden from the \(firstHidden.ordinal)") }
-        return parts.joined(separator: " · ")
+        "\(clean) of \(chords) chords clean · \(timesThrough) \(timesThrough == 1 ? "time" : "times") through"
     }
 }

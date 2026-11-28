@@ -7,7 +7,7 @@ private func at(_ string: Int, _ fret: Int) -> FretboardLocation { FretboardLoca
 private func setup(_ preset: TuningPreset = .standard, capo: Int = 0, seed: UInt64 = 1,
                    _ change: (inout DrillOptions) -> Void = { _ in }) -> DrillSetup {
     var options = DrillOptions()
-    options.triadFade = .hidden
+    options.triadFade = .last
     change(&options)
     return DrillSetup(fretboard: Fretboard(tuning: preset.tuning, capo: capo), options: options, seed: seed)
 }
@@ -51,19 +51,19 @@ struct InversionsTests {
         #expect(DrillKind.all.contains(.inversions))
         #expect(DrillKind.inversions.id == "inversions")
         #expect(DrillKind.inversions.module == .triads)
-        #expect(DrillKind.all.filter(\.hasClimbs) == [.inversions])
+        #expect(DrillKind.all.filter(\.hasClimbs) == [.inversions, .triadCircle])
         #expect(DrillKind.inversions.repeatTitle == "Restart")
         #expect(!DrillKind.inversions.offersInversions)
         #expect(DrillKind.triadPlayIt.offersInversions)
     }
 
-    @Test func itStartsOnTheLowestVoicingWithItsNotesHidden() throws {
+    @Test func itStartsOnTheLowestVoicingWithOnlyItsRootShown() throws {
         let display = try #require(aMinor().display)
         #expect(display.headline == "A minor · 2nd inversion")
         #expect(display.subline == "D-G-B")
         #expect(display.highlightedStrings == [2, 3, 4])
-        #expect(display.markers.isEmpty)
-        #expect(display.chips.map(\.text) == ["?", "?", "?"])
+        #expect(display.markers == [.init(location: at(3, 2), label: "A", isAnswer: true)])
+        #expect(display.chips.map(\.text) == ["?", "A", "?"])
         #expect(display.chips.map(\.state) == [.current, .waiting, .waiting])
         #expect(display.voicings.map(\.title) == ["2nd", "root", "1st", "root", "2nd"])
         #expect(display.voicings.map(\.state) == [.current, .waiting, .waiting, .waiting, .waiting])
@@ -106,7 +106,7 @@ struct InversionsTests {
         drill.handle(.tick(at: s(3.5)))
         #expect(drill.phase == .waiting)
         #expect(drill.promptStart == s(3.5))
-        #expect(drill.display?.chips.map(\.text) == ["?", "?", "?"])
+        #expect(drill.display?.chips.map(\.text) == ["A", "?", "?"])
     }
 
     @Test func onlyTheVoicingReachedIsRight() {
@@ -130,7 +130,7 @@ struct InversionsTests {
         #expect(drill.stats.prompts == 1)
         let facts = [Triad.Inversion.second, .root, .first, .root, .second].flatMap { inversion -> [AttemptFacts] in
             var facts = TriadFacts(triad: Triad(.minor, root: .a), inversion: inversion, stringSet: .dGB)
-            facts.fadeStage = .hidden
+            facts.fadeLevel = .last
             return Array(repeating: AttemptFacts.triad(facts), count: 3)
         }
         #expect(drill.attempts.map(\.facts) == facts)
@@ -207,7 +207,7 @@ struct InversionsTests {
         #expect(drill.phase == .waiting)
         #expect(drill.promptStart == s(9))
         #expect(inversionAsked(drill) == "Root position")
-        #expect(drill.display?.chips.map(\.text) == ["?", "?", "?"])
+        #expect(drill.display?.chips.map(\.text) == ["A", "?", "?"])
         #expect(drill.display?.voicings.map(\.state) == [.found, .current, .waiting, .waiting, .waiting])
         #expect(drill.attempts.count == 4)
         for (index, midi) in root.enumerated() { play(midi, at: 10 + Double(index), &drill) }
@@ -231,7 +231,7 @@ struct InversionsTests {
         play(52, at: 1, &drill)
         #expect(drill.canHold)
         drill.handle(.hold(until: s(4)))
-        #expect(drill.display?.chips.map(\.text) == ["E", "?", "?"])
+        #expect(drill.display?.chips.map(\.text) == ["E", "A", "?"])
         drill.handle(.tick(at: s(4)))
         play(57, at: 5, &drill)
         #expect(drill.attempts.last?.responseTime == s(1))

@@ -149,7 +149,9 @@ public struct InversionsRules: DrillRules {
 
     public mutating func hint(isShown: Bool) { fade.hint(isShown: isShown) }
 
-    public var fadeStages: FadeStages? {
+    public mutating func timerStarted(at time: Duration) { fade.timerStarted(at: time) }
+
+    public var fadeLevels: FadeLevels? {
         get { fade.reached }
         set { if let newValue { fade.reached = newValue } }
     }
@@ -173,7 +175,7 @@ public struct InversionsRules: DrillRules {
 
     public func display(of moment: DrillMoment) -> DrillDisplay {
         guard let climb, let voicing, let facts else { return DrillDisplay(standard: moment, in: setup) }
-        var display = DrillDisplay(triad: facts, at: voicing.locations, played: played, showing: fade.shown, moment: moment, in: setup)
+        var display = DrillDisplay(triad: facts, at: voicing.locations, played: played, fading: fade.noteFade, moment: moment, in: setup)
         display.voicings = climb.voicings.enumerated().map { index, voicing in
             let state: DrillDisplay.Chip.State = if index < results.count { results[index] } else { index == voicingIndex ? .current : .waiting }
             return DrillDisplay.Chip(title: voicing.inversion.shortName, spokenTitle: "voicing \(index + 1) of \(climb.voicings.count)",

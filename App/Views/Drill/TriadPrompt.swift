@@ -41,7 +41,7 @@ struct TriadPrompt<Countdown: View, Resting: View>: View {
 }
 
 /// A circle per string, lowest first.
-private struct TriadCircles: View {
+struct TriadCircles: View {
     let chips: [DrillDisplay.Chip]
     let size: CGFloat
 
@@ -64,7 +64,7 @@ private struct TriadCircles: View {
 }
 
 /// A climb as a line that rises and falls, with a dot per voicing over its inversion.
-private struct ClimbLine: View {
+struct ClimbLine: View {
     let voicings: [DrillDisplay.Chip]
 
     private static let spacing: CGFloat = 46
@@ -144,7 +144,7 @@ struct TriadOptions: View {
             .help("Inversions")
         }
         FretsPicker(frets: $options.frets)
-        FadePicker(stage: $options.triadFade, unit: "voicings")
+        FadeLevelPicker(level: $options.triadFade, unit: "voicings")
     }
 
     /// "Sets: all", or the only one, or how many.

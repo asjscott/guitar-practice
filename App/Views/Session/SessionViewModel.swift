@@ -45,31 +45,15 @@ final class SessionViewModel: MetronomePanelOwner {
     struct Snapshot: Equatable {
         var stage: SessionStage = .idle
         var blockIndex = 0
-        var blocks: [BlockProgress] = []
+        /// The routine's steps, for the rail.
+        var steps: [RailStep] = []
         /// Whole seconds left of the Ready card.
         var readySeconds = 0
         var display: DrillDisplay?
         /// What the next pass is played at, in a scale block from its Ready card on.
         var passSettings: PassSettings?
-        /// When it will end if it goes on now.
-        var finish = Finish()
-    }
-
-    /// When a session will end: the time of day, or while paused, how long after resuming.
-    struct Finish: Equatable {
-        var timeText = ""
-        var afterResuming: Duration?
-    }
-
-    /// A block in the drills bar.
-    struct BlockProgress: Equatable {
-        var kind: DrillKind
-        /// What is left, "+0:12" in overtime, or for a block that is over, what was spent.
-        var timeText: String
-        /// Goes on past its planned end.
-        var isOvertime: Bool
-        /// Of the planned length, 0–1.
-        var fraction: Double
+        /// The session's time so far, "18:20".
+        var elapsedText = ""
     }
 
     /// The tuning and capo in Settings, for the next session. One that is going keeps its own.
@@ -130,6 +114,8 @@ final class SessionViewModel: MetronomePanelOwner {
 
     /// The positions its passes go through.
     @ObservationIgnored private var passPositions: [Position.ID] = []
+    /// Each step's details, as setup shows them.
+    @ObservationIgnored private var stepDetails: [String] = []
     /// The string sets triads are on.
     @ObservationIgnored private var stringSets: Set<StringSet> = []
 
@@ -159,7 +145,9 @@ final class SessionViewModel: MetronomePanelOwner {
     var isActive: Bool { stage == .ready || stage == .playing || stage == .paused }
 
     /// The current block's drill; nil before Start.
-    var blockKind: DrillKind? { snapshot.blocks.indices.contains(snapshot.blockIndex) ? snapshot.blocks[snapshot.blockIndex].kind : nil }
+    var blockKind: DrillKind? {
+        snapshot.steps.indices.contains(snapshot.blockIndex) ? snapshot.steps[snapshot.blockIndex].kind : nil
+    }
 
     // MARK: - Setup
 
@@ -178,36 +166,82 @@ final class SessionViewModel: MetronomePanelOwner {
     /// Whether sound can be heard, as far as is known.
     private var hasSound: Bool { soundOutput.map { $0.problem == nil } ?? false }
 
+    /// The day's session: the routine's eight steps, from the theme, against the circles' bests.
+    func routine(on date: Date = .now) -> SessionRoutine {
+        let setup = drillSetup(seed: 0)
+        let unlocked = log.map { SessionPlanner.unlocksHearFindIt(noteCircles: $0.circles(of: .noteCircle)) } ?? false
+        var bests: [DrillKind: CircleResult] = [:]
+        for kind in DrillKind.all where kind.goesRoundTheCircle {
+            bests[kind] = log?.circleBest(of: kind, on: setup.fretboard)
+        }
+        return SessionPlanner.routine(for: setup, day: Calendar.dayNumber(of: date), hasSound: hasSound,
+                                      hearFindItUnlocked: unlocked, circleBests: bests)
+    }
+
+    /// The steps for setup's rail, each with what it does today.
+    func plannedSteps(on date: Date = .now) -> [RailStep] {
+        let routine = routine(on: date)
+        return zip(routine.blocks, details(of: routine)).map { block, detail in
+            block.isLeftOut ? RailStep(kind: block.kind, state: .leftOut, detail: "Left out")
+                : RailStep(kind: block.kind, state: .toCome, detail: detail)
+        }
+    }
+
+    /// "About 33 minutes, then free time": the median of past sessions, once there are three; nil before.
+    func estimateText(on date: Date = .now) -> String? {
+        guard let estimate = SessionPlanner.estimate(from: log?.routineTimes() ?? []) else { return nil }
+        let minutes = max(1, Int((estimate / .seconds(60)).rounded()))
+        let hasFreeTime = routine(on: date).blocks.contains { $0.kind == .freeTime && !$0.isLeftOut }
+        return "About \(minutes) \(minutes == 1 ? "minute" : "minutes")" + (hasFreeTime ? ", then free time" : "")
+    }
+
+    /// What each step does today.
+    private func details(of routine: SessionRoutine) -> [String] {
+        let session = drillSetup(seed: 0)
+        return routine.blocks.map { block in
+            let setup = block.setup ?? session
+            let key = setup.key ?? setup.options.key
+            let position = session.theme?.position(on: session.fretboard)?.name ?? setup.position?.name ?? ""
+            let progression = setup.options.progression?.name ?? ""
+            switch block.kind {
+            case .noteCircle:
+                let tonics = key.circleOfFifths.prefix(2).map { $0.tonic.description }
+                return "Every \(tonics.joined(separator: ", then every ")), … frets 0–12"
+            case .scaleCircle:
+                return "\(key), \(position), round all 12 keys"
+            case .upAndDown:
+                return "\(key), \(position), to the clicks · \(clockText(block.length ?? .zero))"
+            case .triadCircle:
+                let sets = setup.fretboard.stringSets.filter(setup.options.stringSets.contains)
+                return sets.count == 1 ? "Every inversion on \(sets[0].name), round all 12 keys"
+                    : "Every inversion, round all 12 keys"
+            case .chordsInPosition:
+                return "\(progression) in the \(position), no backing"
+            case .stayInPosition:
+                let backing = setup.options.backing
+                return "\(progression) over the backing, \(backing.style.title.lowercased()), \(backing.tempo) BPM"
+            case .freeTime:
+                return "The backing loops; play what you like"
+            default:
+                return "Today’s note drill · \(clockText(block.length ?? .zero))"
+            }
+        }
+    }
+
     /// What a session without sound does differently; nil with sound.
-    var noSoundNotice: String? { hasSound ? nil : SessionPlanner.noSoundNotice(from: DrillKind.all) }
+    var noSoundNotice: String? { routine().noSoundNotice }
 
-    /// Why there are no triads; nil when there are, or nothing at all can be prompted.
-    var noTriadsNotice: String? {
-        nothingToPromptReason == nil ? SessionPlanner.noTriadsNotice(from: DrillKind.all, for: drillSetup(seed: 0)) : nil
-    }
-
-    /// Why there are no progressions; nil when there are, or nothing at all can be prompted.
-    var noProgressionsNotice: String? {
-        nothingToPromptReason == nil
-            ? SessionPlanner.noProgressionsNotice(from: DrillKind.all, for: drillSetup(seed: 0)) : nil
-    }
+    /// What is left out of today's session, and why; none when nothing can be played at all.
+    var notices: [String] { nothingToPromptReason == nil ? routine().notices : [] }
 
     /// Whether a progression block is planned, and its backing would be heard as notes or not at all; for setup.
     var backingNotices: [String] {
-        guard plan().contains(where: \.kind.hasBacking) else { return [] }
+        guard routine().blocks.contains(where: { $0.kind.hasBacking && !$0.isLeftOut }) else { return [] }
         return backingHearing.notices(hasSounds: backingPlayer?.hasSounds, player: "Progressions")
     }
 
-    /// The blocks a session would have, of the drills that have something to prompt, and can be heard if they need to be.
-    func plan(on date: Date = .now) -> [SessionBlock] {
-        let drills = SessionPlanner.drills(from: DrillKind.all, for: drillSetup(seed: 0), hasSound: hasSound)
-        return SessionPlanner.plan(drills, budget: setup.budget, day: Calendar.dayNumber(of: date))
-    }
-
-    /// Why no drill can prompt anything; nil when one can.
-    var nothingToPromptReason: String? {
-        SessionPlanner.nothingToPromptReason(from: DrillKind.all, for: drillSetup(seed: 0), hasSound: hasSound)
-    }
+    /// Why no step can be played; nil when one can.
+    var nothingToPromptReason: String? { routine().nothingToPromptReason }
 
     /// Why nothing can be heard: a session can't start or resume. Nil when it can.
     var inputProblem: AudioInputProblem? { input?.problem }
@@ -260,18 +294,24 @@ final class SessionViewModel: MetronomePanelOwner {
         showTheme(on: date)
         // Tried before planning, so that a session without sound is planned as one.
         soundOutput?.prepare()
-        let blocks = plan(on: date)
+        let routine = routine(on: date)
+        let blocks = routine.blocks
+        stepDetails = details(of: routine)
         var drillSetup = drillSetup(seed: seed)
-        passPositions = drillSetup.passPositions.map(\.id)
-        stringSets = drillSetup.options.stringSets
-        drillSetup.fadeStages = log?.fadeStages(in: passPositions, on: stringSets) ?? FadeStages()
+        // Up and down's, and the Scale circle's.
+        passPositions = (blocks.compactMap { $0.setup?.passPositions }.joined() + drillSetup.scaleCirclePositions).map(\.id)
+        // The progression blocks' voicings can be on any string set.
+        stringSets = Set(drillSetup.fretboard.stringSets)
+        // Before the session's record, which is the run it is played in: nothing of it is logged yet.
+        drillSetup.fadeLevels = log?.fadeLevels(in: passPositions, on: stringSets) ?? FadeLevels()
         fretboard = drillSetup.fretboard
         frets = drillSetup.options.frets
         player = SessionPlayer(blocks: blocks, setup: drillSetup, hasSound: hasSound)
         record = PracticeSession(
-            day: Calendar.practiceDay(of: date), startedAt: date, budgetMinutes: setup.minutes,
+            day: Calendar.practiceDay(of: date), startedAt: date, budgetMinutes: nil,
             naturalsOnly: setup.notes == .naturals, wholeNeck: setup.range == .wholeNeck,
-            blocks: blocks.map { SessionBlockRecord(drill: $0.kind.id, plannedSeconds: $0.length / .seconds(1)) })
+            // A block that ends by itself has no planned length: 0.
+            blocks: blocks.map { SessionBlockRecord(drill: $0.kind.id, plannedSeconds: ($0.length ?? .zero) / .seconds(1)) })
         record?.theme = theme?.theme
         send(.start(at: clockNow()))
         startTicking()
@@ -314,7 +354,7 @@ final class SessionViewModel: MetronomePanelOwner {
         asksToEnd = false
         loadPassSettings()
         // Free practice may have moved them.
-        if let log { send(.fadeStages(log.fadeStages(in: passPositions, on: stringSets))) }
+        if let log { send(.fadeLevels(log.fadeLevels(in: passPositions, on: stringSets, current: record?.id))) }
         send(.resume(at: clockNow()))
     }
 
@@ -408,6 +448,12 @@ final class SessionViewModel: MetronomePanelOwner {
     /// H held or let go.
     func hint(isShown: Bool) { send(.hint(isShown: isShown, at: clockNow())) }
 
+    /// Whether the current block has a planned length, which + extends.
+    var hasPlannedLength: Bool {
+        guard let player, player.blocks.indices.contains(snapshot.blockIndex) else { return false }
+        return player.blocks[snapshot.blockIndex].isExtendable
+    }
+
     private func startTicking() {
         ticker.start { [weak self] in
             if let self { send(.tick(at: clockNow())) }
@@ -462,7 +508,7 @@ final class SessionViewModel: MetronomePanelOwner {
             startTicking()
         }
         if player.stage == .finished { summary = player.summary }
-        let new = Snapshot(of: player)
+        let new = Snapshot(of: player, details: stepDetails)
         if new != snapshot { snapshot = new }
         if let drill = player.drill { followTyping(drill) } else { nameEntry = NoteNameEntry() }
         if player.stage == .ready, before.stage != .ready { loadPassSettings() }
@@ -626,35 +672,52 @@ final class SessionViewModel: MetronomePanelOwner {
     #endif
 }
 
+/// A step in the session rail: done, current, to come, or left out.
+struct RailStep: Equatable {
+    enum State: Equatable {
+        case toCome, current, done, leftOut
+    }
+
+    var kind: DrillKind
+    var state: State
+    /// To come, what it does today; while current, where it has got to ("F♯ · 3 of 12", "1:12 left"); once done, how
+    /// it went.
+    var detail: String
+}
+
 extension SessionViewModel.Snapshot {
-    @MainActor fileprivate init(of player: SessionPlayer) {
+    @MainActor fileprivate init(of player: SessionPlayer, details: [String]) {
         stage = player.stage
         blockIndex = player.blockIndex
         readySeconds = player.readyRemaining.map { Int(($0 / .seconds(1)).rounded(.up)) } ?? 0
         display = player.display
         passSettings = player.passSettings
-        finish = player.stage == .paused ? .init(afterResuming: player.timeToFinish)
-            : .init(timeText: sessionFinishText(player.timeToFinish, after: .now))
-        blocks = player.blocks.indices.map { index in
-            let spent = player.spent(inBlock: index)
-            let isOver = spent != nil && index < player.blockIndex
-            let left = player.timeLeft(inBlock: index)
-            let isOvertime = !isOver && left < .zero
-            let timeText = if player.isLeftOut(block: index) { "no sound" }
-                else if isOver { clockText(spent ?? .zero) }
-                else if isOvertime { "+" + clockText(.zero - left) }
-                else { clockText(left, rounding: .up) }
-            return .init(
-                kind: player.blocks[index].kind,
-                timeText: timeText,
-                isOvertime: isOvertime,
-                // In 200ths, so that the bar moves smoothly without a redraw on every tick.
-                fraction: isOver ? 1 : min(1, ((spent ?? .zero) / player.length(ofBlock: index) * 200).rounded(.down) / 200))
+        elapsedText = clockText(player.elapsed)
+        let results = Dictionary(player.summary.blocks.map { ($0.step, $0.resultText) }) { first, _ in first }
+        steps = player.blocks.indices.map { index in
+            let kind = player.blocks[index].kind
+            if player.isLeftOut(block: index) { return RailStep(kind: kind, state: .leftOut, detail: "Left out") }
+            if index == player.blockIndex, player.stage != .finished {
+                return RailStep(kind: kind, state: .current, detail: Self.place(in: player, details: details))
+            }
+            if let result = results[index] { return RailStep(kind: kind, state: .done, detail: result) }
+            return RailStep(kind: kind, state: .toCome, detail: details.indices.contains(index) ? details[index] : "")
         }
     }
-}
 
-/// "Ends 18:42".
-func sessionFinishText(_ timeLeft: Duration, after date: Date) -> String {
-    "Ends " + (date + timeLeft / .seconds(1)).formatted(date: .omitted, time: .shortened)
+    /// Where the current block has got to; on its Ready card, what it does.
+    @MainActor private static func place(in player: SessionPlayer, details: [String]) -> String {
+        let index = player.blockIndex
+        guard let drill = player.drill else { return details.indices.contains(index) ? details[index] : "" }
+        if let circle = drill.display?.circle { return circle.placeText }
+        if let left = player.timeLeft(inBlock: index) {
+            if left > .zero { return clockText(left, rounding: .up) + " left" }
+            return player.blocks[index].isExtendable ? "Space to go on" : "Last pass"
+        }
+        if case .afterTimesThrough(let count) = player.blocks[index].end, let timeThrough = drill.display?.progression?.timeThrough {
+            return "Time through \(min(timeThrough, count)) of \(count)"
+        }
+        if drill.kind.hasNoPrompts { return "Until you end the session" }
+        return clockText(player.spent(inBlock: index) ?? .zero)
+    }
 }

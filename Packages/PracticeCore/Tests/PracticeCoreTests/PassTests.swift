@@ -425,7 +425,7 @@ struct PassNoteTests {
         #expect(drill.attempts.allSatisfy { $0.group?.size == 23 && $0.group?.number == drill.attempts[0].group?.number })
         #expect(drill.attempts.allSatisfy { attempt in
             facts(attempt) == PassFacts(scale: Scale(.minorPentatonic, tonic: .a), position: .init(system: .caged, number: 5),
-                                        startDegree: .init(1), tempo: 60, signature: .fourFour, fadeStage: .shown,
+                                        startDegree: .init(1), tempo: 60, signature: .fourFour, fadeLevel: .first,
                                         hinted: false, clickOffset: .milliseconds(50))
         })
     }

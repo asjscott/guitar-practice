@@ -95,7 +95,9 @@ public struct TriadPlayItRules: DrillRules {
 
     public mutating func hint(isShown: Bool) { fade.hint(isShown: isShown) }
 
-    public var fadeStages: FadeStages? {
+    public mutating func timerStarted(at time: Duration) { fade.timerStarted(at: time) }
+
+    public var fadeLevels: FadeLevels? {
         get { fade.reached }
         set { if let newValue { fade.reached = newValue } }
     }
@@ -115,35 +117,37 @@ public struct TriadPlayItRules: DrillRules {
     public func display(of moment: DrillMoment) -> DrillDisplay {
         guard let asked else { return DrillDisplay(standard: moment, in: setup) }
         let played = moment.attempts.filter { $0.group?.number == group && $0.outcome == .answered }
-        return DrillDisplay(triad: asked, at: revealed?.locations ?? [], played: played, showing: fade.shown, moment: moment, in: setup)
+        return DrillDisplay(triad: asked, at: revealed?.locations ?? [], played: played, fading: fade.noteFade, moment: moment, in: setup)
     }
 }
 
 extension DrillDisplay {
-    /// A voicing being arpeggiated, with the notes played so far; of the rest, what the fade stage shows until it is over.
-    init(triad facts: TriadFacts, at locations: [FretboardLocation], played: [Attempt], showing stage: FadeStage,
+    /// A voicing being arpeggiated, with the notes played so far solid; of the rest, the root solid and the others as
+    /// they fade, until it is over.
+    init(triad facts: TriadFacts, at locations: [FretboardLocation], played: [Attempt], fading fade: NoteFade,
          moment: DrillMoment, in setup: DrillSetup) {
         self.init(standard: moment, in: setup)
         let isOver = result == .timedOut || played.count == facts.noteCount
         let tones = facts.triad.tones(in: facts.inversion)
         let tuning = setup.fretboard.tuning
+        let fading = fade.opacity(at: moment.now)
+        func opacity(_ index: Int) -> Double {
+            isOver || index < played.count || tones[index] == facts.triad.root ? 1 : fading
+        }
 
         headline = facts.text
         subline = facts.stringSet.name
         highlightedStrings = Set(facts.stringSet.strings)
-        // Until it is over, when Hidden, the earlier notes would give the voicing away.
         markers = locations.enumerated().compactMap { index, location in
-            let isLast = index == played.count - 1, isNamed = isOver || isLast || stage == .shown
-            guard isNamed || stage == .faded else { return nil }
-            return Marker(location: location, label: isNamed ? tones[index].description : "",
-                          isAnswer: tones[index] == facts.triad.root, isFaint: !isNamed, isLastPlayed: isLast)
+            guard opacity(index) > 0 else { return nil }
+            return Marker(location: location, label: tones[index].description, isAnswer: tones[index] == facts.triad.root,
+                          opacity: opacity(index), isLastPlayed: index == played.count - 1)
         }
         chips = facts.stringSet.strings.enumerated().map { index, string in
             let state: Chip.State = if index < played.count { .found } else if isOver { .timedOut }
                 else { index == played.count ? .current : .waiting }
-            let isNamed = index < played.count || isOver || stage == .shown
             return Chip(title: "\(tuning.stringNumber(ofString: string))", spokenTitle: tuning.stringLabel(ofString: string),
-                        text: isNamed ? tones[index].description : "?", state: state)
+                        text: opacity(index) > 0 ? tones[index].description : "?", state: state)
         }
         if result == .wrong, moment.wrongAnswers.last?.pitchClass == moment.prompt.pitchClass {
             feedback += ", in another octave"

@@ -18,7 +18,6 @@ extension Fretboard {
     public func cagedPositions(of scale: Scale) -> [Position] {
         let pentatonic = Scale(.majorPentatonic, tonic: scale.key.relativeMajor.tonic).pitchClasses
         let extraNotes = Set(scale.pitchClasses).subtracting(pentatonic)
-        let usesNames = tuning.hasStandardIntervals
 
         // A dropped low string plays the standard shape's string-6 pitches: the shape is built
         // on the undropped neck, then string 6 moves up by the drop (Drop D: 2 frets).
@@ -34,9 +33,10 @@ extension Fretboard {
             let relative = shapeBoard.relativeLocations(of: shape, pentatonic: pentatonic, extraNotes: extraNotes)
             let placements = placements(of: relative.inWindow.map(moved), choices: relative.stretches.map { $0.map(moved) })
             return placements.enumerated().map { octave, locations in
-                Position(id: .init(system: .caged, number: shape.number, octave: octave),
+                let id = Position.ID(system: .caged, number: shape.number, octave: octave)
+                return Position(id: id,
                          scale: scale,
-                         name: usesNames ? "\(shape.letter) shape" : "Position \(shape.number)",
+                         name: id.name(in: tuning),
                          cagedShape: shape,
                          locations: locations)
             }

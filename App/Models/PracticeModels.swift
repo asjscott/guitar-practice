@@ -4,17 +4,20 @@ import SwiftData
 import TheoryCore
 
 // The current version's models. `LoggedAttempt` is the saved record; PracticeCore's `Attempt` is the drill's.
-typealias PracticeSession = PracticeSchemaV3.Session
-typealias LoggedAttempt = PracticeSchemaV3.Attempt
-typealias DayTheme = PracticeSchemaV3.DayTheme
+typealias PracticeSession = PracticeSchemaV5.Session
+typealias LoggedAttempt = PracticeSchemaV5.Attempt
+typealias DayTheme = PracticeSchemaV5.DayTheme
 
 enum PracticeMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] {
-        [PracticeSchemaV1.self, PracticeSchemaV2.self, PracticeSchemaV3.self]
+        [PracticeSchemaV1.self, PracticeSchemaV2.self, PracticeSchemaV3.self, PracticeSchemaV4.self,
+         PracticeSchemaV5.self]
     }
     static var stages: [MigrationStage] {
         [.lightweight(fromVersion: PracticeSchemaV1.self, toVersion: PracticeSchemaV2.self),
-         .lightweight(fromVersion: PracticeSchemaV2.self, toVersion: PracticeSchemaV3.self)]
+         .lightweight(fromVersion: PracticeSchemaV2.self, toVersion: PracticeSchemaV3.self),
+         .lightweight(fromVersion: PracticeSchemaV3.self, toVersion: PracticeSchemaV4.self),
+         .lightweight(fromVersion: PracticeSchemaV4.self, toVersion: PracticeSchemaV5.self)]
     }
 }
 
@@ -86,7 +89,7 @@ extension PracticeSession {
 extension LoggedAttempt {
     /// The record of an attempt at a drill, ending now.
     convenience init(_ attempt: Attempt, in drill: any Drill, date: Date, source: AttemptSource, groupID: UUID?,
-                     blockIndex: Int?) {
+                     circleID: UUID? = nil, runID: UUID? = nil, blockIndex: Int?) {
         let fretboard = drill.fretboard
         let location = attempt.prompt.target ?? attempt.location
         self.init(date: date, sourceRaw: source.rawValue, drill: drill.kind.id,
@@ -100,6 +103,8 @@ extension LoggedAttempt {
                   blockIndex: blockIndex)
         groupSize = attempt.group?.size
         groupPlace = attempt.group?.place
+        self.circleID = circleID
+        self.runID = runID
         switch attempt.facts {
         case .pass(let facts): setFacts(facts)
         case .triad(let facts): setFacts(facts)
@@ -117,9 +122,10 @@ extension LoggedAttempt {
         startDegree = facts.startDegree.number
         startDegreeAlteration = facts.startDegree.alteration
         tempo = facts.tempo
-        beatsPerBar = facts.signature.beats
-        beatUnit = facts.signature.unit
-        fadeStageRaw = facts.fadeStage.rawValue
+        beatsPerBar = facts.signature?.beats
+        beatUnit = facts.signature?.unit
+        passDirection = facts.direction?.rawValue
+        fadeLevel = facts.fadeLevel.number
         hinted = facts.hinted
         clickOffsetSeconds = facts.clickOffset.map { $0 / .seconds(1) }
         inputDelaySeconds = facts.inputDelay / .seconds(1)
@@ -131,8 +137,8 @@ extension LoggedAttempt {
         chordQuality = facts.triad.quality.rawValue
         inversion = facts.inversion.rawValue
         stringSet = facts.stringSet.rawValue
-        fadeStageRaw = facts.fadeStage?.rawValue
-        hinted = facts.fadeStage.map { _ in facts.hinted }
+        fadeLevel = facts.fadeLevel?.number
+        hinted = facts.fadeLevel.map { _ in facts.hinted }
     }
 
     private func setFacts(_ facts: ChordFacts) {
@@ -148,10 +154,11 @@ extension LoggedAttempt {
         positionOctave = facts.position.octave
         playedVoicing = facts.played.map(VoicingRecord.init)
         acceptedVoicings = facts.accepted.map(VoicingRecord.init)
-        backingStyle = facts.style.rawValue
+        // Nil without backing (Chords in position).
+        backingStyle = facts.style?.rawValue
         tempo = facts.tempo
-        (beatsPerBar, beatUnit) = (4, 4)
-        fadeStageRaw = facts.fadeStage.rawValue
+        (beatsPerBar, beatUnit) = facts.tempo == nil ? (nil, nil) : (4, 4)
+        fadeLevel = facts.fadeLevel.number
         hinted = facts.hinted
         chordOutcomeRaw = facts.outcome.rawValue
         firstOnsetSeconds = facts.firstOnset.map { $0 / .seconds(1) }
@@ -159,6 +166,11 @@ extension LoggedAttempt {
     }
 
     var source: AttemptSource? { AttemptSource(rawValue: sourceRaw) }
+
+    /// What the pass, voicing or chord was played at: its level, or in older versions' attempts its stage as a level.
+    var playedFadeLevel: FadeLevel? {
+        fadeLevel.map(FadeLevel.init) ?? fadeStageRaw.flatMap(FadeStage.init).map(FadeLevel.init)
+    }
     var outcome: Attempt.Outcome? { Attempt.Outcome(rawValue: outcomeRaw) }
 }
 

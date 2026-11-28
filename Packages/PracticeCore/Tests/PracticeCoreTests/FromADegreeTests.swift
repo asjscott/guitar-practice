@@ -32,7 +32,7 @@ private func headlines(_ count: Int, of setup: DrillSetup) -> [String] { passes(
 @Suite("From a degree")
 struct FromADegreeTests {
     @Test func itIsAScalesDrill() {
-        #expect(DrillKind.all.filter { $0.module == .scales } == [.upAndDown, .fromADegree])
+        #expect(DrillKind.all.filter { $0.module == .scales } == [.upAndDown, .fromADegree, .scaleCircle])
         #expect(DrillKind.fromADegree.id == "fromADegree")
         #expect(DrillKind.fromADegree.title == "From a degree")
         #expect(DrillKind.fromADegree.hasPasses)

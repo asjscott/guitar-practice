@@ -10,9 +10,10 @@ import TheoryCore
 /// a note goes on with the chord before if it can, and otherwise begins the next. Once a voicing is finished, notes
 /// are ignored until the next window opens; a note played again at once (the same pitch twice) is ignored too.
 ///
-/// The fade is per run: Shown for times through 1–2, Faded for 3–4, then Hidden; in Hidden, a time through with a
-/// chord that isn't clean makes the next one Faded. H held shows the voicing, and the chord isn't clean. Skip does
-/// nothing; pausing stops the backing, and Resume starts that time through again after a count-in.
+/// Each chord's voicing fades at its shape's fade level, as the triad drills reached it (ADR 0007): its notes but the
+/// root fade out from the chord's first beat over the fade time, a share of the chord's length. Chords don't move the
+/// levels. While the next chord's voicing is at level 0, it is ghosted. H held shows the voicing, and the chord isn't
+/// clean. Skip does nothing; pausing stops the backing, and Resume starts that time through again after a count-in.
 public struct ProgressionDrill<Rules: ProgressionRules>: Drill {
     public private(set) var phase: DrillPhase = .idle
     public private(set) var attempts: [Attempt] = []
@@ -24,6 +25,8 @@ public struct ProgressionDrill<Rules: ProgressionRules>: Drill {
         let slot: Int
         let expected: ExpectedVoicings
         var hinted: Bool
+        /// What its voicing is played at.
+        let level: FadeLevel
         /// Every note taken, in order.
         var notes: [Pitch] = []
         /// The notes since the last wrong one that begin an accepted voicing.
@@ -63,9 +66,9 @@ public struct ProgressionDrill<Rules: ProgressionRules>: Drill {
     /// This time through's chords so far.
     private var outcomes: [ChordOutcome?] = []
     private var group = -1
-    /// Times through played to the end.
-    private var completed = 0
-    private var stage = FadeStage.shown
+    /// The fade levels reached, which chords are played at, unless all are played at `override`.
+    private var reached: FadeLevels
+    private let override: FadeLevel?
     private var previousPlayed: TriadVoicing?
     private var previousDrawn: TriadVoicing?
     private var isHintShown = false
@@ -78,6 +81,8 @@ public struct ProgressionDrill<Rules: ProgressionRules>: Drill {
 
     public init(setup: DrillSetup) {
         self.setup = setup
+        reached = setup.fadeLevels
+        override = setup.options.triadFade
         key = setup.chosenKey
         progression = setup.options.progression
         position = setup.progressionPosition
@@ -109,6 +114,7 @@ public struct ProgressionDrill<Rules: ProgressionRules>: Drill {
     public var promptStart: Duration? { nil }
     public var canHold: Bool { false }
     public var resumesSamePrompt: Bool { phase == .paused }
+    public var fadeLevels: FadeLevels? { reached }
 
     public var nothingToPromptReason: String? {
         if let problem = setup.progressionProblem { return problem }
@@ -170,9 +176,7 @@ public struct ProgressionDrill<Rules: ProgressionRules>: Drill {
         case .start(let now):
             guard !isRunning, nothingToPromptReason == nil else { return }
             attempts = []
-            completed = 0
             timeThrough = 0
-            stage = .shown
             lastTimeThroughText = nil
             begin(at: now)
         case .pause(let now):
@@ -214,7 +218,9 @@ public struct ProgressionDrill<Rules: ProgressionRules>: Drill {
             advance(to: now)
         case .hold(let end):
             hold(until: end)
-        case .typed, .soundStarted, .clicksStarted, .passSettings, .fadeStages:
+        case .fadeLevels(let new):
+            reached = new
+        case .typed, .soundStarted, .clicksStarted, .passSettings:
             break
         }
     }
@@ -278,7 +284,7 @@ public struct ProgressionDrill<Rules: ProgressionRules>: Drill {
             pendingBacking = [.stop]
             return
         }
-        open = OpenChord(slot: slot, expected: expected, hinted: isHintShown)
+        open = OpenChord(slot: slot, expected: expected, hinted: isHintShown, level: level(of: expected.drawn))
     }
 
     /// Scores the open chord and opens the next.
@@ -305,16 +311,15 @@ public struct ProgressionDrill<Rules: ProgressionRules>: Drill {
         open(slot: next)
     }
 
+    /// What a voicing is played at.
+    private func level(of voicing: TriadVoicing) -> FadeLevel {
+        override ?? reached.level(of: FadeLevels.VoicingShape(tuning: fretboard.tuning, quality: voicing.triad.quality,
+                                                              inversion: voicing.inversion, stringSet: voicing.stringSet))
+    }
+
     private mutating func endTimeThrough() {
-        let isClean = outcomes.allSatisfy { $0 == .clean }
         let clean = outcomes.filter { $0 == .clean }.count
         lastTimeThroughText = "\(clean) of \(count) clean"
-        completed += 1
-        stage = switch completed {
-        case ..<2: .shown
-        case ..<4: .faded
-        default: stage == .hidden && !isClean ? .faded : .hidden
-        }
         timeThrough += 1
         group += 1
         outcomes = Array(repeating: nil, count: count)
@@ -369,7 +374,7 @@ public struct ProgressionDrill<Rules: ProgressionRules>: Drill {
         let played = outcome == .missed ? nil : chord.played
         let facts = ChordFacts(progression: progression, key: key, place: index, triad: chords[index],
                                position: position.id, played: played, accepted: chord.expected.accepted,
-                               style: settings.style, tempo: settings.tempo, fadeStage: stage, hinted: chord.hinted,
+                               style: settings.style, tempo: settings.tempo, fadeLevel: chord.level, hinted: chord.hinted,
                                outcome: outcome, firstOnset: chord.firstOnset, inputDelay: setup.inputDelay)
         // The prompt is the chord's root in the voicing played, or else the one drawn.
         attempts.append(Attempt(prompt: rootPrompt(of: played ?? chord.expected.drawn),
@@ -397,15 +402,16 @@ public struct ProgressionDrill<Rules: ProgressionRules>: Drill {
 
     public var display: DrillDisplay? {
         guard isRunning, phase != .paused, let neck, let progression, let position else { return nil }
-        let shownStage = isHintShown ? .shown : stage
+        let level = neck.chord?.level ?? level(of: neck.voicing)
+        let fade = isHintShown ? NoteFade.none
+            : NoteFade(level: level, expected: end(ofSlot: neck.slot) - start(ofSlot: neck.slot), start: start(ofSlot: neck.slot))
         let (result, feedback) = resultAndFeedback(of: neck.chord)
         var display = DrillDisplay(headline: chords.map(\.shortName).joined(separator: "  "),
                                    subline: "\(progression.name) in \(key.shortName) · \(position.name)",
                                    feedback: feedback, result: result,
-                                   markers: markers(of: neck.voicing, played: neck.played, stage: shownStage,
-                                                    slot: neck.slot))
-        if shownStage != .hidden { display.highlightedStrings = Set(neck.voicing.stringSet.strings) }
-        display.progression = progress(fretWindow: position.fretWindow)
+                                   markers: markers(of: neck.voicing, played: neck.played, fade: fade, slot: neck.slot))
+        if isHintShown || level != .last { display.highlightedStrings = Set(neck.voicing.stringSet.strings) }
+        display.progression = progress(fretWindow: position.fretWindow, level: level)
         return display
     }
 
@@ -426,17 +432,19 @@ public struct ProgressionDrill<Rules: ProgressionRules>: Drill {
 
     private var isCountingIn: Bool { open?.slot == 0 && now < start(ofSlot: 0) }
 
-    /// The voicing's notes played so far solid, the last ringed; the rest as the stage shows (Shown during a hint).
-    /// While the run is at Shown, the next chord's voicing is ghosted.
-    private func markers(of voicing: TriadVoicing, played: Int, stage: FadeStage, slot: Int) -> [DrillDisplay.Marker] {
+    /// The voicing's notes played so far and its root solid, the last played ringed; the rest as they fade. While the
+    /// next chord's voicing is at level 0, it is ghosted.
+    private func markers(of voicing: TriadVoicing, played: Int, fade: NoteFade, slot: Int) -> [DrillDisplay.Marker] {
+        let fading = fade.opacity(at: now)
         var markers = fretboard.locationsLowToHigh(of: voicing).enumerated().compactMap { index, location -> DrillDisplay.Marker? in
             let isPlayed = index < played
-            guard isPlayed || stage != .hidden else { return nil }
-            return marker(location, of: voicing.triad, isFaint: !isPlayed && stage == .faded,
-                          isLast: isPlayed && index == played - 1)
+            let isRoot = fretboard.pitch(at: location).pitchClass == voicing.triad.root.pitchClass
+            let opacity = isPlayed || isRoot ? 1 : fading
+            guard opacity > 0 else { return nil }
+            return marker(location, of: voicing.triad, opacity: opacity, isLast: isPlayed && index == played - 1)
         }
-        if self.stage == .shown,
-           let next = Rules.expected(for: turn(slot: slot + 1, previousPlayed: voicing, previousDrawn: voicing))?.drawn {
+        if let next = Rules.expected(for: turn(slot: slot + 1, previousPlayed: voicing, previousDrawn: voicing))?.drawn,
+           level(of: next) == .first {
             markers += next.locations.filter { !voicing.locations.contains($0) }.map {
                 marker($0, of: next.triad, isFaint: true, isLast: false)
             }
@@ -444,14 +452,16 @@ public struct ProgressionDrill<Rules: ProgressionRules>: Drill {
         return markers
     }
 
-    private func marker(_ location: FretboardLocation, of triad: Triad, isFaint: Bool, isLast: Bool) -> DrillDisplay.Marker {
+    private func marker(_ location: FretboardLocation, of triad: Triad, isFaint: Bool = false, opacity: Double = 1,
+                        isLast: Bool) -> DrillDisplay.Marker {
         let pitchClass = fretboard.pitch(at: location).pitchClass
         let name = triad.notes.first { $0.pitchClass == pitchClass } ?? key.spell(pitchClass)
         return DrillDisplay.Marker(location: location, label: isFaint ? "" : name.description,
-                                   isAnswer: pitchClass == triad.root.pitchClass, isFaint: isFaint, isLastPlayed: isLast)
+                                   isAnswer: pitchClass == triad.root.pitchClass, isFaint: isFaint, opacity: opacity,
+                                   isLastPlayed: isLast)
     }
 
-    private func progress(fretWindow: ClosedRange<Int>) -> ProgressionProgress? {
+    private func progress(fretWindow: ClosedRange<Int>, level: FadeLevel) -> ProgressionProgress? {
         guard let progression, let chord = open else { return nil }
         let first = chord.slot / count * count
         let beats = progression.steps.map { $0.bars * Backing.beatsPerBar }
@@ -470,7 +480,7 @@ public struct ProgressionDrill<Rules: ProgressionRules>: Drill {
             }
         }
         return ProgressionProgress(blocks: blocks, current: current, beat: beat, timeThrough: timeThrough + 1,
-                                   fadeStage: stage, countIn: countIn, tempo: settings.tempo,
+                                   fadeLevel: level, countIn: countIn, tempo: settings.tempo,
                                    fretWindow: fretWindow, topNotes: topNotes)
     }
 }

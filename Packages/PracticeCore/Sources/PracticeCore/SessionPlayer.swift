@@ -23,9 +23,9 @@ public enum SessionEvent: Hashable, Sendable {
     /// Back to what was paused: a Ready card counts down afresh; a drill follows its own resume rule.
     /// Without sound, a block that needs it is left for the next one.
     case resume(at: Duration)
-    /// +: moves the end of the block that is playing 2 minutes later, in overtime too.
+    /// +: moves the planned end of the block that is playing 2 minutes later, past it too.
     case extend(at: Duration)
-    /// Ends the session before its last block is over.
+    /// Ends the session: early, unless in a last block that only ends so (Free time).
     case end(at: Duration)
     /// The clock moved on.
     case tick(at: Duration)
@@ -45,9 +45,9 @@ public enum SessionEvent: Hashable, Sendable {
     case backingStarted(Backing)
     /// What the block's passes are played at, from the next one on: on its Ready card and while paused too.
     case passSettings(PassSettings, at: Duration)
-    /// The fade stages reached by now, read again from the log, which has this session's passes too: from the next pass
+    /// The fade levels reached by now, read again from the log, which has this session's passes too: from the next pass
     /// on.
-    case fadeStages(FadeStages)
+    case fadeLevels(FadeLevels)
     case hint(isShown: Bool, at: Duration)
     case skip(at: Duration)
     case `repeat`(at: Duration)
@@ -55,7 +55,10 @@ public enum SessionEvent: Hashable, Sendable {
 
 /// Runs a session's blocks: a pure state machine driven by events and a clock, like the drills it drives.
 ///
-/// A block ends only when the player moves on. The open prompt is then dropped, unrecorded.
+/// A block with a planned length ends only when the player moves on; the others end by themselves (`SessionBlock.End`),
+/// with a soft chime, or when the player moves on. One that ends after the pass that crosses its length does so with
+/// the chime that waits for the pass to end. The open prompt is then dropped, unrecorded. Blocks left out, and
+/// those that need sound when there is none, are passed over.
 ///
 /// Chimes mark 30 s left and the planned end. Each waits for a gap between prompts (in triad drills, voicings), and the next prompt then waits for
 /// it to end, since a note played over it wouldn't count. Between passes, a chime also waits for the bar to end, and in
@@ -97,6 +100,8 @@ public struct SessionPlayer: Sendable {
     private var lastEvent: Duration = .zero
     /// Waiting for a gap.
     private var dueChime: AppSound?
+    /// The block ends when the due chime sounds.
+    private var endsOnChime = false
     /// For the app to take.
     private var chimeToPlay: AppSound?
     /// For the app to take.
@@ -105,7 +110,7 @@ public struct SessionPlayer: Sendable {
     private var pendingBacking: [BackingRequest] = []
     private var settingsByKind: [DrillKind: PassSettings] = [:]
     /// What has been reached, this session's passes included.
-    private var fadeStages: FadeStages
+    public private(set) var fadeLevels: FadeLevels
 
     /// A block as played.
     private struct Progress: Sendable {
@@ -120,7 +125,7 @@ public struct SessionPlayer: Sendable {
         self.blocks = blocks
         self.hasSound = hasSound
         self.setup = setup
-        fadeStages = setup.fadeStages
+        fadeLevels = setup.fadeLevels
         progress = blocks.map { _ in Progress() }
     }
 
@@ -132,26 +137,33 @@ public struct SessionPlayer: Sendable {
     /// How often the block has been extended.
     public func extends(ofBlock index: Int) -> Int { progress[index].extends }
 
-    /// The block's planned length, extends included.
-    public func length(ofBlock index: Int) -> Duration { blocks[index].length + Self.extendTime * extends(ofBlock: index) }
+    /// The block's planned length, extends included; nil for a block without one.
+    public func length(ofBlock index: Int) -> Duration? {
+        blocks[index].length.map { $0 + Self.extendTime * extends(ofBlock: index) }
+    }
 
-    /// Until the block's planned end; negative in overtime.
-    public func timeLeft(inBlock index: Int) -> Duration { length(ofBlock: index) - (progress[index].spent ?? .zero) }
+    /// Until the block's planned end, negative past it; nil for a block without one.
+    public func timeLeft(inBlock index: Int) -> Duration? {
+        length(ofBlock: index).map { $0 - (progress[index].spent ?? .zero) }
+    }
 
-    /// Passed over for want of sound, or going to be.
+    /// Passed over, planned so or for want of sound, or going to be.
     public func isLeftOut(block index: Int) -> Bool {
         progress[index].spent == nil && (index < blockIndex || !canRun(block: index))
     }
 
-    private func canRun(block index: Int) -> Bool { hasSound || !blocks[index].kind.needsSound }
+    private func canRun(block index: Int) -> Bool {
+        !blocks[index].isLeftOut && (hasSound || !blocks[index].kind.needsSound)
+    }
 
-    /// Until the session's end, if each block ends on time (or, in overtime, now).
+    /// Until the session's end, counting only the Ready cards and planned lengths (or, past one, now): blocks that end
+    /// by themselves add nothing.
     public var timeToFinish: Duration {
         guard stage != .finished else { return .zero }
         return blocks.indices[blockIndex...].filter { canRun(block: $0) }.reduce(.zero) { total, index in
             var ready: Duration = progress[index].spent == nil ? Self.readyTime : .zero
             if index == blockIndex, let readyRemaining { ready = readyRemaining }
-            return total + ready + max(.zero, timeLeft(inBlock: index))
+            return total + ready + max(.zero, timeLeft(inBlock: index) ?? .zero)
         }
     }
 
@@ -163,11 +175,16 @@ public struct SessionPlayer: Sendable {
 
     /// What has been done so far.
     public var summary: SessionSummary {
-        SessionSummary(totalTime: elapsed, blocks: zip(blocks, progress).compactMap { block, progress in
-            progress.spent.map {
-                SessionSummary.Block(kind: block.kind, time: $0, stats: RunStats(attempts: progress.attempts))
-            }
-        })
+        SessionSummary(
+            totalTime: elapsed,
+            blocks: blocks.indices.compactMap { index in
+                progress[index].spent.map {
+                    SessionSummary.Block(kind: blocks[index].kind, step: index, time: $0,
+                                         stats: RunStats(attempts: progress[index].attempts),
+                                         circleBest: blocks[index].setup?.circleBest)
+                }
+            },
+            steps: blocks.count, endedEarly: endedEarly, fadeMoves: fadeLevels.moves(since: setup.fadeLevels))
     }
 
     /// The sounds the drill asked for since the last call: call it after every event, as for a drill.
@@ -196,7 +213,7 @@ public struct SessionPlayer: Sendable {
     /// What the block's next pass will be played at, from its Ready card on; nil in blocks without passes.
     public var passSettings: PassSettings? {
         guard stage != .idle, stage != .finished, blocks[blockIndex].kind.hasPasses else { return nil }
-        return settingsByKind[blocks[blockIndex].kind] ?? setup.options.pass
+        return settingsByKind[blocks[blockIndex].kind] ?? (blocks[blockIndex].setup ?? setup).options.pass
     }
 
     // MARK: - Events
@@ -204,8 +221,25 @@ public struct SessionPlayer: Sendable {
     public mutating func handle(_ event: SessionEvent) {
         let attemptCount = drill?.attempts.count ?? 0
         act(on: event)
+        if endsOnTimesThrough() { dueChime = .softChime }
         soundDueChime(afterAttempt: (drill?.attempts.count ?? 0) > attemptCount)
+        if endsOnChime, dueChime == nil {
+            endBlock(at: lastEvent)
+        } else if stage == .playing, drill?.isRunning == false {
+            // Done by itself.
+            chimeToPlay = .softChime
+            endBlock(at: lastEvent)
+        }
         holdForChime()
+    }
+
+    /// Whether the block has just gone through as often as it ends after: its chime is then due, and the block ends
+    /// with it.
+    private mutating func endsOnTimesThrough() -> Bool {
+        guard stage == .playing, !endsOnChime, case .afterTimesThrough(let count) = blocks[blockIndex].end,
+              let timeThrough = drill?.display?.progression?.timeThrough, timeThrough >= count else { return false }
+        endsOnChime = true
+        return true
     }
 
     private mutating func act(on event: SessionEvent) {
@@ -241,15 +275,13 @@ public struct SessionPlayer: Sendable {
             }
         case .extend(let now):
             passTime(to: now)
-            guard stage == .playing else { return }
-            progress[blockIndex].extends += 1
-            let left = timeLeft(inBlock: blockIndex)
+            guard stage == .playing, blocks[blockIndex].isExtendable, let left = extended() else { return }
             if (dueChime == .chime && left > Self.warningTime) || (dueChime == .softChime && left > .zero) { dueChime = nil }
         case .end(let now):
             guard stage == .ready || stage == .playing || stage == .paused else { return }
             passTime(to: now)
+            endedEarly = !(stage == .playing && isLastBlock && blocks[blockIndex].kind.hasNoPrompts)
             stopDrill(at: now)
-            endedEarly = true
             finish()
         case .tick(let now):
             passTime(to: now)
@@ -285,9 +317,9 @@ public struct SessionPlayer: Sendable {
             settingsByKind[blocks[blockIndex].kind] = new
             drill?.handle(.passSettings(new, at: now))
             followDrill()
-        case .fadeStages(let new):
-            fadeStages = new
-            drill?.handle(.fadeStages(new))
+        case .fadeLevels(let new):
+            fadeLevels = new
+            drill?.handle(.fadeLevels(new))
         case .hint(let isShown, let now):
             passTime(to: now)
             send(.hint(isShown: isShown, at: now))
@@ -312,9 +344,15 @@ public struct SessionPlayer: Sendable {
         case .playing:
             let before = timeLeft(inBlock: blockIndex)
             progress[blockIndex].spent? += passed
-            let after = timeLeft(inBlock: blockIndex)
-            if before > Self.warningTime, after <= Self.warningTime { dueChime = .chime }
-            if before > .zero, after <= .zero { dueChime = .softChime }
+            if let before, let after = timeLeft(inBlock: blockIndex) {
+                let crossesItsLength = !blocks[blockIndex].isExtendable
+                if !crossesItsLength, before > Self.warningTime, after <= Self.warningTime { dueChime = .chime }
+                if before > .zero, after <= .zero {
+                    dueChime = .softChime
+                    // It ends with the chime, which waits for the pass to end.
+                    if crossesItsLength { endsOnChime = true }
+                }
+            }
         }
         elapsed += passed
     }
@@ -385,14 +423,24 @@ public struct SessionPlayer: Sendable {
         readyRemaining = Self.readyTime
     }
 
+    /// One extend more: what is then left.
+    private mutating func extended() -> Duration? {
+        progress[blockIndex].extends += 1
+        return timeLeft(inBlock: blockIndex)
+    }
+
+    /// No block after the current one will run.
+    private var isLastBlock: Bool { !blocks.indices.contains { $0 > blockIndex && canRun(block: $0) } }
+
     private mutating func startBlock(at now: Duration) {
         stage = .playing
         readyRemaining = nil
         progress[blockIndex].spent = .zero
-        var blockSetup = setup
+        endsOnChime = false
+        var blockSetup = blocks[blockIndex].setup ?? setup
         if let passSettings { blockSetup.options.pass = passSettings }
         blockSetup.seed &+= UInt64(blockIndex)
-        blockSetup.fadeStages = fadeStages
+        blockSetup.fadeLevels = fadeLevels
         drill = blocks[blockIndex].kind.makeDrill(blockSetup)
         send(.start(at: now))
     }
@@ -400,6 +448,7 @@ public struct SessionPlayer: Sendable {
     private mutating func endBlock(at now: Duration) {
         stopDrill(at: now)
         dueChime = nil
+        endsOnChime = false
         showReady(blockIndex + 1)
     }
 
@@ -424,6 +473,6 @@ public struct SessionPlayer: Sendable {
         pendingClicks += drill?.takeClicks() ?? []
         pendingBacking += drill?.takeBacking() ?? []
         if let settings = drill?.passSettings { settingsByKind[blocks[blockIndex].kind] = settings }
-        if let reached = drill?.fadeStages { fadeStages = reached }
+        if let reached = drill?.fadeLevels { fadeLevels = reached }
     }
 }

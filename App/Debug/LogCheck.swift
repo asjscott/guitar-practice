@@ -8,7 +8,7 @@ import TheoryCore
 /// Checks that what is logged survives a relaunch, when `GP_LOG_CHECK=<store file>` is set (see `scripts/log-check`).
 ///
 /// `GP_LOG_CHECK_STEP=write` runs drills against a new store there; `read`, in a second process, prints what it
-/// holds. `writeV1` and `writeV2` instead make a store with an older schema, and `readAll` prints all that one holds
+/// holds. `writeV1`, `writeV2` and `writeV3` instead make a store with an older schema, and `readAll` prints all that one holds
 /// as the current one. It never opens the player's own log, and shows no window.
 @MainActor
 enum LogCheck {
@@ -23,10 +23,13 @@ enum LogCheck {
             do {
                 let url = URL(fileURLWithPath: environment["GP_LOG_CHECK"] ?? "")
                 let step = environment["GP_LOG_CHECK_STEP"]
-                if step == "writeV1" || step == "writeV2" {
-                    try step == "writeV1" ? writeV1(at: url) : writeV2(at: url)
-                    _exit(EXIT_SUCCESS)
+                switch step {
+                case "writeV1": try writeV1(at: url)
+                case "writeV2": try writeV2(at: url)
+                case "writeV3": try writeV3(at: url)
+                default: break
                 }
+                if step?.hasPrefix("writeV") == true { _exit(EXIT_SUCCESS) }
                 let log = try AttemptLog.stored(at: url)
                 if step == "read" {
                     try read(log)
@@ -36,8 +39,11 @@ enum LogCheck {
                     try checkSessions()
                     try checkThemes()
                     try checkFreePractice()
+                    try checkNoteCircle()
+                    try checkScaleCircle()
                     try checkResume()
-                    try await write(log)
+                    try checkFadeRuns()
+                    try write(log)
                 }
                 if let problem = log.problem { throw LogCheckError.notSaved(problem) }
                 // As abrupt as a crash: nothing gets a chance to save on the way out.
@@ -52,7 +58,7 @@ enum LogCheck {
         exit(EXIT_FAILURE)
     }
 
-    private static func write(_ log: AttemptLog) async throws {
+    private static func write(_ log: AttemptLog) throws {
         let drill = DrillViewModel()
         drill.log = log
         drill.tuning = TuningPreset.dropD.tuning
@@ -65,7 +71,8 @@ enum LogCheck {
         drill.playForSnapshot(right: true)
         drill.skip()
         drill.skip()
-        try await Task.sleep(for: .milliseconds(10_400))
+        // Past the time limit and its grace, on the drill's clock.
+        drill.passTimeForSnapshot(10.4)
         drill.skip()
         drill.playForSnapshot(right: false)
         drill.togglePause()
@@ -115,7 +122,7 @@ enum LogCheck {
 
         // Passes and triads.
         let pass = PassFacts(scale: Scale(.blues, tonic: .a), position: Position.ID(system: .caged, number: 4, octave: 1),
-                             startDegree: Scale.Degree(5, -1), tempo: 72, signature: TimeSignature(beats: 7, unit: 8) ?? .fourFour, fadeStage: .faded,
+                             startDegree: Scale.Degree(5, -1), tempo: 72, signature: TimeSignature(beats: 7, unit: 8) ?? .fourFour, fadeLevel: FadeLevel(2),
                              hinted: true, clickOffset: .milliseconds(-125), inputDelay: .microseconds(12500))
         let triad = TriadFacts(triad: Triad(.minor, root: .bFlat), inversion: .second, stringSet: .dGB)
         for (place, facts) in [AttemptFacts.pass(pass), .triad(triad)].enumerated() {
@@ -143,7 +150,7 @@ enum LogCheck {
             (chord.positionSystem, chord.positionNumber, chord.positionOctave) = ("caged", 4, 0)
             (chord.playedVoicing, chord.acceptedVoicings) = (played, accepted)
             (chord.backingStyle, chord.tempo, chord.beatsPerBar, chord.beatUnit) = ("rock", 70, 4, 4)
-            (chord.fadeStageRaw, chord.hinted) = (FadeStage.hidden.rawValue, place == 1)
+            (chord.fadeLevel, chord.hinted) = (FadeLevel.last.number, place == 1)
             chord.chordOutcomeRaw = played == nil ? "missed" : "wrong"
             chord.firstOnsetSeconds = played.map { _ in -0.25 }
             chord.inputDelaySeconds = 0
@@ -164,7 +171,18 @@ enum LogCheck {
         chords.handle(.tick(at: .seconds(16.5)))
         chordRun.update(from: chords)
 
-        // Two clean passes and one cut short by a pause, so the next is played at Hidden.
+        // Chords in position: G clean, without backing, so its style and tempo are nil.
+        var inPosition = DrillKind.chordsInPosition.makeDrill(progressionSetup)
+        let inPositionRun = log.run()
+        inPosition.handle(.start(at: .zero))
+        for index in 1...3 {
+            guard let target = inPosition.prompt?.target else { break }
+            let onset = Duration.seconds(index)
+            inPosition.handle(.played(inPosition.fretboard.pitch(at: target), onset: onset, at: onset))
+        }
+        inPositionRun.update(from: inPosition)
+
+        // Two clean passes and one cut short by a pause, in one run, so the next run is played at level 1.
         var passes = DrillKind.upAndDown.makeDrill(DrillSetup(fretboard: Fretboard(tuning: .standard), seed: 1))
         let passRun = log.run()
         passes.handle(.start(at: .zero))
@@ -185,7 +203,7 @@ enum LogCheck {
         passes.handle(.resume(at: .seconds(400)))
         playPass(3)
 
-        // A clean voicing, so that its shape is Faded, then one with only its first note.
+        // A clean voicing, so that its shape is at level 1, then one with only its first note.
         var triadSetup = DrillSetup(fretboard: Fretboard(tuning: .standard), seed: 1)
         triadSetup.options.stringSets = [.dGB]
         var triads = DrillKind.triadPlayIt.makeDrill(triadSetup)
@@ -218,8 +236,8 @@ enum LogCheck {
                                  SessionBlockRecord(drill: "b", plannedSeconds: 450)])
     }
 
-    /// Sessions run by the Session screen's model, whatever drills there are: one with attempts in its first block is
-    /// saved with them, and one with none isn't. In memory, since what is prompted varies by day.
+    /// Sessions run by the Session screen's model, the daily routine without sound: one with attempts in its first block
+    /// is saved with them, with no budget, and one with none isn't. In memory, since what is prompted varies by day.
     private static func checkSessions() throws {
         let log = AttemptLog.inMemory()
         let session = SessionViewModel()
@@ -231,9 +249,13 @@ enum LogCheck {
         session.start()
         session.next()
         session.skip()
-        session.extend()
-        session.extend()
         session.skip()
+        // Step 2 has a planned length; the Note circle hasn't.
+        session.extend()
+        session.next()
+        session.next()
+        session.extend()
+        session.extend()
         while session.isActive { session.next() }
         session.done()
         session.start()
@@ -256,7 +278,8 @@ enum LogCheck {
         let attempts = try log.context.fetch(FetchDescriptor<LoggedAttempt>())
         guard saved.map(\.attempts.count) == [2, 1], saved.map(\.state) == [.completed, .endedEarly],
               saved.allSatisfy({ $0.endedAt != nil && $0.totalSeconds != nil && $0.blocks.first?.spentSeconds != nil }),
-              saved.map({ $0.blocks.first?.extends }) == [2, 0],
+              saved.map({ Array($0.blocks.map(\.extends).prefix(2)) }) == [[0, 2], [0, 0]],
+              saved.allSatisfy({ $0.budgetMinutes == nil && $0.blocks.count == 8 }),
               attempts.count == 3, attempts.allSatisfy({ $0.source == .session && $0.blockIndex == 0 }) else {
             throw LogCheckError.sessions(saved.map { "\($0.stateRaw) \($0.attempts.count)" })
         }
@@ -307,7 +330,67 @@ enum LogCheck {
         drill.stop()
     }
 
-    /// Resuming a scale drill takes up the tempo and the fade stage that a session has moved meanwhile. In memory.
+    /// A Note circle logs one attempt per location, a group per key and one circle id per run; the log reads circles
+    /// back, complete or not, and the best clean one per tuning and capo. In memory.
+    private static func checkNoteCircle() throws {
+        func require(_ condition: Bool, _ what: String) throws {
+            if !condition { throw LogCheckError.freePractice("Note circle: " + what) }
+        }
+        let log = AttemptLog.inMemory()
+        let drill = DrillViewModel()
+        drill.kind = .noteCircle
+        drill.keepOptionsForSnapshot()
+        drill.log = log
+        for interval in [2.0, 1.0] {
+            drill.start(seed: 1)
+            drill.playCircleForSnapshot(every: .seconds(interval))
+            drill.stop()
+        }
+        drill.start(seed: 1)
+        drill.playCircleForSnapshot(5)
+        drill.stop()
+        let attempts = try log.context.fetch(FetchDescriptor<LoggedAttempt>())
+        let locations = (attempts.count - 5) / 2
+        try require(attempts.allSatisfy { $0.drill == "noteCircle" && $0.groupSize != nil }, "attempts")
+        try require(Set(attempts.compactMap(\.circleID)).count == 3, "one circle id per run")
+        try require(Set(attempts.compactMap(\.groupID)).count == 25, "a group per key")
+        let circles = log.circles(of: .noteCircle)
+        try require(circles.map(\.isComplete) == [true, true, false], "complete circles")
+        try require(circles.map(\.time) == [.seconds(2 * locations), .seconds(locations), .seconds(5)], "times")
+        try require(log.circleBest(of: .noteCircle, on: drill.fretboard) == circles[1], "the best")
+        try require(log.circleBest(of: .noteCircle, on: Fretboard(tuning: .standard, capo: 2)) == nil, "best per capo")
+    }
+
+    /// A Scale circle logs its passes one way each, taking turns from up, with no tempo, and one circle id per run; a
+    /// clean run moves the fade levels of the positions it went through, and the log reads its circle back. In memory.
+    private static func checkScaleCircle() throws {
+        func require(_ condition: Bool, _ what: String) throws {
+            if !condition { throw LogCheckError.freePractice("Scale circle: " + what) }
+        }
+        let log = AttemptLog.inMemory()
+        let drill = DrillViewModel()
+        drill.kind = .scaleCircle
+        drill.keepOptionsForSnapshot()
+        drill.options.key = .major(.e)
+        drill.options.position = Position.ID(system: .caged, number: CAGEDShape.c.number)
+        drill.log = log
+        drill.start(seed: 1)
+        drill.playCircleForSnapshot()
+        drill.stop()
+        let attempts = try log.context.fetch(FetchDescriptor<LoggedAttempt>(sortBy: [SortDescriptor(\.date)]))
+        try require(attempts.allSatisfy { $0.drill == "scaleCircle" && $0.tempo == nil && $0.groupSize != nil }, "attempts")
+        try require(Set(attempts.compactMap(\.circleID)).count == 1, "one circle id")
+        var directions: [String] = []
+        for attempt in attempts where attempt.groupPlace == 0 { directions.append(attempt.passDirection ?? "-") }
+        try require(directions == (0..<6).flatMap { _ in ["up", "down"] }, "directions")
+        try require(log.circles(of: .scaleCircle).map(\.isClean) == [true], "the circle")
+        let levels = log.fadeLevels(in: drill.setup.scaleCirclePositions.map(\.id), on: [])
+        let theme = FadeLevels.Subject(tuning: drill.fretboard.tuning, scaleKind: .major,
+                                       position: Position.ID(system: .caged, number: CAGEDShape.c.number))
+        try require(levels.level(of: theme) > .first, "fade levels")
+    }
+
+    /// Resuming a scale drill takes up the tempo and the fade level that a session has moved meanwhile. In memory.
     private static func checkResume() throws {
         let suite = "LogCheck-\(UUID())"
         guard let defaults = UserDefaults(suiteName: suite) else { throw LogCheckError.freePractice("no defaults") }
@@ -322,13 +405,18 @@ enum LogCheck {
 
         defaults.set(76, forKey: MetronomeSettings.Key.tempo(of: .upAndDown))
         defaults.set(1, forKey: MetronomeSettings.Key.notClean(of: .upAndDown))
-        var other = DrillKind.upAndDown.makeDrill(DrillSetup(fretboard: Fretboard(tuning: .standard), seed: 1))
-        let run = log.run()
-        other.handle(.start(at: .zero))
-        for _ in 0..<(other.display?.pass?.notes.count ?? 0) {
-            guard let target = other.prompt?.target, let start = other.promptStart else { break }
-            other.handle(.played(other.fretboard.pitch(at: target), onset: start, at: start))
-            run.update(from: other)
+        // Six runs of a clean pass each reach the last level, which shows only the roots.
+        for _ in 0..<6 {
+            var setup = DrillSetup(fretboard: Fretboard(tuning: .standard), seed: 1)
+            setup.fadeLevels = log.fadeLevels(in: setup.passPositions.map(\.id), on: [])
+            var other = DrillKind.upAndDown.makeDrill(setup)
+            let run = log.run()
+            other.handle(.start(at: .zero))
+            for _ in 0..<(other.display?.pass?.notes.count ?? 0) {
+                guard let target = other.prompt?.target, let start = other.promptStart else { break }
+                other.handle(.played(other.fretboard.pitch(at: target), onset: start, at: start))
+                run.update(from: other)
+            }
         }
 
         drill.resume()
@@ -338,10 +426,49 @@ enum LogCheck {
         guard drill.passSettings.ladder.notClean == 1, defaults.integer(forKey: MetronomeSettings.Key.notClean(of: .upAndDown)) == 1 else {
             throw LogCheckError.freePractice("resumed with the old ladder count")
         }
-        guard let markers = drill.snapshot.display?.markers, !markers.isEmpty, markers.allSatisfy(\.isFaint) else {
-            throw LogCheckError.freePractice("resumed at the old fade stage")
+        guard let markers = drill.snapshot.display?.markers, !markers.isEmpty, markers.allSatisfy(\.isAnswer) else {
+            throw LogCheckError.freePractice("resumed at the old fade level")
         }
         drill.stop()
+    }
+
+    /// A run's attempts share a run id, and its fade levels move one level at most: two clean passes in one run of
+    /// Up and down take it to level 1, and the next run's to 2, while that run, still going, is played at 1. In memory.
+    private static func checkFadeRuns() throws {
+        func require(_ condition: Bool, _ what: String) throws {
+            if !condition { throw LogCheckError.freePractice("fade runs: " + what) }
+        }
+        let log = AttemptLog.inMemory()
+        let setup = DrillSetup(fretboard: Fretboard(tuning: .standard), seed: 1)
+        let positions = setup.passPositions.map(\.id)
+        guard let position = setup.passPositions.first else { throw LogCheckError.freePractice("fade runs: no position") }
+        let subject = FadeLevels.Subject(tuning: .standard, scaleKind: position.scale.kind, position: position.id)
+        func run(passes: Int) -> RunLog {
+            var runSetup = setup
+            runSetup.fadeLevels = log.fadeLevels(in: positions, on: [])
+            var drill = DrillKind.upAndDown.makeDrill(runSetup)
+            let run = log.run()
+            drill.handle(.start(at: .zero))
+            for _ in 0..<passes {
+                for _ in 0..<(drill.display?.pass?.notes.count ?? 0) {
+                    guard let target = drill.prompt?.target, let start = drill.promptStart else { break }
+                    drill.handle(.played(drill.fretboard.pitch(at: target), onset: start, at: start))
+                    run.update(from: drill)
+                }
+                if let end = drill.passEnd { drill.handle(.tick(at: end)) }
+            }
+            return run
+        }
+        let first = run(passes: 2)
+        let attempts = try log.context.fetch(FetchDescriptor<LoggedAttempt>())
+        try require(Set(attempts.compactMap(\.groupID)).count == 2, "two passes")
+        try require(attempts.allSatisfy { $0.runID == first.runID }, "one run id")
+        try require(log.fadeLevels(in: positions, on: []).level(of: subject) == FadeLevel(1), "one level a run")
+        let second = run(passes: 1)
+        try require(log.fadeLevels(in: positions, on: []).level(of: subject) == FadeLevel(2), "the next run")
+        let going = log.fadeLevels(in: positions, on: [], current: second.runID)
+        try require(going.level(of: subject) == FadeLevel(1) && going.levelAfterRun(of: subject) == FadeLevel(2),
+                    "the run still going")
     }
 
     /// A day's theme through rerolls, a discarded session, a relaunch, a session past midnight, another position
@@ -536,6 +663,61 @@ enum LogCheck {
         try context.save()
     }
 
+    /// A store as version 3 of the app left it: on top of version 2's, a pass at each fade stage, a progression's
+    /// chord and the input delay.
+    private static func writeV3(at url: URL) throws {
+        let schema = Schema(versionedSchema: PracticeSchemaV3.self)
+        let configuration = ModelConfiguration(schema: schema, url: url, cloudKitDatabase: .none)
+        let container = try ModelContainer(for: schema, configurations: configuration)
+        let context = container.mainContext
+        func id(_ number: Int) -> UUID { UUID(uuidString: String(format: "00000000-0000-0000-0000-%012d", number))! }
+        func date(_ seconds: Double) -> Date { Date(timeIntervalSinceReferenceDate: seconds) }
+
+        let session = PracticeSchemaV3.Session(
+            day: "2026-11-24", startedAt: date(4000), budgetMinutes: 25, naturalsOnly: true, wholeNeck: false,
+            blocks: [SessionBlockRecord(drill: "upAndDown", plannedSeconds: 600, spentSeconds: 610)])
+        session.id = id(4)
+        session.endedAt = date(4700)
+        session.stateRaw = "completed"
+        session.totalSeconds = 700.5
+        (session.themeTonic, session.themeMode, session.themePositionSystem) = (7, "major", "caged")
+        (session.themePositionNumber, session.themePositionOctave, session.themeStringSet) = (4, 0, "dGB")
+        session.themeProgression = "I–V–vi–IV"
+        context.insert(session)
+
+        func attempt(_ number: Int, drill: String, group: Int, place: Int, size: Int) -> PracticeSchemaV3.Attempt {
+            let record = PracticeSchemaV3.Attempt(
+                date: date(Double(number)), sourceRaw: "session", drill: drill, tuning: [40, 45, 50, 55, 59, 64], capo: 0,
+                targetName: "G", targetPitchClass: 7, targetString: 0, targetFret: 3, targetPitch: 43, outcomeRaw: "answered",
+                firstRight: true, responseSeconds: 0.5, wrongAnswers: [], groupID: id(group), blockIndex: 0)
+            record.id = id(number)
+            (record.groupSize, record.groupPlace) = (size, place)
+            context.insert(record)
+            record.session = session
+            return record
+        }
+        for (index, stage) in ["shown", "faded", "hidden"].enumerated() {
+            let pass = attempt(31 + index, drill: "upAndDown", group: 301 + index, place: 0, size: 1)
+            (pass.scaleKind, pass.scaleTonic, pass.positionSystem, pass.positionNumber, pass.positionOctave) = ("major", 7, "caged", 4, 0)
+            (pass.startDegree, pass.startDegreeAlteration, pass.tempo, pass.beatsPerBar, pass.beatUnit) = (1, 0, 64, 4, 4)
+            (pass.fadeStageRaw, pass.hinted, pass.clickOffsetSeconds, pass.inputDelaySeconds) = (stage, false, -0.0625, 0.0125)
+        }
+        let chord = attempt(34, drill: "stayInPosition", group: 304, place: 1, size: 4)
+        (chord.progression, chord.keyTonic, chord.keyMode, chord.numeral) = ("I–V–vi–IV", 7, "major", "V")
+        (chord.chordRootName, chord.chordRoot, chord.chordQuality) = ("D", 2, "major")
+        (chord.positionSystem, chord.positionNumber, chord.positionOctave) = ("caged", 4, 0)
+        chord.playedVoicing = VoicingRecord(notes: [.init(string: 2, fret: 0), .init(string: 3, fret: 2), .init(string: 4, fret: 3)])
+        (chord.backingStyle, chord.tempo, chord.beatsPerBar, chord.beatUnit) = ("pop", 90, 4, 4)
+        (chord.fadeStageRaw, chord.hinted, chord.chordOutcomeRaw, chord.firstOnsetSeconds) = ("faded", false, "clean", 0.125)
+        chord.inputDelaySeconds = 0.0125
+
+        let theme = PracticeSchemaV3.DayTheme(day: "2026-11-24", rerolls: 0, tonic: 7, mode: "major", positionSystem: "caged",
+                                              positionNumber: 4, positionOctave: 0)
+        (theme.stringSet, theme.progression) = ("dGB", "I–V–vi–IV")
+        context.insert(theme)
+        try context.save()
+    }
+
     /// Everything saved, one line a record.
     private static func readAll(_ log: AttemptLog) throws {
         func text<T>(_ value: T?) -> String { value.map { "\($0)" } ?? "-" }
@@ -543,7 +725,7 @@ enum LogCheck {
         func seconds(_ date: Date?) -> String { text(date?.timeIntervalSinceReferenceDate) }
         for session in try log.context.fetch(FetchDescriptor<PracticeSession>(sortBy: [SortDescriptor(\.startedAt)])) {
             print("session", number(session.id), session.day, seconds(session.startedAt), seconds(session.endedAt), session.stateRaw,
-                  text(session.totalSeconds), session.budgetMinutes, session.naturalsOnly, session.wholeNeck,
+                  text(session.totalSeconds), text(session.budgetMinutes), session.naturalsOnly, session.wholeNeck,
                   "theme", text(session.themeTonic), text(session.themeMode), text(session.themePositionSystem),
                   text(session.themePositionNumber), text(session.themePositionOctave), text(session.themeStringSet),
                   text(session.themeProgression),
@@ -573,7 +755,9 @@ enum LogCheck {
             ("tonic", attempt.scaleTonic), ("system", attempt.positionSystem), ("number", attempt.positionNumber),
             ("octave", attempt.positionOctave), ("degree", attempt.startDegree),
             ("alteration", attempt.startDegreeAlteration), ("tempo", attempt.tempo), ("beats", attempt.beatsPerBar),
-            ("unit", attempt.beatUnit), ("fade", attempt.fadeStageRaw), ("hinted", attempt.hinted),
+            ("unit", attempt.beatUnit), ("fade", attempt.fadeStageRaw), ("level", attempt.fadeLevel),
+            ("as", attempt.playedFadeLevel?.number), ("hinted", attempt.hinted), ("circle", attempt.circleID.map { String($0.uuidString.suffix(3)) }),
+            ("direction", attempt.passDirection),
             ("offset", attempt.clickOffsetSeconds), ("root", attempt.chordRootName), ("rootClass", attempt.chordRoot),
             ("quality", attempt.chordQuality), ("inversion", attempt.inversion), ("set", attempt.stringSet),
             ("delay", attempt.inputDelaySeconds), ("progression", attempt.progression), ("key", attempt.keyTonic),
@@ -591,17 +775,18 @@ enum LogCheck {
     }
 
     private static func read(_ log: AttemptLog) throws {
-        let eShape = FadeStages.Subject(tuning: .standard, scaleKind: .major, position: Position.ID(system: .caged, number: 1))
-        let stages = log.fadeStages(in: [eShape.position], on: [.dGB])
+        let eShape = FadeLevels.Subject(tuning: .standard, scaleKind: .major, position: Position.ID(system: .caged, number: 1))
+        let levels = log.fadeLevels(in: [eShape.position], on: [.dGB])
         var dropD = eShape
         dropD.tuning = TuningPreset.dropD.tuning
-        print("fade \(stages.stage(of: eShape)), in Drop D \(stages.stage(of: dropD))")
+        print("fade \(levels.level(of: eShape)), in Drop D \(levels.level(of: dropD))")
         let shapes = Triad.Quality.allCases.flatMap { quality in
             Triad.Inversion.allCases.map {
-                FadeStages.VoicingShape(tuning: .standard, quality: quality, inversion: $0, stringSet: .dGB)
+                FadeLevels.VoicingShape(tuning: .standard, quality: quality, inversion: $0, stringSet: .dGB)
             }
         }
-        print("triads faded on D-G-B \(shapes.filter { stages.stage(of: $0) == .faded }.count), hidden \(shapes.filter { stages.stage(of: $0) == .hidden }.count)")
+        let shapeLevels = shapes.map { levels.level(of: $0).number }
+        print("triads on D-G-B at level 1 \(shapeLevels.filter { $0 == 1 }.count), above \(shapeLevels.filter { $0 > 1 }.count)")
         var groups: [UUID] = []
         func group(of attempt: LoggedAttempt) -> String {
             guard let id = attempt.groupID else { return "none" }
