@@ -13,6 +13,7 @@ private func reached(_ levels: [(voicing: TriadVoicing, level: Int)]) -> FadeLev
                 FadeLevels.VoicingNote(shape: shape, level: FadeLevel(number), hinted: false, place: $0, outcome: .answered,
                                        firstRight: true)
             })
+            reached.endRun()
         }
     }
     return reached

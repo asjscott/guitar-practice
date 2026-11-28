@@ -29,18 +29,18 @@ public struct FadeMove: Hashable, Sendable {
 }
 
 extension FadeLevels {
-    /// What moved since `before`: positions first, up the shapes (or patterns) then by scale kind; then triad voicings,
+    /// What moved since `before`, each counting its run: positions first, up the shapes (or patterns) then by scale kind; then triad voicings,
     /// by string set, then quality, then inversion.
     public func moves(since before: FadeLevels) -> [FadeMove] {
-        let passMoves = Set(passes.subjects).union(before.passes.subjects)
+        let passMoves = passes.subjects.union(before.passes.subjects)
             .sorted { $0.order.lexicographicallyPrecedes($1.order) }
             .compactMap { subject in
-                FadeMove(.pass(subject), from: before.passes.level(of: subject), to: passes.level(of: subject))
+                FadeMove(.pass(subject), from: before.passes.levelAfterRun(of: subject), to: passes.levelAfterRun(of: subject))
             }
-        let voicingMoves = Set(voicings.subjects).union(before.voicings.subjects)
+        let voicingMoves = voicings.subjects.union(before.voicings.subjects)
             .sorted { $0.order.lexicographicallyPrecedes($1.order) }
             .compactMap { shape in
-                FadeMove(.voicing(shape), from: before.voicings.level(of: shape), to: voicings.level(of: shape))
+                FadeMove(.voicing(shape), from: before.voicings.levelAfterRun(of: shape), to: voicings.levelAfterRun(of: shape))
             }
         return passMoves + voicingMoves
     }

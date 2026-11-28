@@ -111,3 +111,46 @@ struct FadeLevelsTests {
         #expect(level(after: oldPass(at: .shown), oldPass(at: .faded), pass(at: 6, clean: false)) == 5)
     }
 }
+
+/// As the log has them, each pass a group, each with its run, in order.
+private func fold(_ runs: [(run: Int, pass: [FadeLevels.Note])], current: Int? = nil) -> FadeLevels {
+    let notes = runs.enumerated().flatMap { group, entry in
+        entry.pass.map { (run: Optional(entry.run), group: group, note: $0) }
+    }
+    return FadeLevels(runs: notes, current: current)
+}
+
+@Suite("Fade levels from the log: a level a run at most")
+struct FadeLevelRunTests {
+    @Test func everyPassOfARunCleanMovesItUpOne() {
+        #expect(fold([(1, pass()), (1, pass()), (1, pass())]).level(of: eShape) == FadeLevel(1))
+        #expect(fold([(1, pass()), (1, pass()), (2, pass(at: 1)), (2, pass(at: 1))]).level(of: eShape) == FadeLevel(2))
+    }
+
+    @Test func anyPassOfARunNotCleanMovesItDownOne() {
+        let up = [(run: 1, pass: pass()), (2, pass(at: 1)), (3, pass(at: 2))]
+        #expect(fold(up).level(of: eShape) == FadeLevel(3))
+        let mixed = up + [(4, pass(at: 3)), (4, pass(at: 3, clean: false)), (4, pass(at: 3))]
+        #expect(fold(mixed).level(of: eShape) == FadeLevel(2))
+    }
+
+    @Test func passesAtAnotherLevelDontCount() {
+        #expect(fold([(1, pass()), (1, pass(at: 4, clean: false))]).level(of: eShape) == FadeLevel(1))
+    }
+
+    @Test func theCurrentRunIsPlayedAtTheLevelFromBeforeIt() {
+        let levels = fold([(1, pass()), (2, pass(at: 1)), (2, pass(at: 1))], current: 2)
+        #expect(levels.level(of: eShape) == FadeLevel(1))
+        #expect(levels.levelAfterRun(of: eShape) == FadeLevel(2))
+    }
+
+    @Test func runsCountInTheOrderTheyEnded() {
+        // A session (run 1) paused for a run of free practice (2), which ends first: the session's pass from before it,
+        // at the level then, no longer counts, and its pass after it, at the level reached, does.
+        let log = [(run: 1, pass: pass()), (2, pass()), (1, pass(at: 1, clean: false))]
+        #expect(fold(log).level(of: eShape) == .first)
+        let going = fold(log, current: 1)
+        #expect(going.level(of: eShape) == FadeLevel(1))
+        #expect(going.levelAfterRun(of: eShape) == .first)
+    }
+}

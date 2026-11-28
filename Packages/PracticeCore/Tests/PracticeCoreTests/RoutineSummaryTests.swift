@@ -12,18 +12,20 @@ private func shape(_ inversion: Triad.Inversion, _ quality: Triad.Quality = .maj
 }
 
 extension FadeLevels {
-    /// Clean or not, a one-note pass of `subject` at the level it has reached.
+    /// Clean or not, a one-note pass of `subject` at the level it has reached, in a run of its own.
     fileprivate mutating func pass(_ subject: Subject, isClean: Bool = true) {
         add([Note(subject: subject, level: level(of: subject), hinted: false, size: 1, place: 0,
                   outcome: isClean ? .answered : .timedOut, firstRight: isClean)])
+        endRun()
     }
 
-    /// Clean or not, a voicing of `shape` at the level it has reached.
+    /// Clean or not, a voicing of `shape` at the level it has reached, in a run of its own.
     fileprivate mutating func voicing(_ shape: VoicingShape, isClean: Bool = true) {
         add(voicing: (0..<3).map {
             VoicingNote(shape: shape, level: level(of: shape), hinted: false, place: $0, outcome: .answered,
                         firstRight: isClean)
         })
+        endRun()
     }
 }
 

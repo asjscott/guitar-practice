@@ -249,12 +249,13 @@ struct TriadCircleFadeTests {
         #expect(markers(&drill, at: 7.5).map(\.opacity) == [0.5, 0.5, 1])
     }
 
-    @Test func aCleanVoicingMovesItsShapeUp() {
+    @Test func cleanVoicingsMoveTheirShapeUpOneForTheRun() {
         var drill = circle(from: .major(.e))
         finishClimb(&drill)
         let shape = FadeLevels.VoicingShape(tuning: .standard, quality: .major, inversion: .root, stringSet: .dGB)
-        // Root position, clean at the bottom of the climb and again at its end.
-        #expect(drill.fadeLevels?.level(of: shape) == FadeLevel(2))
+        // Root position, clean at the bottom of the climb and again at its end: still played at level 0 this run.
+        #expect(drill.fadeLevels?.level(of: shape) == .first)
+        #expect(drill.fadeLevels?.levelAfterRun(of: shape) == FadeLevel(1))
     }
 }
 

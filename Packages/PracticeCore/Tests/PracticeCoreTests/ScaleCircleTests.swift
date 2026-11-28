@@ -188,6 +188,7 @@ struct ScaleCircleFadeTests {
                             outcome: .answered, firstRight: true)
         }
         levels.add(notes)
+        levels.endRun()
         return levels
     }
 
@@ -240,7 +241,9 @@ struct ScaleCircleFadeTests {
         #expect(drill.attempts.compactMap(passFacts).first?.hinted == true)
         for _ in 0..<11 { finishPass(&drill) }
         let shapes = standard.scaleCirclePositions(from: try theme(), going: .up).dropFirst()
-        #expect(shapes.contains { (drill.fadeLevels?.level(of: subject($0.id)) ?? .first) > .first })
+        #expect(shapes.contains { (drill.fadeLevels?.levelAfterRun(of: subject($0.id)) ?? .first) > .first })
+        // Played at the level from before the run.
+        #expect(shapes.allSatisfy { drill.fadeLevels?.level(of: subject($0.id)) == .first })
     }
 
     @Test func theFadePickerOverridesTheLevel() throws {

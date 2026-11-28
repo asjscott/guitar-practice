@@ -159,7 +159,7 @@ How long a prompt should take: for a pass or chord played to clicks or backing, 
 _Avoid_: Target time, time limit (a prompt can still time out separately)
 
 **Fade level**:
-How far a scale kind in one position, or a triad's quality, inversion and string set, has got towards being played from the roots alone, whatever the key or root. Level 0 never fades; each level after it shortens the fade time; at the last, only the roots are shown from the start. A clean prompt moves it up a level and any other moves it down.
+How far a scale kind in one position, or a triad's quality, inversion and string set, has got towards being played from the roots alone, whatever the key or root. Level 0 never fades; each level after it shortens the fade time; at the last, only the roots are shown from the start. It moves at most one level a session (in free practice, a run): up if every prompt of it played at the level reached was clean, down if any wasn't. Its prompts are played at the level reached before the session or run.
 _Avoid_: Fade stage (the earlier Shown / Faded / Hidden), memory level, difficulty
 
 **Hint**:
