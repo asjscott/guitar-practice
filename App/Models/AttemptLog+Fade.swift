@@ -5,12 +5,13 @@ import TheoryCore
 
 extension AttemptLog {
     /// The fade levels reached in these positions, and by triads on these string sets, worked out from everything logged
-    /// in them. What can't be read is left out.
-    func fadeLevels(in positions: [Position.ID], on stringSets: Set<StringSet>) -> FadeLevels {
-        FadeLevels(log: passNotes(in: positions), voicings: voicingNotes(on: stringSets))
+    /// in them, a level a run at most. The run `current` (a session's id, or `RunLog.runID`) is left going: its prompts
+    /// are still played at the levels from before it. What can't be read is left out.
+    func fadeLevels(in positions: [Position.ID], on stringSets: Set<StringSet>, current: UUID? = nil) -> FadeLevels {
+        FadeLevels(runs: passNotes(in: positions), voicings: voicingNotes(on: stringSets), current: current)
     }
 
-    private func passNotes(in positions: [Position.ID]) -> [(group: UUID, note: FadeLevels.Note)] {
+    private func passNotes(in positions: [Position.ID]) -> [(run: UUID?, group: UUID, note: FadeLevels.Note)] {
         guard !positions.isEmpty else { return [] }
         // Only these positions' notes, since fetching every pass ever logged would hold up the start of a run.
         let systems = positions.map(\.system.rawValue), numbers = positions.map(\.number)
@@ -22,11 +23,11 @@ extension AttemptLog {
         let attempts = (try? context.fetch(notes)) ?? []
         return attempts.compactMap { attempt in
             guard let group = attempt.groupID, let note = FadeLevels.Note(attempt) else { return nil }
-            return (group, note)
+            return (attempt.runID, group, note)
         }
     }
 
-    private func voicingNotes(on stringSets: Set<StringSet>) -> [(group: UUID, note: FadeLevels.VoicingNote)] {
+    private func voicingNotes(on stringSets: Set<StringSet>) -> [(run: UUID?, group: UUID, note: FadeLevels.VoicingNote)] {
         guard !stringSets.isEmpty else { return [] }
         let sets = stringSets.map(\.rawValue)
         let onSets = #Predicate<LoggedAttempt> { attempt in attempt.stringSet.flatMap { sets.contains($0) } ?? false }
@@ -34,7 +35,7 @@ extension AttemptLog {
         let attempts = (try? context.fetch(notes)) ?? []
         return attempts.compactMap { attempt in
             guard let group = attempt.groupID, let note = FadeLevels.VoicingNote(attempt) else { return nil }
-            return (group, note)
+            return (attempt.runID, group, note)
         }
     }
 }

@@ -59,7 +59,8 @@ struct SessionView: View {
             SessionPlayingView(model: model)
         case .finished:
             if let summary = model.summary {
-                SessionSummaryView(summary: summary, steps: model.snapshot.steps, done: model.done)
+                SessionSummaryView(summary: summary, steps: model.snapshot.steps, tuning: model.fretboard.tuning,
+                                   key: model.theme?.key, done: model.done)
             }
         }
     }

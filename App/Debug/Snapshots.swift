@@ -675,8 +675,8 @@ enum Snapshots {
     }
 
     /// Scale circle from E major's C shape, in layout C: idle; a pass mid-fade at level 1 (three notes in, seven seconds
-    /// into a fade of about fifteen); the key change to B, shown whole with its first note ringed; and G major's E shape
-    /// at the nut, played 12 frets up.
+    /// into a fade of about fifteen); the key change to B, shown whole with its first note ringed; G major's E shape
+    /// at the nut, played 12 frets up; and the last level, only the roots.
     private static func saveScaleCircle() async throws {
         func circle(_ key: Key = .major(.e), _ shape: CAGEDShape = .c, level: FadeLevel? = nil) -> DrillViewModel {
             let model = DrillViewModel()
@@ -706,6 +706,10 @@ enum Snapshots {
         let nut = circle(.major(.g), .e)
         try await save("scale-circle-nut", DrillView(model: nut)) { nut.start(seed: 1) }
         nut.stop()
+        // At the last level only the roots, without the first note ringed.
+        let roots = circle(level: .last)
+        try await save("scale-circle-roots", DrillView(model: roots)) { roots.start(seed: 1) }
+        roots.stop()
     }
 
     /// Triad circle from E on D-G-B, in layout C, against a best set by a slower circle logged first: mid-climb at
@@ -968,10 +972,26 @@ enum Snapshots {
             play(.upAndDown)
             session.pause()
         }
-        try await save("session-scale-chiming", SessionView(model: session), settle: .milliseconds(150)) {
+        // Past its minute, step 4 plays on to the end of the pass, then ends by itself.
+        /// Plays step 4 a note each half second until the rail says `detail`, or the step is over.
+        func playStepFour(until detail: String?) {
+            for _ in 0..<600 where session.blockKind == .upAndDown && session.stage == .playing {
+                if let detail, session.snapshot.steps.first(where: { $0.state == .current })?.detail == detail { return }
+                session.passTimeForSnapshot(0.5)
+                session.answerForSnapshot(right: true)
+            }
+        }
+        try await save("session-scale-last-pass", SessionView(model: session)) {
             play(.upAndDown)
-            session.passTimeForSnapshot(SessionPlanner.shortFocusLength / .seconds(1) - 29)
-            session.skip()
+            playStepFour(until: "Last pass")
+        } check: {
+            precondition(session.blockKind == .upAndDown && session.stage == .playing)
+        }
+        try await save("session-scale-ended", SessionView(model: session), settle: .milliseconds(150)) {
+            play(.upAndDown)
+            playStepFour(until: nil)
+        } check: {
+            precondition(session.blockKind == .triadCircle && session.stage == .ready)
         }
         // M pauses; the session's keys then do nothing, and [ and ] neither. Closing goes on.
         try await save("session-scale-panel", SessionView(model: session), settle: .milliseconds(900)) {

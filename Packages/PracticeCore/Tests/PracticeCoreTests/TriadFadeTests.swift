@@ -5,10 +5,13 @@ import PracticeCore
 private let aMinorSecond = TriadFacts(triad: Triad(.minor, root: .a), inversion: .second, stringSet: .dGB)
 private let shape = FadeLevels.VoicingShape(tuning: .standard, quality: .minor, inversion: .second, stringSet: .dGB)
 
-/// Clean voicings from level 0 up to `level`.
+/// Clean voicings from level 0 up to `level`, each in a run of its own.
 private func reached(_ level: Int, _ shape: FadeLevels.VoicingShape = shape) -> FadeLevels {
     var levels = FadeLevels()
-    for number in 0..<level { levels.add(voicing: voicing(at: number, shape)) }
+    for number in 0..<level {
+        levels.add(voicing: voicing(at: number, shape))
+        levels.endRun()
+    }
     return levels
 }
 
@@ -22,9 +25,13 @@ private func voicing(at level: Int, _ shape: FadeLevels.VoicingShape = shape, wr
     }
 }
 
+/// Each voicing in a run of its own.
 private func level(after voicings: [FadeLevels.VoicingNote]...) -> Int {
     var levels = FadeLevels()
-    for voicing in voicings { levels.add(voicing: voicing) }
+    for voicing in voicings {
+        levels.add(voicing: voicing)
+        levels.endRun()
+    }
     return levels.level(of: shape).number
 }
 
@@ -44,6 +51,7 @@ struct TriadFadeFoldTests {
                         voicing(at: 3, endingWith: .timedOut, count: 1), voicing(at: 3, endingWith: .timedOut)] {
             var levels = reached(3)
             levels.add(voicing: unclean)
+            levels.endRun()
             #expect(levels.level(of: shape) == FadeLevel(2))
         }
         #expect(level(after: voicing(at: 0, wrongAt: 0)) == 0)
@@ -78,6 +86,7 @@ struct TriadFadeFoldTests {
         others[3].stringSet = .gBE
         #expect(others.map(levels.level(of:)) == [.first, .first, .first, .first])
         levels.add(voicing: voicing(at: 0, others[0]))
+        levels.endRun()
         #expect(levels.level(of: shape) == FadeLevel(2))
     }
 
@@ -225,7 +234,8 @@ struct TriadPlayItFadeTests {
         let hinted = drill.attempts.map { if case .triad(let facts) = $0.facts { facts.hinted } else { false } }
         #expect(hinted == [false, true])
         play(60, at: 5, &drill)
-        #expect(drill.fadeLevels?.level(of: shape) == FadeLevel(5))
+        #expect(drill.fadeLevels?.level(of: shape) == .last)
+        #expect(drill.fadeLevels?.levelAfterRun(of: shape) == FadeLevel(5))
     }
 
     @Test func pausingEndsAHint() {
@@ -239,7 +249,8 @@ struct TriadPlayItFadeTests {
     @Test func aCleanOneMovesItUpAndIsLoggedAtItsLevel() {
         var drill = asking(reached(2))
         for (index, midi) in low.enumerated() { play(midi, at: 1 + Double(index), &drill) }
-        #expect(drill.fadeLevels?.level(of: shape) == FadeLevel(3))
+        #expect(drill.fadeLevels?.level(of: shape) == FadeLevel(2))
+        #expect(drill.fadeLevels?.levelAfterRun(of: shape) == FadeLevel(3))
         #expect(levels(logged: drill) == [2, 2, 2])
         drill = asking()
         for (index, midi) in low.enumerated() { play(midi, at: 1 + Double(index), &drill) }
@@ -271,6 +282,7 @@ struct TriadPlayItFadeTests {
         for quality in Triad.Quality.allCases {
             all.add(voicing: voicing(at: 0, .init(tuning: .standard, quality: quality, inversion: .second, stringSet: .dGB)))
         }
+        all.endRun()
         drill.handle(.fadeLevels(all))
         drill.handle(.resume(at: s(2)))
         #expect(markers(&drill, at: 6.5).map(\.opacity) == [0.5, 1, 0.5])
@@ -314,7 +326,7 @@ struct InversionsFadeTests {
 
     private let root = [57, 60, 64], first = [60, 64, 69]
 
-    @Test func theWayBackUsesWhatTheWayUpReachedAndEachVoicingFadesFromItsStart() throws {
+    @Test func theWayBackStaysAtTheLevelFromBeforeTheRun() throws {
         var drill = climbing()
         #expect(drill.display?.chips.map(\.text) == ["E", "A", "C"])
         #expect(drill.timeRemaining(at: s(1)) == nil)
@@ -322,10 +334,11 @@ struct InversionsFadeTests {
         play(root, from: 6, &drill)
         #expect(drill.display?.markers.map(\.opacity) == [1, 1, 1])
         play(first, from: 11, &drill)
-        // Root position again, now at level 1: it fades from when it came up.
+        // Root position again, still at level 0 this run, though the way up was clean.
         let start = try #require(drill.promptStart) / .seconds(1)
-        #expect(drill.fadeLevels?.level(of: shape) == FadeLevel(1))
-        #expect(markers(&drill, at: start + 4.5).map(\.opacity) == [1, 0.5, 0.5])
+        #expect(drill.fadeLevels?.level(of: shape) == .first)
+        #expect(drill.fadeLevels?.levelAfterRun(of: shape) == FadeLevel(1))
+        #expect(markers(&drill, at: start + 4.5).map(\.opacity) == [1, 1, 1])
     }
 
     @Test func aVoicingResumedStartsAfresh() {
@@ -335,7 +348,7 @@ struct InversionsFadeTests {
         drill.handle(.pause(at: s(3)))
         drill.handle(.resume(at: s(4)))
         play(low, from: 5, &drill)
-        #expect(drill.fadeLevels?.level(of: shape) == FadeLevel(1))
+        #expect(drill.fadeLevels?.levelAfterRun(of: shape) == FadeLevel(1))
         let notes = drill.attemptsToLog.compactMap { attempt in
             FadeLevels.VoicingNote(attempt, in: .standard).map { (group: attempt.group?.number ?? -1, note: $0) }
         }
@@ -352,6 +365,7 @@ struct SessionTriadFadeTests {
             for number in 0..<6 {
                 levels.add(voicing: voicing(at: number, .init(tuning: .standard, quality: quality, inversion: .second,
                                                               stringSet: .dGB)))
+                levels.endRun()
             }
         }
         var player = SessionPlayer(blocks: [block, block], setup: setup(levels, seed: 1))

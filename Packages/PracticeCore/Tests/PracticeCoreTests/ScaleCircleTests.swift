@@ -20,8 +20,8 @@ private func circle(on fretboard: Fretboard = standard, _ change: (inout DrillSe
 @discardableResult
 private func finishPass(_ drill: inout any Drill, every interval: Double = 1) -> [FretboardLocation] {
     var played: [FretboardLocation] = []
-    let pass = drill.prompt?.sweep
-    while drill.isRunning, drill.prompt?.sweep == pass, let target = drill.prompt?.target, let start = drill.promptStart,
+    let pass = drill.prompt?.pass
+    while drill.isRunning, drill.prompt?.pass == pass, let target = drill.prompt?.target, let start = drill.promptStart,
           played.count < 100 {
         played.append(target)
         drill.handle(.played(drill.fretboard.pitch(at: target), onset: start + s(interval), at: start + s(interval)))
@@ -124,6 +124,21 @@ struct ScaleCircleAnswerTests {
         #expect(drill.promptStart == s(2) * notes)
     }
 
+    @Test func theClockRunsOnBetweenOnePasssLastNoteAndTheNextKey() throws {
+        var drill = circle()
+        while drill.isRunning, drill.attempts.count + 1 < standard.passOrder(of: try theme(), going: .up).count {
+            guard let target = drill.prompt?.target, let start = drill.promptStart else { break }
+            drill.handle(.played(drill.fretboard.pitch(at: target), onset: start + s(1), at: start + s(1)))
+            drill.handle(.tick(at: start + s(1.1)))
+        }
+        let last = try #require(drill.prompt?.target)
+        let start = try #require(drill.promptStart)
+        drill.handle(.played(drill.fretboard.pitch(at: last), onset: start + s(1), at: start + s(1)))
+        // The pass's last note is in, and the next key isn't up yet.
+        let circle = try #require(drill.display?.circle)
+        #expect(circle.time(at: start + s(3)) == circle.elapsed + s(2))
+    }
+
     @Test func wrongNotesAreCountedAndASkipLeavesTheCircleNotClean() {
         var drill = circle()
         drill.handle(.played(Pitch(30), onset: s(1), at: s(1)))
@@ -173,6 +188,7 @@ struct ScaleCircleFadeTests {
                             outcome: .answered, firstRight: true)
         }
         levels.add(notes)
+        levels.endRun()
         return levels
     }
 
@@ -225,16 +241,20 @@ struct ScaleCircleFadeTests {
         #expect(drill.attempts.compactMap(passFacts).first?.hinted == true)
         for _ in 0..<11 { finishPass(&drill) }
         let shapes = standard.scaleCirclePositions(from: try theme(), going: .up).dropFirst()
-        #expect(shapes.contains { (drill.fadeLevels?.level(of: subject($0.id)) ?? .first) > .first })
+        #expect(shapes.contains { (drill.fadeLevels?.levelAfterRun(of: subject($0.id)) ?? .first) > .first })
+        // Played at the level from before the run.
+        #expect(shapes.allSatisfy { drill.fadeLevels?.level(of: subject($0.id)) == .first })
     }
 
     @Test func theFadePickerOverridesTheLevel() throws {
         var drill = circle { $0.options.pass.fadeLevel = .last }
         let first = standard.passOrder(of: try theme(), going: .up)[0]
         let markers = try #require(drill.display?.markers)
-        // The roots, and the ringed first note to start from.
-        #expect(markers.allSatisfy { $0.isAnswer || $0.location == first })
-        #expect(markers.count > 1)
+        // At the last level only the roots, without the first note ringed.
+        #expect(!markers.isEmpty)
+        #expect(markers.allSatisfy { $0.isAnswer })
+        #expect(!markers.contains { $0.location == first })
+        #expect(!markers.contains { $0.isLastPlayed })
         play(&drill, at: 1)
         #expect(drill.attempts.compactMap(passFacts).first?.fadeLevel == .last)
     }

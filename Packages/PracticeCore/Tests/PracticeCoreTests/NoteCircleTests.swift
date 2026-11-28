@@ -219,7 +219,7 @@ struct NoteCircleTimeTests {
         let result = try #require(circle.result)
         #expect(result.time == s(Double(locations)))
         #expect(result.wrongNotes == 1)
-        #expect(result.isClean)
+        #expect(!result.isClean)
         #expect(circle.time(at: s(500)) == result.time)
         #expect(drill.isRunning)
         drill.handle(.tick(at: s(Double(locations) + 2)))
@@ -228,7 +228,7 @@ struct NoteCircleTimeTests {
     }
 
     @Test func theBestIsShownAndBeatenByAFasterCleanCircle() throws {
-        let best = CircleResult(time: .seconds(500), wrongNotes: 2, skips: 0, isComplete: true)
+        let best = CircleResult(time: .seconds(500), wrongNotes: 0, skips: 0, isComplete: true)
         var drill = circle(from: .major(.e)) { $0.circleBest = best }
         #expect(drill.display?.circle?.best == best)
         for _ in 0..<12 { finishSweep(&drill) }
@@ -238,15 +238,18 @@ struct NoteCircleTimeTests {
     }
 
     @Test func onlyAFinishedCleanCircleCanBeTheBest() {
-        let clean = CircleResult(time: .seconds(500), wrongNotes: 2, skips: 0, isComplete: true)
-        let faster = CircleResult(time: .seconds(400), wrongNotes: 0, skips: 1, isComplete: true)
+        let clean = CircleResult(time: .seconds(500), wrongNotes: 0, skips: 0, isComplete: true)
+        let skipped = CircleResult(time: .seconds(400), wrongNotes: 0, skips: 1, isComplete: true)
+        let wrong = CircleResult(time: .seconds(300), wrongNotes: 1, skips: 0, isComplete: true)
         let unfinished = CircleResult(time: .seconds(100), wrongNotes: 0, skips: 0, isComplete: false)
-        let fewerWrong = CircleResult(time: .seconds(500), wrongNotes: 1, skips: 0, isComplete: true)
-        #expect(CircleResult.best(of: [clean, faster, unfinished]) == clean)
-        #expect(CircleResult.best(of: [clean, fewerWrong]) == fewerWrong)
-        #expect(CircleResult.best(of: [faster, unfinished]) == nil)
+        let faster = CircleResult(time: .seconds(450), wrongNotes: 0, skips: 0, isComplete: true)
+        #expect(!wrong.isClean)
+        #expect(CircleResult.best(of: [clean, skipped, wrong, unfinished]) == clean)
+        #expect(CircleResult.best(of: [clean, faster]) == faster)
+        #expect(CircleResult.best(of: [skipped, wrong, unfinished]) == nil)
         #expect(clean.isBetter(than: nil))
-        #expect(!faster.isBetter(than: nil))
+        #expect(!skipped.isBetter(than: nil))
+        #expect(!wrong.isBetter(than: clean))
     }
 
     @Test func aCircleStoppedPartWayIsNotComplete() throws {

@@ -135,8 +135,8 @@ public struct PromptDrill<Rules: DrillRules>: Drill {
         case .hint(let isShown, let now):
             advance(to: now)
             if isRunning, phase != .paused { rules.hint(isShown: isShown) }
-        case .fadeLevels(let stages):
-            rules.fadeLevels = stages
+        case .fadeLevels(let levels):
+            rules.fadeLevels = levels
         case .clicksStarted, .backingStarted, .passSettings:
             break
         case .tick(let now):

@@ -10,6 +10,9 @@ public struct SessionBlock: Hashable, Sendable {
         case whenDone
         /// When the time through numbered this (from 1) ends, with the chime that waits for it.
         case afterTimesThrough(Int)
+        /// By itself, after the pass that crosses this length, with the chime that waits for the pass to end. No
+        /// chime before it, and no Extend.
+        case afterPassCrossing(Duration)
     }
 
     public let kind: DrillKind
@@ -31,9 +34,17 @@ public struct SessionBlock: Hashable, Sendable {
         self.init(kind: kind, end: .planned(length))
     }
 
-    /// Nil unless it has a planned length.
+    /// Nil unless it has a planned length, or ends after the pass that crosses one.
     public var length: Duration? {
-        if case .planned(let length) = end { length } else { nil }
+        switch end {
+        case .planned(let length), .afterPassCrossing(let length): length
+        case .whenDone, .afterTimesThrough: nil
+        }
+    }
+
+    /// Whether Extend moves its end: only a planned length's.
+    public var isExtendable: Bool {
+        if case .planned = end { true } else { false }
     }
 }
 
@@ -64,7 +75,7 @@ public enum SessionPlanner {
     /// The eight blocks, from a setup that follows the day's theme (`DrillSetup.follow`):
     ///
     /// 1. Note circle; 2. a note drill by day (`noteDrill(day:hasSound:hearFindItUnlocked:)`), 2 minutes; 3. Scale circle;
-    /// 4. Up and down in the theme's scale and position alone, 1 minute; 5. Triad circle on the theme's string set, or
+    /// 4. Up and down in the theme's scale and position alone, ending after the pass that crosses 1 minute; 5. Triad circle on the theme's string set, or
     /// where that can't go round, on another; 6. Chords in position; 7. Stay in position, until every voicing of every
     /// chord in the position has come up and at least 4 times through; 8. Free time.
     ///
@@ -88,7 +99,7 @@ public enum SessionPlanner {
             (noteDrill(day: day, hasSound: hasSound, hearFindItUnlocked: hearFindItUnlocked), .planned(noteDrillLength),
              setup),
             (.scaleCircle, .whenDone, setup),
-            (.upAndDown, .planned(shortFocusLength), themesScaleOnly(setup)),
+            (.upAndDown, .afterPassCrossing(shortFocusLength), themesScaleOnly(setup)),
             (.triadCircle, .whenDone, triadCircleSetup(setup)),
             (.chordsInPosition, .whenDone, setup),
             (.stayInPosition, .afterTimesThrough(timesThrough(of: setup)), setup),

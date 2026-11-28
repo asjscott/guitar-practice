@@ -87,10 +87,11 @@ public struct SessionSummary: Hashable, Sendable {
     /// Such a session isn't saved.
     public var hasNoAttempts: Bool { blocks.allSatisfy(\.stats.attempts.isEmpty) }
 
-    /// The slowest prompts of every block but the scale and progression blocks: timeouts, then the longest response
-    /// times.
+    /// The slowest prompts of every block but the scale blocks (the Scale circle's too) and those with chords:
+    /// timeouts, then the longest response times.
     public func slowest(_ count: Int) -> [Attempt] {
-        RunStats(attempts: blocks.filter { $0.passes == nil && $0.chords == nil }.flatMap(\.stats.attempts)).slowest(count)
+        let blocks = blocks.filter { $0.kind.module != .scales && $0.chords == nil }
+        return RunStats(attempts: blocks.flatMap(\.stats.attempts)).slowest(count)
     }
 }
 

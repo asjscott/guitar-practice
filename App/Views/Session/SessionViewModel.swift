@@ -302,6 +302,7 @@ final class SessionViewModel: MetronomePanelOwner {
         passPositions = (blocks.compactMap { $0.setup?.passPositions }.joined() + drillSetup.scaleCirclePositions).map(\.id)
         // The progression blocks' voicings can be on any string set.
         stringSets = Set(drillSetup.fretboard.stringSets)
+        // Before the session's record, which is the run it is played in: nothing of it is logged yet.
         drillSetup.fadeLevels = log?.fadeLevels(in: passPositions, on: stringSets) ?? FadeLevels()
         fretboard = drillSetup.fretboard
         frets = drillSetup.options.frets
@@ -353,7 +354,7 @@ final class SessionViewModel: MetronomePanelOwner {
         asksToEnd = false
         loadPassSettings()
         // Free practice may have moved them.
-        if let log { send(.fadeLevels(log.fadeLevels(in: passPositions, on: stringSets))) }
+        if let log { send(.fadeLevels(log.fadeLevels(in: passPositions, on: stringSets, current: record?.id))) }
         send(.resume(at: clockNow()))
     }
 
@@ -450,7 +451,7 @@ final class SessionViewModel: MetronomePanelOwner {
     /// Whether the current block has a planned length, which + extends.
     var hasPlannedLength: Bool {
         guard let player, player.blocks.indices.contains(snapshot.blockIndex) else { return false }
-        return player.blocks[snapshot.blockIndex].length != nil
+        return player.blocks[snapshot.blockIndex].isExtendable
     }
 
     private func startTicking() {
@@ -710,7 +711,8 @@ extension SessionViewModel.Snapshot {
         guard let drill = player.drill else { return details.indices.contains(index) ? details[index] : "" }
         if let circle = drill.display?.circle { return circle.placeText }
         if let left = player.timeLeft(inBlock: index) {
-            return left > .zero ? clockText(left, rounding: .up) + " left" : "Space to go on"
+            if left > .zero { return clockText(left, rounding: .up) + " left" }
+            return player.blocks[index].isExtendable ? "Space to go on" : "Last pass"
         }
         if case .afterTimesThrough(let count) = player.blocks[index].end, let timeThrough = drill.display?.progression?.timeThrough {
             return "Time through \(min(timeThrough, count)) of \(count)"

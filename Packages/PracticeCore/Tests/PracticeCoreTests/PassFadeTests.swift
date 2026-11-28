@@ -141,22 +141,34 @@ struct PassFadeTests {
         }
     }
 
-    @Test func eachCompletePassMovesItOneLevel() {
-        var drill = started(at: 0)
+    @Test func aRunPlaysAtTheLevelReachedBeforeItAndMovesItOneLevelAtMost() {
+        var drill = started(at: 2)
         playPass(from: 4, &drill)
-        #expect(facts(drill)?.fadeLevel == FadeLevel(0))
-        // Until the next pass, which starts shown.
-        #expect(showsAll(drill))
-        #expect(showsAll(markers(&drill, at: 16.1)))
+        drill.handle(.tick(at: s(16.1)))
         playPass(from: 20, &drill)
-        #expect(facts(drill)?.fadeLevel == FadeLevel(1))
+        #expect(facts(drill)?.fadeLevel == FadeLevel(2))
         #expect(drill.passes.map(\.isClean) == [true, true])
+        // Every pass clean so far: one up, however many.
+        #expect(drill.fadeLevels?.level(of: gShape) == FadeLevel(2))
+        #expect(drill.fadeLevels?.levelAfterRun(of: gShape) == FadeLevel(3))
         drill.handle(.tick(at: s(32.1)))
         playPass(from: 36, wrongFirst: true, &drill)
-        #expect(facts(drill)?.fadeLevel == FadeLevel(2))
         drill.handle(.tick(at: s(48.1)))
         playPass(from: 52, &drill)
-        #expect(facts(drill)?.fadeLevel == FadeLevel(1))
+        #expect(facts(drill)?.fadeLevel == FadeLevel(2))
+        // One not clean: one down, whatever the others.
+        #expect(drill.fadeLevels?.levelAfterRun(of: gShape) == FadeLevel(1))
+    }
+
+    @Test func theNextRunMovesItAgain() {
+        var drill = started(at: 2)
+        playPass(from: 4, &drill)
+        var levels = drill.fadeLevels ?? FadeLevels()
+        levels.endRun()
+        var next = started(setup(levels))
+        playPass(from: 4, &next)
+        #expect(facts(next)?.fadeLevel == FadeLevel(3))
+        #expect(next.fadeLevels?.levelAfterRun(of: gShape) == FadeLevel(4))
     }
 
     @Test func aPassCutShortDoesnt() {
@@ -192,7 +204,8 @@ struct PassFadeTests {
         #expect(FadeLevels(log: notes).level(of: gShape) == FadeLevel(1))
     }
 
-    @Test func theBlocksOfASessionCarryItOn() {
+    /// Two blocks of Up and down from level 5: a clean pass in the first, then the second's first pass from 32 s.
+    private func sessionOfTwoBlocks() -> SessionPlayer {
         let block = SessionBlock(kind: .upAndDown, length: s(180))
         var player = SessionPlayer(blocks: [block, block], setup: setup(reached(5)))
         player.handle(.start(at: s(0)))
@@ -202,9 +215,32 @@ struct PassFadeTests {
         }
         player.handle(.next(at: s(27)))
         player.handle(.next(at: s(28)))
-        #expect(rootsOnly(player.display?.markers ?? []))
+        return player
+    }
+
+    @Test func theBlocksOfASessionPlayAtTheLevelFromBeforeIt() {
+        var player = sessionOfTwoBlocks()
+        #expect(!rootsOnly(player.display?.markers ?? []))
+        #expect(player.drill?.fadeLevels?.level(of: gShape) == FadeLevel(5))
         player.handle(.hint(isShown: true, at: s(29)))
         #expect(showsAll(player.display?.markers ?? []))
+    }
+
+    @Test func aSessionMovesItOneLevelAtMost() {
+        var clean = sessionOfTwoBlocks()
+        for (index, midi) in wholePass.enumerated() {
+            clean.handle(.played(Pitch(midi), onset: s(32 + Double(index)), at: s(32 + Double(index))))
+        }
+        clean.handle(.end(at: s(60)))
+        #expect(clean.summary.fadeMoves.map(\.text) == ["G shape, minor pentatonic: 5 → 6"])
+
+        var notClean = sessionOfTwoBlocks()
+        notClean.handle(.played(Pitch(47), onset: s(32), at: s(32)))
+        for (index, midi) in wholePass.enumerated() {
+            notClean.handle(.played(Pitch(midi), onset: s(32.5 + Double(index)), at: s(32.5 + Double(index))))
+        }
+        notClean.handle(.end(at: s(60)))
+        #expect(notClean.summary.fadeMoves.map(\.text) == ["G shape, minor pentatonic: 5 → 4"])
     }
 }
 
@@ -291,9 +327,10 @@ struct HintTests {
         #expect(drill.display?.feedback == "Pass done · hint used")
         drill.handle(.tick(at: s(16.1)))
         playPass(from: 20, &drill)
-        #expect(facts(drill)?.fadeLevel == FadeLevel(5))
+        #expect(facts(drill)?.fadeLevel == FadeLevel(6))
         #expect(facts(drill)?.hinted == false)
         #expect(drill.passes.map(\.isClean) == [false, true])
+        #expect(drill.fadeLevels?.levelAfterRun(of: gShape) == FadeLevel(5))
     }
 
     @Test func inTheCountInToo() {

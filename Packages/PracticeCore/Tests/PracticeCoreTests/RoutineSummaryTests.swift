@@ -12,18 +12,20 @@ private func shape(_ inversion: Triad.Inversion, _ quality: Triad.Quality = .maj
 }
 
 extension FadeLevels {
-    /// Clean or not, a one-note pass of `subject` at the level it has reached.
+    /// Clean or not, a one-note pass of `subject` at the level it has reached, in a run of its own.
     fileprivate mutating func pass(_ subject: Subject, isClean: Bool = true) {
         add([Note(subject: subject, level: level(of: subject), hinted: false, size: 1, place: 0,
                   outcome: isClean ? .answered : .timedOut, firstRight: isClean)])
+        endRun()
     }
 
-    /// Clean or not, a voicing of `shape` at the level it has reached.
+    /// Clean or not, a voicing of `shape` at the level it has reached, in a run of its own.
     fileprivate mutating func voicing(_ shape: VoicingShape, isClean: Bool = true) {
         add(voicing: (0..<3).map {
             VoicingNote(shape: shape, level: level(of: shape), hinted: false, place: $0, outcome: .answered,
                         firstRight: isClean)
         })
+        endRun()
     }
 }
 
@@ -101,6 +103,8 @@ struct CircleTextTests {
         #expect(circle(600).comparison(with: circle(598)) == "Best 9:58")
         #expect(circle(300, complete: false).comparison(with: circle(598)) == "Not finished")
         #expect(circle(300, skips: 2).comparison(with: circle(598)) == "Not clean: 2 skipped")
+        #expect(circle(300, wrong: 1).comparison(with: circle(598)) == "Not clean: 1 wrong")
+        #expect(circle(300, wrong: 2, skips: 1).comparison(with: circle(598)) == "Not clean: 2 wrong · 1 skipped")
     }
 }
 
@@ -112,7 +116,7 @@ private func scaleCircle(_ seconds: [Double]) -> [Attempt] {
     var drill = DrillKind.scaleCircle.makeDrill(setup)
     drill.handle(.start(at: s(0)))
     for (pass, interval) in seconds.enumerated() {
-        while drill.isRunning, drill.prompt?.sweep == pass, let target = drill.prompt?.target, let start = drill.promptStart {
+        while drill.isRunning, drill.prompt?.pass == pass, let target = drill.prompt?.target, let start = drill.promptStart {
             drill.handle(.played(drill.fretboard.pitch(at: target), onset: start + s(interval), at: start + s(interval)))
             drill.handle(.tick(at: start + s(interval + 0.1)))
         }
@@ -166,13 +170,13 @@ extension SessionPlayer {
 
     /// Plays each prompt's pitch a second after its timer starts, then ticks past any pause, `count` times or until
     /// the block is over.
-    fileprivate mutating func playRight(_ count: Int = 1000) {
+    fileprivate mutating func playRight(_ count: Int = 1000, after seconds: Double = 1) {
         let block = blockIndex
         for _ in 0..<count {
             guard stage == .playing, blockIndex == block, let drill, let target = drill.prompt?.target,
                   let start = drill.promptStart else { return }
-            handle(.played(drill.fretboard.pitch(at: target), onset: start + s(1), at: start + s(1)))
-            handle(.tick(at: start + s(1.6)))
+            handle(.played(drill.fretboard.pitch(at: target), onset: start + s(seconds), at: start + s(seconds)))
+            handle(.tick(at: start + s(seconds + 0.6)))
         }
     }
 }
@@ -198,6 +202,18 @@ struct RoutineSummaryFromSessionTests {
         #expect(summary.circles.map(\.kind) == [.noteCircle])
     }
 
+    @Test func theSlowestPromptsLeaveOutTheScaleCircle() {
+        var player = routine()
+        player.play(step: 1)
+        player.playRight(3, after: 2)
+        player.play(step: 3)
+        player.playRight(3, after: 5)
+        player.handle(.end(at: s(1000)))
+        let slowest = player.summary.slowest(3)
+        #expect(slowest.count == 3)
+        #expect(slowest.allSatisfy { $0.responseTime == s(2) })
+    }
+
     @Test func aCircleNotFinishedSaysSo() {
         var player = routine()
         player.play(step: 1)
@@ -210,8 +226,8 @@ struct RoutineSummaryFromSessionTests {
         var player = routine()
         player.play(step: 3)
         for _ in 0..<3 {
-            let pass = player.drill?.prompt?.sweep
-            while player.stage == .playing, player.drill?.prompt?.sweep == pass { player.playRight(1) }
+            let pass = player.drill?.prompt?.pass
+            while player.stage == .playing, player.drill?.prompt?.pass == pass { player.playRight(1) }
         }
         let keys = player.summary.scaleCircleKeys
         #expect(keys.map(\.key.shortName) == ["G", "D", "A"])

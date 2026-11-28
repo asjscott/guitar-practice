@@ -196,28 +196,7 @@ public struct TriadCircleRules: DrillRules {
     }
 
     private func progress(at moment: DrillMoment, place: Int) -> CircleProgress {
-        let attempts = moment.attempts
-        let isAnswerable = switch moment.phase {
-        case .waiting, .wrong: true
-        default: false
-        }
-        let result = CircleResult(attempts: attempts, count: keys.count).flatMap { $0.isComplete ? $0 : nil }
-        let runningSince: Duration? = if result != nil {
-            nil
-        } else if isAnswerable {
-            moment.promptStart
-        } else if let start = moment.promptStart, let time = attempts.last?.responseTime {
-            // Between voicings: from the last right note.
-            start + time
-        } else {
-            nil
-        }
-        return CircleProgress(
-            keys: keys, place: min(max(place, 0), keys.count - 1),
-            wrongNotes: attempts.map(\.wrongAnswers.count).reduce(0, +) + (isAnswerable ? moment.wrongAnswers.count : 0),
-            skips: attempts.filter(\.skipped).count,
-            elapsed: attempts.reduce(.zero) { $0 + ($1.responseTime ?? .zero) },
-            runningSince: runningSince, result: result, best: setup.circleBest)
+        CircleProgress(at: moment, keys: keys, place: place, best: setup.circleBest)
     }
 }
 

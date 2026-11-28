@@ -3,12 +3,15 @@ import SwiftUI
 import TheoryCore
 
 /// After a session, layout C (prototype/phase4b-screens): the rail with each step's result, and beside it the headline,
-/// the circles' times against your best, the Scale circle's time per key and the fade levels that moved. A session
-/// ended early shows only the blocks played.
+/// the circles' times against your best, the Scale circle's time per key, the fade levels that moved and the slowest
+/// prompts. A session ended early shows only the blocks played, and the slowest prompts.
 struct SessionSummaryView: View {
     let summary: SessionSummary
     /// The rail's steps, as the session left them.
     let steps: [RailStep]
+    let tuning: Tuning
+    /// The theme's, for spelling.
+    let key: Key?
     let done: () -> Void
 
     var body: some View {
@@ -28,6 +31,7 @@ struct SessionSummaryView: View {
                     if summary.hasNoAttempts {
                         Text("No prompts done, so nothing was saved.").foregroundStyle(.secondary)
                     } else {
+                        slowest
                         AttemptLogNotice()
                     }
                 }
@@ -101,6 +105,18 @@ struct SessionSummaryView: View {
                     }
                     .frame(width: 52)
                     .accessibilityElement(children: .combine)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private var slowest: some View {
+        let attempts = summary.slowest(3)
+        if !attempts.isEmpty {
+            Text("Slowest").font(.headline)
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(Array(attempts.enumerated()), id: \.offset) { _, attempt in
+                    Text(attempt.summaryLine(in: tuning, key: key)).foregroundStyle(.secondary)
                 }
             }
         }
