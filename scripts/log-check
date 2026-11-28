@@ -14,7 +14,7 @@ trap 'rm -rf "$folder"' EXIT
 export GP_LOG_CHECK="$folder/Check.store"
 GP_LOG_CHECK_STEP=write "$app"
 found="$(GP_LOG_CHECK_STEP=read "$app")"
-expected='fade Level 2, in Drop D Level 0
+expected='fade Level 1, in Drop D Level 0
 triads on D-G-B at level 1 1, above 0
 attempt notePlayIt freePractice answered tuning [38, 45, 50, 55, 59, 64] capo 2 target E string 3 fret 9 pitch 64 group none first false wrong [65] timed session none facts []
 attempt notePlayIt freePractice skipped tuning [38, 45, 50, 55, 59, 64] capo 2 target C string 2 fret -1 pitch -1 group none first false wrong [] no time session none facts []

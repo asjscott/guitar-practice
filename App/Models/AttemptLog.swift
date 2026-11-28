@@ -54,7 +54,7 @@ final class AttemptLog {
     }
 
     private static func makeContainer(at url: URL?) throws -> ModelContainer {
-        let schema = Schema(versionedSchema: PracticeSchemaV4.self)
+        let schema = Schema(versionedSchema: PracticeSchemaV5.self)
         let configuration = url.map { ModelConfiguration(schema: schema, url: $0, cloudKitDatabase: .none) }
             ?? ModelConfiguration(schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, migrationPlan: PracticeMigrationPlan.self, configurations: configuration)
@@ -99,11 +99,14 @@ final class RunLog {
     private var count = 0
     private var groupIDs: [Int: UUID] = [:]
     private var circleIDs: [Int: UUID] = [:]
+    /// Shared by every attempt of the run: in a session, the session's id, so that its blocks are one run.
+    let runID: UUID
 
     fileprivate init(log: AttemptLog, session: PracticeSession?, blockIndex: Int?) {
         self.log = log
         self.session = session
         self.blockIndex = blockIndex
+        runID = session?.id ?? UUID()
     }
 
     /// Saves the drill's attempts that ended since the last call: call it after every event.
@@ -114,7 +117,7 @@ final class RunLog {
             let record = LoggedAttempt(attempt, in: drill, date: .now, source: session == nil ? .freePractice : .session,
                                        groupID: (attempt.group?.number).map { Self.id(for: $0, in: &groupIDs) },
                                        circleID: (attempt.group?.circle).map { Self.id(for: $0, in: &circleIDs) },
-                                       blockIndex: blockIndex)
+                                       runID: runID, blockIndex: blockIndex)
             log.context.insert(record)
             record.session = session
         }

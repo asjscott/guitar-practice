@@ -42,7 +42,8 @@ enum LogCheck {
                     try checkNoteCircle()
                     try checkScaleCircle()
                     try checkResume()
-                    try await write(log)
+                    try checkFadeRuns()
+                    try write(log)
                 }
                 if let problem = log.problem { throw LogCheckError.notSaved(problem) }
                 // As abrupt as a crash: nothing gets a chance to save on the way out.
@@ -57,7 +58,7 @@ enum LogCheck {
         exit(EXIT_FAILURE)
     }
 
-    private static func write(_ log: AttemptLog) async throws {
+    private static func write(_ log: AttemptLog) throws {
         let drill = DrillViewModel()
         drill.log = log
         drill.tuning = TuningPreset.dropD.tuning
@@ -70,7 +71,8 @@ enum LogCheck {
         drill.playForSnapshot(right: true)
         drill.skip()
         drill.skip()
-        try await Task.sleep(for: .milliseconds(10_400))
+        // Past the time limit and its grace, on the drill's clock.
+        drill.passTimeForSnapshot(10.4)
         drill.skip()
         drill.playForSnapshot(right: false)
         drill.togglePause()
@@ -180,7 +182,7 @@ enum LogCheck {
         }
         inPositionRun.update(from: inPosition)
 
-        // Two clean passes and one cut short by a pause, so the next is played at level 2.
+        // Two clean passes and one cut short by a pause, in one run, so the next run is played at level 1.
         var passes = DrillKind.upAndDown.makeDrill(DrillSetup(fretboard: Fretboard(tuning: .standard), seed: 1))
         let passRun = log.run()
         passes.handle(.start(at: .zero))
@@ -403,17 +405,18 @@ enum LogCheck {
 
         defaults.set(76, forKey: MetronomeSettings.Key.tempo(of: .upAndDown))
         defaults.set(1, forKey: MetronomeSettings.Key.notClean(of: .upAndDown))
-        var other = DrillKind.upAndDown.makeDrill(DrillSetup(fretboard: Fretboard(tuning: .standard), seed: 1))
-        let run = log.run()
-        other.handle(.start(at: .zero))
-        // Six clean passes reach the last level, which shows only the roots.
+        // Six runs of a clean pass each reach the last level, which shows only the roots.
         for _ in 0..<6 {
+            var setup = DrillSetup(fretboard: Fretboard(tuning: .standard), seed: 1)
+            setup.fadeLevels = log.fadeLevels(in: setup.passPositions.map(\.id), on: [])
+            var other = DrillKind.upAndDown.makeDrill(setup)
+            let run = log.run()
+            other.handle(.start(at: .zero))
             for _ in 0..<(other.display?.pass?.notes.count ?? 0) {
                 guard let target = other.prompt?.target, let start = other.promptStart else { break }
                 other.handle(.played(other.fretboard.pitch(at: target), onset: start, at: start))
                 run.update(from: other)
             }
-            if let end = other.passEnd { other.handle(.tick(at: end)) }
         }
 
         drill.resume()
@@ -427,6 +430,45 @@ enum LogCheck {
             throw LogCheckError.freePractice("resumed at the old fade level")
         }
         drill.stop()
+    }
+
+    /// A run's attempts share a run id, and its fade levels move one level at most: two clean passes in one run of
+    /// Up and down take it to level 1, and the next run's to 2, while that run, still going, is played at 1. In memory.
+    private static func checkFadeRuns() throws {
+        func require(_ condition: Bool, _ what: String) throws {
+            if !condition { throw LogCheckError.freePractice("fade runs: " + what) }
+        }
+        let log = AttemptLog.inMemory()
+        let setup = DrillSetup(fretboard: Fretboard(tuning: .standard), seed: 1)
+        let positions = setup.passPositions.map(\.id)
+        guard let position = setup.passPositions.first else { throw LogCheckError.freePractice("fade runs: no position") }
+        let subject = FadeLevels.Subject(tuning: .standard, scaleKind: position.scale.kind, position: position.id)
+        func run(passes: Int) -> RunLog {
+            var runSetup = setup
+            runSetup.fadeLevels = log.fadeLevels(in: positions, on: [])
+            var drill = DrillKind.upAndDown.makeDrill(runSetup)
+            let run = log.run()
+            drill.handle(.start(at: .zero))
+            for _ in 0..<passes {
+                for _ in 0..<(drill.display?.pass?.notes.count ?? 0) {
+                    guard let target = drill.prompt?.target, let start = drill.promptStart else { break }
+                    drill.handle(.played(drill.fretboard.pitch(at: target), onset: start, at: start))
+                    run.update(from: drill)
+                }
+                if let end = drill.passEnd { drill.handle(.tick(at: end)) }
+            }
+            return run
+        }
+        let first = run(passes: 2)
+        let attempts = try log.context.fetch(FetchDescriptor<LoggedAttempt>())
+        try require(Set(attempts.compactMap(\.groupID)).count == 2, "two passes")
+        try require(attempts.allSatisfy { $0.runID == first.runID }, "one run id")
+        try require(log.fadeLevels(in: positions, on: []).level(of: subject) == FadeLevel(1), "one level a run")
+        let second = run(passes: 1)
+        try require(log.fadeLevels(in: positions, on: []).level(of: subject) == FadeLevel(2), "the next run")
+        let going = log.fadeLevels(in: positions, on: [], current: second.runID)
+        try require(going.level(of: subject) == FadeLevel(1) && going.levelAfterRun(of: subject) == FadeLevel(2),
+                    "the run still going")
     }
 
     /// A day's theme through rerolls, a discarded session, a relaunch, a session past midnight, another position

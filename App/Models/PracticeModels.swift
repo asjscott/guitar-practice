@@ -4,18 +4,20 @@ import SwiftData
 import TheoryCore
 
 // The current version's models. `LoggedAttempt` is the saved record; PracticeCore's `Attempt` is the drill's.
-typealias PracticeSession = PracticeSchemaV4.Session
-typealias LoggedAttempt = PracticeSchemaV4.Attempt
-typealias DayTheme = PracticeSchemaV4.DayTheme
+typealias PracticeSession = PracticeSchemaV5.Session
+typealias LoggedAttempt = PracticeSchemaV5.Attempt
+typealias DayTheme = PracticeSchemaV5.DayTheme
 
 enum PracticeMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] {
-        [PracticeSchemaV1.self, PracticeSchemaV2.self, PracticeSchemaV3.self, PracticeSchemaV4.self]
+        [PracticeSchemaV1.self, PracticeSchemaV2.self, PracticeSchemaV3.self, PracticeSchemaV4.self,
+         PracticeSchemaV5.self]
     }
     static var stages: [MigrationStage] {
         [.lightweight(fromVersion: PracticeSchemaV1.self, toVersion: PracticeSchemaV2.self),
          .lightweight(fromVersion: PracticeSchemaV2.self, toVersion: PracticeSchemaV3.self),
-         .lightweight(fromVersion: PracticeSchemaV3.self, toVersion: PracticeSchemaV4.self)]
+         .lightweight(fromVersion: PracticeSchemaV3.self, toVersion: PracticeSchemaV4.self),
+         .lightweight(fromVersion: PracticeSchemaV4.self, toVersion: PracticeSchemaV5.self)]
     }
 }
 
@@ -87,7 +89,7 @@ extension PracticeSession {
 extension LoggedAttempt {
     /// The record of an attempt at a drill, ending now.
     convenience init(_ attempt: Attempt, in drill: any Drill, date: Date, source: AttemptSource, groupID: UUID?,
-                     circleID: UUID? = nil, blockIndex: Int?) {
+                     circleID: UUID? = nil, runID: UUID? = nil, blockIndex: Int?) {
         let fretboard = drill.fretboard
         let location = attempt.prompt.target ?? attempt.location
         self.init(date: date, sourceRaw: source.rawValue, drill: drill.kind.id,
@@ -102,6 +104,7 @@ extension LoggedAttempt {
         groupSize = attempt.group?.size
         groupPlace = attempt.group?.place
         self.circleID = circleID
+        self.runID = runID
         switch attempt.facts {
         case .pass(let facts): setFacts(facts)
         case .triad(let facts): setFacts(facts)

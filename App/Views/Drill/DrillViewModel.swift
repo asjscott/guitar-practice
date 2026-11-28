@@ -181,13 +181,16 @@ final class DrillViewModel: MetronomePanelOwner {
     /// The run's chords so far, and how they went.
     var chordSummary: ChordSummary { ChordSummary(attempts: snapshot.attempts) }
 
-    /// Those reached by now in what the drill goes through, a session's included.
-    private func loggedFadeLevels() -> FadeLevels? {
+    /// Those reached by now in what the drill goes through, a session's included, with the run `current` left going.
+    private func loggedFadeLevels(current: UUID? = nil) -> FadeLevels? {
         guard kind.fades else { return nil }
-        if kind.hasPasses { return log?.fadeLevels(in: setup.passPositions.map(\.id), on: []) }
-        if kind == .scaleCircle { return log?.fadeLevels(in: setup.scaleCirclePositions.map(\.id), on: []) }
+        if kind.hasPasses { return log?.fadeLevels(in: setup.passPositions.map(\.id), on: [], current: current) }
+        if kind == .scaleCircle {
+            return log?.fadeLevels(in: setup.scaleCirclePositions.map(\.id), on: [], current: current)
+        }
         // A progression's voicings can be on any string set.
-        return log?.fadeLevels(in: [], on: kind.module == .progressions ? Set(setup.fretboard.stringSets) : options.stringSets)
+        let stringSets = kind.module == .progressions ? Set(setup.fretboard.stringSets) : options.stringSets
+        return log?.fadeLevels(in: [], on: stringSets, current: current)
     }
 
     /// The metronome panel. The view keeps the run's buttons and keys from acting while it is open.
@@ -294,7 +297,8 @@ final class DrillViewModel: MetronomePanelOwner {
         guard isPaused, inputProblem == nil, prepareSound() else { return }
         pauseNotice = nil
         loadTempo()
-        if let levels = loggedFadeLevels() { send(.fadeLevels(levels)) }
+        // This run's passes and voicings so far are in the log too: it is still going.
+        if let levels = loggedFadeLevels(current: runLog?.runID) { send(.fadeLevels(levels)) }
         send(.resume(at: clockNow()))
         startTicking()
     }
@@ -359,10 +363,17 @@ final class DrillViewModel: MetronomePanelOwner {
     }
 
     private func clockNow() -> Duration {
-        let seconds = AudioInputService.hostTimeNow()
+        let seconds = hostTimeNow()
         now = seconds
         return .seconds(seconds)
     }
+
+    #if DEBUG
+    @ObservationIgnored private var skippedTime = 0.0
+    private func hostTimeNow() -> Double { AudioInputService.hostTimeNow() + skippedTime }
+    #else
+    private func hostTimeNow() -> Double { AudioInputService.hostTimeNow() }
+    #endif
 
     private func send(_ event: DrillEvent) {
         let oldStart = drill.promptStart
@@ -399,11 +410,11 @@ final class DrillViewModel: MetronomePanelOwner {
         guard kind.needsSound, let soundOutput else { return }
         if isNewPrompt {
             soundOutput.stopTones()
-            soundFilter.tonesStopped(at: .seconds(AudioInputService.hostTimeNow()))
+            soundFilter.tonesStopped(at: .seconds(hostTimeNow()))
         }
         for request in requests {
             let sound = AppSound.tones(request.tones)
-            let start = AudioInputService.hostTimeNow()
+            let start = hostTimeNow()
             // A failure reaches the screen as the output's problem, which pauses the run.
             guard let latency = soundOutput.play(sound) else { return }
             soundFilter.started(sound, at: .seconds(start), latency: latency)
@@ -490,6 +501,12 @@ final class DrillViewModel: MetronomePanelOwner {
             send(.tick(at: onset + .milliseconds(500)))
             played += 1
         }
+    }
+
+    /// Moves the drill's clock on, as if that long had passed (see `LogCheck`).
+    func passTimeForSnapshot(_ seconds: Double) {
+        skippedTime += seconds
+        send(.tick(at: clockNow()))
     }
 
     /// Lets the current prompt's time run out now.
